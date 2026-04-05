@@ -1,0 +1,646 @@
+{% extends 'app_admin/base_admin.html' %}
+{% block title %}Historial{% endblock %}
+{% block page_title %}Historial de movimientos{% endblock %}
+{% block nav_historial %}active{% endblock %}
+
+{% block content %}
+
+<style>
+/* ── Animaciones ── */
+@keyframes spin    { to { transform: rotate(360deg); } }
+@keyframes fadeUp  { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+@keyframes pulse   { 0%,100%{ opacity:1; } 50%{ opacity:.45; } }
+
+/* ── Filtros ── */
+.hist-filters {
+  background: var(--ivory);
+  border: 1px solid var(--mist);
+  border-radius: var(--radius);
+  padding: 1rem 1.4rem;
+  margin-bottom: 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: flex-end;
+}
+
+.hist-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+}
+.hist-field label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--stone);
+}
+.hist-field select,
+.hist-field input[type="date"],
+.hist-field input[type="text"] {
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  padding: 0.44rem 0.8rem;
+  border: 1px solid var(--fog);
+  border-radius: 7px;
+  background: var(--ivory);
+  color: var(--ink);
+  transition: border-color 0.15s, box-shadow 0.15s;
+  height: 2.1rem;
+}
+.hist-field select:focus,
+.hist-field input:focus {
+  outline: none;
+  border-color: var(--leaf);
+  box-shadow: 0 0 0 3px rgba(34,197,94,0.10);
+}
+.hist-field.grow { flex: 1; min-width: 180px; }
+.hist-field select { min-width: 130px; }
+.hist-field input[type="date"] { min-width: 130px; }
+
+.filter-actions {
+  display: flex;
+  gap: 0.45rem;
+  align-self: flex-end;
+  margin-left: auto;
+}
+
+/* Separador visual entre grupos */
+.hist-sep {
+  width: 1px;
+  height: 2.1rem;
+  background: var(--mist);
+  align-self: flex-end;
+  flex-shrink: 0;
+}
+
+/* ── Active filter pills ── */
+.filter-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+  min-height: 0;
+  transition: all 0.2s;
+}
+.filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem 0.2rem 0.65rem;
+  background: var(--leaf-tint);
+  color: var(--leaf-dark);
+  border-radius: 99px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid rgba(34,197,94,0.18);
+  animation: fadeUp 0.18s var(--ease) both;
+}
+.filter-pill button {
+  background: none; border: none; cursor: pointer;
+  color: var(--leaf); font-size: 0.62rem;
+  display: flex; align-items: center;
+  padding: 0; line-height: 1;
+  opacity: 0.65;
+  transition: opacity 0.12s;
+}
+.filter-pill button:hover { opacity: 1; }
+
+/* ── Stats row ── */
+.hist-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.85rem;
+  margin-bottom: 1.25rem;
+}
+@media (max-width: 900px) { .hist-stats { grid-template-columns: repeat(2,1fr); } }
+
+.hstat {
+  background: var(--ivory);
+  border: 1px solid var(--mist);
+  border-radius: var(--radius);
+  padding: 0.9rem 1.15rem;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+.hstat:hover { border-color: var(--fog); box-shadow: 0 3px 14px rgba(0,0,0,0.05); }
+.hstat::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  border-radius: 3px 0 0 3px;
+}
+.hstat.entrada::before { background: var(--leaf); }
+.hstat.salida::before  { background: var(--stone); }
+.hstat.ajuste::before  { background: var(--amber); }
+.hstat.merma::before   { background: var(--red); }
+
+.hstat-label {
+  font-size: 0.59rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ash);
+  margin-bottom: 0.45rem;
+}
+.hstat-val {
+  font-family: var(--serif);
+  font-size: 1.7rem;
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  transition: all 0.3s var(--ease);
+}
+.hstat.entrada .hstat-val { color: var(--leaf); }
+.hstat.ajuste  .hstat-val { color: var(--amber); }
+.hstat.merma   .hstat-val { color: var(--red); }
+
+.hstat-icon {
+  position: absolute;
+  right: 1rem; top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.6rem;
+  opacity: 0.07;
+}
+
+/* ── Tabla principal ── */
+.hist-card {
+  background: var(--ivory);
+  border: 1px solid var(--mist);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.hist-card-head {
+  padding: 0.9rem 1.4rem;
+  border-bottom: 1px solid var(--mist);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.hist-card-title {
+  font-family: var(--serif);
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+.hist-count-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.6rem;
+  background: var(--cream);
+  border: 1px solid var(--mist);
+  border-radius: 99px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--stone);
+  letter-spacing: 0.03em;
+  transition: all 0.2s;
+}
+
+/* Loading skeleton */
+.skel-row td { padding: 0.85rem 1.2rem; }
+.skel {
+  height: 0.75rem;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--mist) 25%, var(--cream) 50%, var(--mist) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Row animations */
+.hist-row {
+  animation: fadeUp 0.22s var(--ease) both;
+}
+.hist-row td { border-top: 1px solid var(--mist); vertical-align: middle; padding: 0.82rem 1.2rem; font-size: 0.82rem; }
+.hist-row:hover td { background: var(--cream); }
+
+/* Indicador de tipo en la fila */
+.hist-row td:first-child { padding-left: 0; }
+.mov-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding-left: 1.2rem;
+}
+.mov-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.mov-dot.entrada { background: var(--leaf-bright); }
+.mov-dot.salida  { background: var(--stone); }
+.mov-dot.ajuste  { background: var(--amber); }
+.mov-dot.merma   { background: var(--red); }
+
+/* Cantidad con signo */
+.qty-pos { color: var(--leaf);  font-weight: 700; }
+.qty-neg { color: var(--red);   font-weight: 700; }
+.qty-neu { color: var(--amber); font-weight: 700; }
+
+/* Cat badge inline */
+.cat-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 5px;
+  font-size: 0.63rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.cat-badge.prod { background: var(--sky-pale);   color: var(--sky); }
+.cat-badge.ing  { background: var(--amber-pale); color: var(--amber); }
+
+/* Fecha relativa */
+.fecha-wrap { line-height: 1.35; }
+.fecha-abs  { font-size: 0.77rem; color: var(--stone); }
+.fecha-rel  { font-size: 0.68rem; color: var(--ash); margin-top: 0.06rem; }
+
+/* Empty & error states */
+.hist-state {
+  padding: 4rem 1rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+.hist-state-icon { font-size: 2rem; opacity: 0.25; }
+.hist-state-title { font-size: 0.9rem; font-weight: 600; color: var(--stone); }
+.hist-state-sub   { font-size: 0.78rem; color: var(--ash); max-width: 22rem; line-height: 1.5; }
+
+/* Spinner */
+.spin-icon {
+  animation: spin 0.9s linear infinite;
+  display: inline-block;
+  font-size: 1.3rem;
+  color: var(--leaf);
+  opacity: 0.7;
+}
+
+/* Nota truncada con expand */
+.nota-cell {
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--ash);
+  font-size: 0.79rem;
+  cursor: default;
+}
+.nota-cell[title]:hover { color: var(--stone); }
+
+/* Toolbar acciones */
+.hist-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+</style>
+
+<!-- ─── Filtros ─────────────────────────────────────────────────── -->
+<div class="hist-filters">
+
+  <div class="hist-field">
+    <label>Categoría</label>
+    <select id="f-tipo">
+      <option value="">Todas</option>
+      <option value="producto">Productos</option>
+      <option value="ingrediente">Ingredientes</option>
+    </select>
+  </div>
+
+  <div class="hist-field">
+    <label>Movimiento</label>
+    <select id="f-mov">
+      <option value="">Todos</option>
+      <option value="entrada">Entrada</option>
+      <option value="salida">Salida</option>
+      <option value="ajuste">Ajuste</option>
+      <option value="merma">Merma</option>
+    </select>
+  </div>
+
+  <div class="hist-sep"></div>
+
+  <div class="hist-field">
+    <label>Desde</label>
+    <input type="date" id="f-desde">
+  </div>
+
+  <div class="hist-field">
+    <label>Hasta</label>
+    <input type="date" id="f-hasta">
+  </div>
+
+  <div class="hist-sep"></div>
+
+  <div class="hist-field grow">
+    <label>Buscar</label>
+    <input type="text" id="f-q" placeholder="Nombre del producto o ingrediente…">
+  </div>
+
+  <div class="filter-actions">
+    <button class="btn btn-primary btn-sm" onclick="aplicarFiltros()">
+      <i class="bi bi-search"></i> Filtrar
+    </button>
+    <button class="btn btn-ghost btn-sm" onclick="limpiarFiltros()" title="Limpiar filtros">
+      <i class="bi bi-x-lg"></i>
+    </button>
+  </div>
+
+</div>
+
+<!-- Pills de filtros activos -->
+<div class="filter-pills" id="filter-pills"></div>
+
+<!-- ─── Stats ────────────────────────────────────────────────────── -->
+<div class="hist-stats">
+  <div class="hstat entrada">
+    <div class="hstat-label">Entradas</div>
+    <div class="hstat-val" id="st-entrada">—</div>
+    <i class="bi bi-arrow-down-circle hstat-icon"></i>
+  </div>
+  <div class="hstat salida">
+    <div class="hstat-label">Salidas</div>
+    <div class="hstat-val" id="st-salida">—</div>
+    <i class="bi bi-arrow-up-circle hstat-icon"></i>
+  </div>
+  <div class="hstat ajuste">
+    <div class="hstat-label">Ajustes</div>
+    <div class="hstat-val" id="st-ajuste">—</div>
+    <i class="bi bi-sliders hstat-icon"></i>
+  </div>
+  <div class="hstat merma">
+    <div class="hstat-label">Mermas</div>
+    <div class="hstat-val" id="st-merma">—</div>
+    <i class="bi bi-exclamation-triangle hstat-icon"></i>
+  </div>
+</div>
+
+<!-- ─── Tabla ─────────────────────────────────────────────────────── -->
+<div class="hist-card">
+  <div class="hist-card-head">
+    <span class="hist-card-title">Movimientos</span>
+    <div class="hist-actions">
+      <span class="hist-count-badge" id="conteo" style="display:none;"></span>
+    </div>
+  </div>
+
+  <!-- Estado: cargando -->
+  <div id="estado-carga" style="display:none;">
+    <div class="hist-state">
+      <span class="spin-icon"><i class="bi bi-arrow-repeat"></i></span>
+      <span class="hist-state-title">Cargando movimientos…</span>
+    </div>
+  </div>
+
+  <!-- Estado: vacío -->
+  <div id="estado-vacio" style="display:none;">
+    <div class="hist-state">
+      <i class="bi bi-journal-x hist-state-icon"></i>
+      <span class="hist-state-title">Sin resultados</span>
+      <span class="hist-state-sub">No hay movimientos para los filtros aplicados. Intenta ajustar los criterios de búsqueda.</span>
+    </div>
+  </div>
+
+  <!-- Estado: inicial -->
+  <div id="estado-inicial">
+    <div class="hist-state">
+      <i class="bi bi-clock-history hist-state-icon"></i>
+      <span class="hist-state-title">Historial de movimientos</span>
+      <span class="hist-state-sub">Usa los filtros de arriba para buscar movimientos, o presiona <strong>Filtrar</strong> para ver todos.</span>
+    </div>
+  </div>
+
+  <!-- Estado: error -->
+  <div id="estado-error" style="display:none;">
+    <div class="hist-state">
+      <i class="bi bi-wifi-off hist-state-icon" style="color:var(--red);opacity:.5;"></i>
+      <span class="hist-state-title" style="color:var(--red);">Error al cargar datos</span>
+      <span class="hist-state-sub">No se pudo conectar con el servidor. Verifica tu conexión e intenta nuevamente.</span>
+      <button class="btn btn-ghost btn-sm" onclick="aplicarFiltros()" style="margin-top:0.5rem;">
+        <i class="bi bi-arrow-repeat"></i> Reintentar
+      </button>
+    </div>
+  </div>
+
+  <!-- Tabla real -->
+  <div id="tabla-wrap" style="display:none;overflow-x:auto;">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="padding-left:1.2rem;">Movimiento</th>
+          <th>Categoría</th>
+          <th>Nombre</th>
+          <th style="text-align:right;">Cantidad</th>
+          <th>Proveedor</th>
+          <th>Nota</th>
+          <th>Fecha</th>
+        </tr>
+      </thead>
+      <tbody id="historial-body"></tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const API_URL = "{% url 'app_admin:historial_api' %}";
+
+/* ── Badges de movimiento ── */
+const MOV_CFG = {
+  entrada: { label: 'Entrada', cls: 'badge-ok',       dot: 'entrada', qty: 'qty-pos', sign: '+' },
+  salida:  { label: 'Salida',  cls: 'badge-entregado', dot: 'salida',  qty: 'qty-neg', sign: '−' },
+  ajuste:  { label: 'Ajuste',  cls: 'badge-pendiente', dot: 'ajuste',  qty: 'qty-neu', sign: '±' },
+  merma:   { label: 'Merma',   cls: 'badge-out',       dot: 'merma',   qty: 'qty-neg', sign: '−' },
+};
+
+/* ── Estado interno ── */
+let ultimosFiltros = null;
+
+/* ── Formateo de fecha relativa ── */
+function fechaRelativa(isoStr) {
+  const ahora = new Date();
+  const fecha = new Date(isoStr);
+  const diff  = Math.floor((ahora - fecha) / 1000);
+  if (isNaN(diff)) return '';
+  if (diff < 60)           return 'Hace un momento';
+  if (diff < 3600)         return `Hace ${Math.floor(diff/60)} min`;
+  if (diff < 86400)        return `Hace ${Math.floor(diff/3600)} h`;
+  if (diff < 86400 * 2)    return 'Ayer';
+  if (diff < 86400 * 7)    return `Hace ${Math.floor(diff/86400)} días`;
+  return fecha.toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' });
+}
+
+/* ── Pills de filtros activos ── */
+const PILL_LABELS = {
+  tipo:  { producto: 'Productos', ingrediente: 'Ingredientes' },
+  mov:   { entrada: 'Entrada', salida: 'Salida', ajuste: 'Ajuste', merma: 'Merma' },
+};
+
+function renderPills(p) {
+  const wrap = document.getElementById('filter-pills');
+  wrap.innerHTML = '';
+  const adds = [];
+  if (p.tipo)  adds.push({ key:'tipo',  val:p.tipo,  label: PILL_LABELS.tipo[p.tipo] || p.tipo });
+  if (p.mov)   adds.push({ key:'mov',   val:p.mov,   label: PILL_LABELS.mov[p.mov]   || p.mov  });
+  if (p.desde) adds.push({ key:'desde', val:p.desde, label: `Desde ${p.desde}` });
+  if (p.hasta) adds.push({ key:'hasta', val:p.hasta, label: `Hasta ${p.hasta}` });
+  if (p.q)     adds.push({ key:'q',     val:p.q,     label: `"${p.q}"` });
+
+  adds.forEach(({ key, label }) => {
+    const pill = document.createElement('span');
+    pill.className = 'filter-pill';
+    pill.innerHTML = `${label}<button onclick="quitarFiltro('${key}')" title="Quitar filtro"><i class="bi bi-x"></i></button>`;
+    wrap.appendChild(pill);
+  });
+}
+
+function quitarFiltro(key) {
+  const map = { tipo:'f-tipo', mov:'f-mov', desde:'f-desde', hasta:'f-hasta', q:'f-q' };
+  const el = document.getElementById(map[key]);
+  if (!el) return;
+  el.tagName === 'SELECT' ? (el.selectedIndex = 0) : (el.value = '');
+  aplicarFiltros();
+}
+
+/* ── Stats ── */
+function actualizarStats(filas) {
+  const cnt = { entrada:0, salida:0, ajuste:0, merma:0 };
+  filas.forEach(m => { if (cnt[m.tipo_raw] !== undefined) cnt[m.tipo_raw]++; });
+  ['entrada','salida','ajuste','merma'].forEach(k => {
+    const el = document.getElementById(`st-${k}`);
+    if (el) el.textContent = cnt[k];
+  });
+}
+
+function resetStats() {
+  ['entrada','salida','ajuste','merma'].forEach(k => {
+    const el = document.getElementById(`st-${k}`);
+    if (el) el.textContent = '—';
+  });
+}
+
+/* ── Estados UI ── */
+function mostrarEstado(id) {
+  ['estado-carga','estado-vacio','estado-inicial','estado-error','tabla-wrap']
+    .forEach(s => {
+      const el = document.getElementById(s);
+      if (s === id) {
+        el.style.display = s === 'tabla-wrap' ? 'block' : 'flex';
+      } else {
+        el.style.display = 'none';
+      }
+    });
+}
+
+/* ── Carga principal ── */
+function aplicarFiltros() {
+  const tipo  = document.getElementById('f-tipo').value;
+  const mov   = document.getElementById('f-mov').value;
+  const desde = document.getElementById('f-desde').value;
+  const hasta = document.getElementById('f-hasta').value;
+  const q     = document.getElementById('f-q').value.trim();
+
+  const params = new URLSearchParams({ tipo, mov, desde, hasta, q });
+  ultimosFiltros = { tipo, mov, desde, hasta, q };
+
+  renderPills(ultimosFiltros);
+
+  const conteo = document.getElementById('conteo');
+  conteo.style.display = 'none';
+  mostrarEstado('estado-carga');
+  resetStats();
+
+  fetch(`${API_URL}?${params}`)
+    .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+    .then(data => {
+      const filas = data.data || [];
+      actualizarStats(filas);
+
+      if (!filas.length) {
+        mostrarEstado('estado-vacio');
+        return;
+      }
+
+      mostrarEstado('tabla-wrap');
+      conteo.textContent = `${filas.length} resultado${filas.length !== 1 ? 's' : ''}`;
+      conteo.style.display = 'inline-flex';
+
+      const tbody = document.getElementById('historial-body');
+      tbody.innerHTML = filas.map((m, i) => {
+        const cfg     = MOV_CFG[m.tipo_raw] || { label: m.tipo, cls:'badge-simple', dot:'ajuste', qty:'', sign:'' };
+        const qtyClass = cfg.qty;
+        const signo   = m.tipo_raw === 'entrada' ? '+' : (m.tipo_raw === 'ajuste' ? '±' : '−');
+        const catCls  = m.categoria === 'Producto' ? 'prod' : 'ing';
+        const catLbl  = m.categoria === 'Producto' ? 'Producto' : 'Ingrediente';
+        const delay   = Math.min(i * 18, 300);
+        const notaTip = m.nota ? ` title="${m.nota.replace(/"/g,"&quot;")}"` : '';
+
+        return `
+        <tr class="hist-row" style="animation-delay:${delay}ms;">
+          <td>
+            <div class="mov-indicator">
+              <span class="mov-dot ${cfg.dot}"></span>
+              <span class="badge ${cfg.cls}">${cfg.label}</span>
+            </div>
+          </td>
+          <td><span class="cat-badge ${catCls}">${catLbl}</span></td>
+          <td style="font-weight:600;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${m.nombre}</td>
+          <td style="text-align:right;">
+            <span class="${qtyClass}">${signo}${m.cantidad}</span>
+          </td>
+          <td style="color:var(--stone);font-size:0.8rem;">${m.proveedor || '<span style="color:var(--fog);">—</span>'}</td>
+          <td><span class="nota-cell"${notaTip}>${m.nota || '<span style="color:var(--fog);">—</span>'}</span></td>
+          <td>
+            <div class="fecha-wrap">
+              <div class="fecha-abs">${m.fecha}</div>
+              <div class="fecha-rel" id="fr-${i}"></div>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+
+      /* Fechas relativas */
+      filas.forEach((m, i) => {
+        const el = document.getElementById(`fr-${i}`);
+        if (el && m.fecha_iso) el.textContent = fechaRelativa(m.fecha_iso);
+      });
+    })
+    .catch(() => {
+      mostrarEstado('estado-error');
+    });
+}
+
+/* ── Limpiar ── */
+function limpiarFiltros() {
+  ['f-tipo','f-mov'].forEach(id => { document.getElementById(id).selectedIndex = 0; });
+  ['f-desde','f-hasta','f-q'].forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('filter-pills').innerHTML = '';
+  document.getElementById('conteo').style.display = 'none';
+  resetStats();
+  mostrarEstado('estado-inicial');
+}
+
+/* ── Buscar al presionar Enter en el campo q ── */
+document.getElementById('f-q').addEventListener('keydown', e => {
+  if (e.key === 'Enter') aplicarFiltros();
+});
+
+/* ── Carga inicial ── */
+aplicarFiltros();
+</script>
+{% endblock %}

@@ -1,0 +1,94 @@
+{% extends 'app_admin/base_admin.html' %}
+{% load filtros %}
+{% block title %}{{ perfil.user.username }}{% endblock %}
+{% block page_title %}Usuario: {{ perfil.user.username }}{% endblock %}
+{% block nav_usuarios %}active{% endblock %}
+{% block topbar_actions %}<a href="{% url 'app_admin:usuarios' %}" class="btn btn-ghost"><i class="bi bi-arrow-left"></i> Usuarios</a>{% endblock %}
+
+{% block content %}
+<div style="max-width:52rem;display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;align-items:start;">
+
+  <!-- Info general -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Información general</span>
+      <span class="badge {% if perfil.activo %}badge-activo{% else %}badge-inactivo{% endif %}">
+        {% if perfil.activo %}Activo{% else %}Inactivo{% endif %}
+      </span>
+    </div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:0.7rem;">
+      {% with u=perfil.user %}
+      <div><span style="font-size:0.72rem;color:var(--gray-400);text-transform:uppercase;font-weight:700;">Nombre</span><div style="font-weight:600;">{{ u.get_full_name|default:"—" }}</div></div>
+      <div><span style="font-size:0.72rem;color:var(--gray-400);text-transform:uppercase;font-weight:700;">Usuario</span><div style="font-family:monospace;">{{ u.username }}</div></div>
+      <div><span style="font-size:0.72rem;color:var(--gray-400);text-transform:uppercase;font-weight:700;">Correo</span><div>{{ u.email|default:"—" }}</div></div>
+      <div><span style="font-size:0.72rem;color:var(--gray-400);text-transform:uppercase;font-weight:700;">Teléfono</span><div>{{ perfil.telefono|default:"—" }}</div></div>
+      <div><span style="font-size:0.72rem;color:var(--gray-400);text-transform:uppercase;font-weight:700;">Rol</span><div>{{ perfil.get_rol_display }}</div></div>
+      <div><span style="font-size:0.72rem;color:var(--gray-400);text-transform:uppercase;font-weight:700;">Registro</span><div>{{ perfil.created_at|date:"d/m/Y H:i" }}</div></div>
+      {% endwith %}
+      {% if perfil.rol != 'admin' %}
+      <form method="post" action="{% url 'app_admin:usuario_toggle' perfil.pk %}" style="margin-top:0.5rem;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-full {% if perfil.activo %}btn-danger{% else %}btn-primary{% endif %}">
+          {% if perfil.activo %}Desactivar cuenta{% else %}Activar cuenta{% endif %}
+        </button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Info específica por rol -->
+  {% if perfil.rol == 'estudiante' and estudiante %}
+  <div class="card">
+    <div class="card-head"><span class="card-title">Datos del estudiante</span></div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:0.7rem;">
+      <div><span style="font-size:0.72rem;color:var(--gray-400);text-transform:uppercase;font-weight:700;">Grado</span><div style="font-weight:600;">{{ estudiante.grado }}</div></div>
+      <div><span style="font-size:0.72rem;color:var(--gray-400);text-transform:uppercase;font-weight:700;">Código</span><div style="font-family:monospace;">{{ estudiante.codigo }}</div></div>
+      <div><span style="font-size:0.72rem;color:var(--gray-400);text-transform:uppercase;font-weight:700;">Saldo</span><div style="font-family:var(--serif);font-size:1.3rem;color:var(--green-mid);">${{ estudiante.saldo|miles }}</div></div>
+      {% if estudiante.padre %}
+      <div><span style="font-size:0.72rem;color:var(--gray-400);text-transform:uppercase;font-weight:700;">Padre vinculado</span><div>{{ estudiante.padre.perfil.user.get_full_name }}</div></div>
+      {% endif %}
+    </div>
+  </div>
+  {% if pedidos %}
+  <div class="card" style="grid-column:1/-1;">
+    <div class="card-head"><span class="card-title">Últimos pedidos</span></div>
+    <table class="tbl">
+      <thead><tr><th>Ticket</th><th>Total</th><th>Estado</th><th>Fecha</th></tr></thead>
+      <tbody>
+      {% for p in pedidos %}
+      <tr>
+        <td><span style="font-family:monospace;color:var(--green-mid);font-weight:700;">{{ p.ticket }}</span></td>
+        <td style="font-weight:600;">${{ p.total|miles }}</td>
+        <td><span class="badge badge-{{ p.estado }}">{{ p.get_estado_display }}</span></td>
+        <td style="font-size:0.8rem;color:var(--gray-400);">{{ p.fecha_pedido|date:"d/m/Y H:i" }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% elif perfil.rol == 'padre' and padre %}
+  <div class="card">
+    <div class="card-head"><span class="card-title">Hijos vinculados</span></div>
+    {% if hijos %}
+    <table class="tbl">
+      <thead><tr><th>Nombre</th><th>Grado</th><th>Saldo</th></tr></thead>
+      <tbody>
+      {% for hijo in hijos %}
+      <tr>
+        <td style="font-weight:600;">{{ hijo.perfil.user.get_full_name }}</td>
+        <td>{{ hijo.grado }}</td>
+        <td style="color:var(--green-mid);font-weight:600;">${{ hijo.saldo|miles }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state"><i class="bi bi-person-plus" style="font-size:2.5rem;color:var(--gray-200);display:block;margin-bottom:0.5rem;"></i><p>Sin hijos vinculados aún.</p></div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

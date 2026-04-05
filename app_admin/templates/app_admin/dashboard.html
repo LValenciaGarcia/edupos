@@ -1,0 +1,176 @@
+{% extends 'app_admin/base_admin.html' %}
+{% load filtros %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+
+{% block topbar_actions %}
+  <span style="font-size:0.8rem;color:var(--gray-500);">{{ fecha_hoy|date:"l d \d\e F, Y" }}</span>
+{% endblock %}
+
+{% block content %}
+<!-- Stats -->
+<div class="stats-row">
+  <div class="stat-card green">
+    <div class="stat-label">Ventas hoy</div>
+    <div class="stat-val">${{ ventas_hoy|miles }}</div>
+    <div class="stat-sub">{{ total_pedidos }} pedido{{ total_pedidos|pluralize }}</div>
+  </div>
+  <div class="stat-card green">
+    <div class="stat-label">Ganancia hoy</div>
+    <div class="stat-val">${{ ganancia_hoy|miles }}</div>
+    <div class="stat-sub">Ingreso − costo</div>
+  </div>
+  <div class="stat-card amber">
+    <div class="stat-label">Pendientes</div>
+    <div class="stat-val">{{ pendientes }}</div>
+    <div class="stat-sub">En cola o preparando</div>
+  </div>
+  <div class="stat-card blue">
+    <div class="stat-label">Entregados hoy</div>
+    <div class="stat-val">{{ entregados }}</div>
+    <div class="stat-sub">Pedidos completados</div>
+  </div>
+  <div class="stat-card {% if alertas.stock_prod or alertas.stock_ing %}red{% endif %}">
+    <div class="stat-label">Stock crítico</div>
+    <div class="stat-val">{{ alertas.stock_prod|add:alertas.stock_ing }}</div>
+    <div class="stat-sub">Productos e ingredientes</div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.2rem;">
+
+  <!-- Gráfica ventas -->
+  <div class="card">
+    <div class="card-head"><span class="card-title">Ventas — últimos 7 días</span></div>
+    <div class="card-body"><div class="chart-wrap"><canvas id="chartVentas"></canvas></div></div>
+  </div>
+
+  <!-- Stock crítico unificado -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Stock crítico</span>
+      <div style="display:flex;gap:.5rem;">
+        <a href="{% url 'app_admin:inventario' %}" class="btn btn-ghost btn-sm">
+          <i class="bi bi-box-seam"></i>
+        </a>
+        <a href="{% url 'app_admin:ingredientes' %}" class="btn btn-ghost btn-sm">
+          <i class="bi bi-basket"></i>
+        </a>
+      </div>
+    </div>
+
+    {% if prods_criticos or ings_criticos %}
+    <table class="tbl">
+      <thead>
+        <tr><th>Tipo</th><th>Nombre</th><th>Stock</th><th>Proveedor</th><th></th></tr>
+      </thead>
+      <tbody>
+      {% for p in prods_criticos %}
+      <tr>
+        <td><span class="badge badge-simple" style="font-size:.65rem;">Producto</span></td>
+        <td style="font-weight:600;font-size:.85rem;">{{ p.nombre }}</td>
+        <td>
+          {% if p.stock == 0 %}<span class="stock-out">Sin stock</span>
+          {% else %}<span class="stock-low">{{ p.stock }} uds.</span>{% endif %}
+        </td>
+        <td style="font-size:.78rem;color:var(--gray-500);">{{ p.proveedor|default:"—" }}</td>
+        <td>
+          {% if p.proveedor %}
+          <a href="{% url 'app_admin:entrada_stock_producto' p.pk %}"
+             class="btn btn-ghost btn-xs" title="Registrar entrada / reabastecer">
+            <i class="bi bi-plus-circle"></i>
+          </a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      {% for i in ings_criticos %}
+      <tr>
+        <td><span class="badge badge-elaborado" style="font-size:.65rem;">Ingrediente</span></td>
+        <td style="font-weight:600;font-size:.85rem;">{{ i.nombre }}</td>
+        <td>
+          {% if i.sin_stock %}<span class="stock-out">Sin stock</span>
+          {% else %}<span class="stock-low">{{ i.stock }} {{ i.unidad }}</span>{% endif %}
+        </td>
+        <td style="font-size:.78rem;color:var(--gray-500);">{{ i.proveedor|default:"—" }}</td>
+        <td>
+          <a href="{% url 'app_admin:entrada_stock' %}"
+             class="btn btn-ghost btn-xs" title="Registrar entrada">
+            <i class="bi bi-plus-circle"></i>
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+      <i class="bi bi-check-circle" style="font-size:2.5rem;color:var(--green-light);display:block;margin-bottom:.5rem;"></i>
+      <p>Todo el stock en niveles normales</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Últimos pedidos -->
+<div class="card">
+  <div class="card-head">
+    <span class="card-title">Últimos pedidos</span>
+    <a href="{% url 'app_admin:pedidos' %}" class="btn btn-ghost btn-sm">Ver todos</a>
+  </div>
+  {% if ultimos_pedidos %}
+  <table class="tbl">
+    <thead>
+      <tr><th>Ticket</th><th>Estudiante</th><th>Total</th><th>Ganancia</th><th>Estado</th><th>Hora</th></tr>
+    </thead>
+    <tbody>
+    {% for p in ultimos_pedidos %}
+    <tr>
+      <td><span style="font-family:monospace;font-size:.8rem;color:var(--green-mid);font-weight:700;">{{ p.ticket }}</span></td>
+      <td style="font-weight:600;">{{ p.estudiante.perfil.user.get_full_name|default:p.estudiante.perfil.user.username }}</td>
+      <td style="font-weight:700;">${{ p.total|miles }}</td>
+      <td style="color:var(--green-mid);font-weight:600;">${{ p.ganancia|miles }}</td>
+      <td><span class="badge badge-{{ p.estado }}">{{ p.get_estado_display }}</span></td>
+      <td style="color:var(--gray-400);font-size:.8rem;">{{ p.fecha_pedido|time:"H:i" }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-receipt" style="font-size:2.5rem;color:var(--gray-200);display:block;margin-bottom:.5rem;"></i>
+    <p>Sin pedidos hoy aún</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function cargarGraficaVentas() {
+  const r = await fetch("{% url 'app_admin:api_ventas' %}?dias=7");
+  const d = await r.json();
+  new Chart(document.getElementById('chartVentas'), {
+    type: 'bar',
+    data: {
+      labels: d.labels,
+      datasets: [
+        { label: 'Ingresos', data: d.ingresos, backgroundColor: 'rgba(45,106,79,0.15)', borderColor: '#2d6a4f', borderWidth: 2, borderRadius: 6 },
+        { label: 'Ganancia', data: d.ganancia, backgroundColor: 'rgba(64,192,116,0.25)', borderColor: '#40c074', borderWidth: 2, borderRadius: 6 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { font: { family: 'DM Sans', size: 11 } } } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' },
+             ticks: { callback: v => '$' + v.toLocaleString('es-CO') } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+}
+cargarGraficaVentas();
+</script>
+{% endblock %}

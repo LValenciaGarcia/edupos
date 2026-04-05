@@ -1,0 +1,229 @@
+{% extends 'app_padre/base_padre.html' %}
+{% load filtros %}
+{% block title %}Inicio{% endblock %}
+{% block page_title %}Inicio{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── Bienvenida ─────────────────────────────────────────────────────────── */
+  .welcome-bar {
+    background: var(--ink);
+    border-radius: 12px;
+    padding: 1.6rem 2rem;
+    margin-bottom: 1.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .welcome-bar::before {
+    content: '';
+    position: absolute;
+    right: -3rem; top: -3rem;
+    width: 12rem; height: 12rem;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(34,197,94,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .welcome-greeting {
+    font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--leaf-bright); margin-bottom: 0.35rem;
+  }
+  .welcome-name {
+    font-family: var(--serif); font-size: 1.7rem; font-weight: 500;
+    color: #fff; line-height: 1.15; letter-spacing: 0.01em;
+  }
+  .welcome-sub { font-size: 0.78rem; color: rgba(255,255,255,0.4); margin-top: 0.3rem; }
+  .welcome-actions { display: flex; gap: 0.6rem; flex-shrink: 0; }
+  .btn-white { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.12); }
+  .btn-white:hover { background: rgba(255,255,255,0.16); border-color: rgba(255,255,255,0.2); }
+
+  /* ── KPI strip ─────────────────────────────────────────────────────────── */
+  .kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 0.85rem;
+    margin-bottom: 1.4rem;
+  }
+  .kpi-card {
+    background: var(--ivory); border: 1px solid var(--mist); border-radius: 10px;
+    padding: 1.1rem 1.3rem; display: flex; flex-direction: column; gap: 0.3rem;
+    position: relative; overflow: hidden;
+    transition: box-shadow 0.18s, border-color 0.18s;
+  }
+  .kpi-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.06); border-color: var(--fog); }
+  .kpi-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; border-radius: 99px 0 0 99px; }
+  .kpi-card.green::before { background: var(--leaf); }
+  .kpi-card.amber::before { background: var(--amber); }
+  .kpi-card.sky::before   { background: var(--sky); }
+  .kpi-card.violet::before{ background: var(--violet); }
+  .kpi-label { font-size: 0.59rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ash); }
+  .kpi-val   { font-family: var(--serif); font-size: 1.9rem; line-height: 1; }
+  .kpi-card.green .kpi-val  { color: var(--leaf); }
+  .kpi-card.amber .kpi-val  { color: var(--amber); }
+  .kpi-card.sky   .kpi-val  { color: var(--sky); }
+  .kpi-card.violet .kpi-val { color: var(--violet); }
+  .kpi-sub { font-size: 0.68rem; color: var(--ash); }
+
+  /* ── Grid layout ──────────────────────────────────────────────────────── */
+  .dash-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.2rem;
+  }
+  @media (max-width: 900px) { .dash-grid { grid-template-columns: 1fr; } }
+
+  /* ── Hijos cards ─────────────────────────────────────────────────────── */
+  .hijo-row {
+    display: flex; align-items: center; gap: 1rem;
+    padding: 1rem 1.5rem; border-bottom: 1px solid var(--mist);
+    transition: background 0.12s;
+  }
+  .hijo-row:last-child { border-bottom: none; }
+  .hijo-row:hover { background: var(--cream); }
+  .hijo-avatar {
+    width: 2.4rem; height: 2.4rem; border-radius: 50%; flex-shrink: 0;
+    background: var(--leaf-tint); border: 1px solid var(--leaf-pale);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--serif); font-size: 1rem; color: var(--leaf-dark); font-weight: 500;
+  }
+  .hijo-info { flex: 1; min-width: 0; }
+  .hijo-nombre { font-size: 0.86rem; font-weight: 600; }
+  .hijo-meta { font-size: 0.71rem; color: var(--ash); margin-top: 0.1rem; }
+  .hijo-saldo { text-align: right; flex-shrink: 0; }
+  .hijo-saldo-val { font-family: var(--serif); font-size: 1.15rem; color: var(--leaf); font-weight: 500; }
+  .hijo-saldo-lbl { font-size: 0.6rem; color: var(--ash); letter-spacing: 0.06em; text-transform: uppercase; }
+
+  /* ── Pedidos recientes ───────────────────────────────────────────────── */
+  .pedido-row {
+    display: flex; align-items: center; gap: 0.85rem;
+    padding: 0.85rem 1.5rem; border-bottom: 1px solid var(--mist);
+    transition: background 0.12s;
+  }
+  .pedido-row:last-child { border-bottom: none; }
+  .pedido-row:hover { background: var(--cream); }
+  .pedido-ticket { font-size: 0.68rem; font-weight: 700; color: var(--leaf); letter-spacing: 0.05em; font-family: monospace; }
+  .pedido-info { flex: 1; min-width: 0; }
+  .pedido-estudiante { font-size: 0.82rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pedido-fecha { font-size: 0.69rem; color: var(--ash); margin-top: 0.07rem; }
+  .pedido-total { font-size: 0.86rem; font-weight: 700; text-align: right; flex-shrink: 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Bienvenida -->
+<div class="welcome-bar">
+  <div>
+    <div class="welcome-greeting">Bienvenido de nuevo</div>
+    <div class="welcome-name">{{ request.user.get_full_name|default:request.user.username }}</div>
+    <div class="welcome-sub">Panel de padre de familia — Punto Asis</div>
+  </div>
+  <div class="welcome-actions">
+    <a href="{% url 'app_padre:menu' %}" class="btn btn-white btn-sm">
+      <i class="bi bi-shop"></i> <span>Ver menú</span>
+    </a>
+    <a href="{% url 'app_padre:crear_estudiante' %}" class="btn btn-primary btn-sm">
+      <i class="bi bi-person-plus"></i> <span>Registrar hijo</span>
+    </a>
+  </div>
+</div>
+
+<!-- KPIs -->
+<div class="kpi-strip">
+  <div class="kpi-card green">
+    <div class="kpi-label">Saldo total hijos</div>
+    <div class="kpi-val">${{ saldo_total|miles }}</div>
+    <div class="kpi-sub">{{ n_hijos }} hijo{{ n_hijos|pluralize:"s" }} vinculado{{ n_hijos|pluralize:"s" }}</div>
+  </div>
+  <div class="kpi-card amber">
+    <div class="kpi-label">Gasto este mes</div>
+    <div class="kpi-val">${{ gasto_mes|miles }}</div>
+    <div class="kpi-sub">Pedidos entregados</div>
+  </div>
+  <div class="kpi-card sky">
+    <div class="kpi-label">Pedidos recientes</div>
+    <div class="kpi-val">{{ pedidos_recientes.count }}</div>
+    <div class="kpi-sub">Últimos registros</div>
+  </div>
+  <div class="kpi-card violet">
+    <div class="kpi-label">Hijos activos</div>
+    <div class="kpi-val">{{ n_hijos }}</div>
+    <div class="kpi-sub">Estudiantes vinculados</div>
+  </div>
+</div>
+
+<!-- Grid doble -->
+<div class="dash-grid">
+
+  <!-- Saldos de hijos -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Saldos</span>
+      <a href="{% url 'app_padre:hijos' %}" class="btn btn-ghost btn-sm">
+        <i class="bi bi-arrow-right"></i> Ver todos
+      </a>
+    </div>
+    {% if hijos %}
+      {% for hijo in hijos %}
+      <div class="hijo-row">
+        <div class="hijo-avatar">{{ hijo.perfil.user.first_name|slice:":1"|upper }}</div>
+        <div class="hijo-info">
+          <div class="hijo-nombre">{{ hijo.perfil.user.get_full_name|default:hijo.perfil.user.username }}</div>
+          <div class="hijo-meta">Grado {{ hijo.grado }} · {{ hijo.codigo }}</div>
+        </div>
+        <div class="hijo-saldo">
+          <div class="hijo-saldo-val">${{ hijo.saldo|miles }}</div>
+          <div class="hijo-saldo-lbl">saldo</div>
+        </div>
+        <a href="{% url 'app_padre:recargar_saldo' hijo.pk %}" class="btn btn-primary btn-xs" title="Recargar saldo">
+          <i class="bi bi-plus-lg"></i>
+        </a>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">
+        <i class="bi bi-people es-icon"></i>
+        <p>Aún no tienes hijos registrados.</p>
+        <a href="{% url 'app_padre:crear_estudiante' %}" class="btn btn-primary btn-sm" style="margin-top:1rem;">
+          <i class="bi bi-person-plus"></i> Registrar ahora
+        </a>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Pedidos recientes -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Pedidos recientes</span>
+      <a href="{% url 'app_padre:historial' %}" class="btn btn-ghost btn-sm">
+        <i class="bi bi-arrow-right"></i> Historial
+      </a>
+    </div>
+    {% if pedidos_recientes %}
+      {% for pedido in pedidos_recientes %}
+      <div class="pedido-row">
+        <div>
+          <div class="pedido-ticket">{{ pedido.ticket }}</div>
+          <span class="badge badge-{{ pedido.estado }}">{{ pedido.get_estado_display }}</span>
+        </div>
+        <div class="pedido-info">
+          <div class="pedido-estudiante">{{ pedido.estudiante.perfil.user.get_full_name|default:pedido.estudiante.perfil.user.username }}</div>
+          <div class="pedido-fecha">{{ pedido.fecha_pedido|date:"d M, H:i" }}</div>
+        </div>
+        <div class="pedido-total">${{ pedido.total|miles }}</div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">
+        <i class="bi bi-receipt es-icon"></i>
+        <p>No hay pedidos registrados aún.</p>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

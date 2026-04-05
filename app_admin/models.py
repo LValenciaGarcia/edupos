@@ -1,0 +1,423 @@
+from django.db import models
+from django.utils import timezone
+from authentication.models import Estudiante
+import datetime
+
+
+# ─── PROVEEDOR ────────────────────────────────────────────────────────────────
+
+class Proveedor(models.Model):
+    nombre     = models.CharField(max_length=100)
+    nit        = models.CharField(max_length=20, blank=True, verbose_name='NIT')
+    contacto   = models.CharField(max_length=100, blank=True)
+    telefono   = models.CharField(max_length=20, blank=True)
+    email      = models.EmailField(blank=True)
+    direccion  = models.TextField(blank=True)
+    logo       = models.ImageField(upload_to='proveedores/', blank=True, null=True)
+    activo     = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def total_compras(self):
+        return self.compras.aggregate(total=models.Sum('total'))['total'] or 0
+
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        verbose_name = 'Proveedor'
+        verbose_name_plural = 'Proveedores'
+        ordering = ['nombre']
+
+
+# ─── CATEGORÍA ────────────────────────────────────────────────────────────────
+
+class Categoria(models.Model):
+    NOMBRE_CHOICES = [
+        ('desayuno', 'Desayuno'),
+        ('almuerzo', 'Almuerzo'),
+        ('snacks',   'Snacks / Mecato'),
+        ('bebidas',  'Bebidas'),
+    ]
+    nombre      = models.CharField(max_length=30, choices=NOMBRE_CHOICES, unique=True)
+    descripcion = models.TextField(blank=True)
+    icono       = models.CharField(max_length=10, blank=True, default='')
+    activa      = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.get_nombre_display()
+
+    class Meta:
+        verbose_name = 'Categoría'
+        verbose_name_plural = 'Categorías'
+
+
+# ─── INGREDIENTE ──────────────────────────────────────────────────────────────
+
+class Ingrediente(models.Model):
+    UNIDAD_CHOICES = [
+        ('g',        'Gramos (g)'),
+        ('kg',       'Kilogramos (kg)'),
+        ('ml',       'Mililitros (ml)'),
+        ('l',        'Litros (l)'),
+        ('und',      'Unidades'),
+        ('porciones','Porciones'),
+    ]
+
+    nombre            = models.CharField(max_length=100)
+    imagen            = models.ImageField(upload_to='ingredientes/', blank=True, null=True)
+    unidad            = models.CharField(max_length=10, choices=UNIDAD_CHOICES, default='g')
+    precio_unitario   = models.DecimalField(
+        max_digits=10, decimal_places=4,
+        help_text='Precio por unidad de medida (ej: precio por gramo)'
+    )
+    stock             = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    stock_minimo      = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    fecha_vencimiento = models.DateField(null=True, blank=True)
+    proveedor         = models.ForeignKey(
+        Proveedor, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='ingredientes'
+    )
+    activo            = models.BooleanField(default=True)
+    created_at        = models.DateTimeField(auto_now_add=True)
+    updated_at        = models.DateTimeField(auto_now=True)
+
+    @property
+    def stock_bajo(self):
+        return float(self.stock) <= float(self.stock_minimo)
+
+    @property
+    def sin_stock(self):
+        return float(self.stock) <= 0
+
+    @property
+    def vence_pronto(self):
+        if not self.fecha_vencimiento:
+            return False
+        return self.fecha_vencimiento <= (datetime.date.today() + datetime.timedelta(days=7))
+
+    @property
+    def vencido(self):
+        if not self.fecha_vencimiento:
+            return False
+        return self.fecha_vencimiento < datetime.date.today()
+
+    @property
+    def dias_restantes(self):
+        hace_30 = timezone.now() - datetime.timedelta(days=30)
+        consumido = MovimientoIngrediente.objects.filter(
+            ingrediente=self, tipo='salida', fecha__gte=hace_30
+        ).aggregate(total=models.Sum('cantidad'))['total'] or 0
+        if consumido == 0:
+            return None
+        consumo_diario = float(consumido) / 30
+        return round(float(self.stock) / consumo_diario) if consumo_diario > 0 else None
+
+    def __str__(self):
+        return f'{self.nombre} ({self.get_unidad_display()})'
+
+    class Meta:
+        verbose_name = 'Ingrediente'
+        verbose_name_plural = 'Ingredientes'
+        ordering = ['nombre']
+
+
+# ─── MOVIMIENTO DE INGREDIENTE ────────────────────────────────────────────────
+
+class MovimientoIngrediente(models.Model):
+    TIPO_CHOICES = [
+        ('entrada', 'Entrada'),
+        ('salida',  'Salida (uso en receta)'),
+        ('ajuste',  'Ajuste manual'),
+        ('merma',   'Merma / Pérdida'),
+    ]
+    ingrediente = models.ForeignKey(Ingrediente, on_delete=models.CASCADE, related_name='movimientos')
+    tipo        = models.CharField(max_length=10, choices=TIPO_CHOICES)
+    cantidad    = models.DecimalField(max_digits=10, decimal_places=2)
+    nota        = models.CharField(max_length=200, blank=True)
+    compra      = models.ForeignKey(
+        'CompraProveedor', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='movimientos_ingrediente'
+    )
+    fecha       = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.get_tipo_display()} {self.cantidad} {self.ingrediente.unidad} — {self.ingrediente.nombre}'
+
+    class Meta:
+        verbose_name = 'Movimiento de Ingrediente'
+        verbose_name_plural = 'Movimientos de Ingredientes'
+        ordering = ['-fecha']
+
+
+# ─── PRODUCTO ─────────────────────────────────────────────────────────────────
+
+class Producto(models.Model):
+    TIPO_CHOICES = [
+        ('simple',    'Simple (comprado a proveedor)'),
+        ('elaborado', 'Elaborado (hecho en tienda)'),
+    ]
+
+    tipo         = models.CharField(max_length=10, choices=TIPO_CHOICES, default='simple')
+    categoria    = models.ForeignKey(Categoria, on_delete=models.PROTECT, related_name='productos')
+    nombre       = models.CharField(max_length=100)
+    descripcion  = models.TextField(blank=True)
+    precio_venta = models.DecimalField(max_digits=10, decimal_places=2)
+    precio_costo = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    proveedor    = models.ForeignKey(
+        Proveedor, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='productos'
+    )
+    stock        = models.PositiveIntegerField(default=0)
+    stock_minimo = models.PositiveIntegerField(default=5)
+    imagen       = models.ImageField(upload_to='productos/', blank=True, null=True)
+    disponible   = models.BooleanField(default=True)
+    created_at   = models.DateTimeField(auto_now_add=True)
+    updated_at   = models.DateTimeField(auto_now=True)
+
+    @property
+    def costo_calculado(self):
+        if self.tipo == 'simple':
+            return self.precio_costo or 0
+        total = sum(r.cantidad * r.ingrediente.precio_unitario for r in self.receta.all())
+        return round(total, 2)
+
+    @property
+    def ganancia(self):
+        return round(float(self.precio_venta) - float(self.costo_calculado), 2)
+
+    @property
+    def margen(self):
+        if float(self.precio_venta) == 0:
+            return 0
+        return round((self.ganancia / float(self.precio_venta)) * 100, 1)
+
+    @property
+    def stock_bajo(self):
+        return self.tipo == 'simple' and self.stock <= self.stock_minimo
+
+    @property
+    def sin_stock(self):
+        if self.tipo == 'simple':
+            return self.stock <= 0
+        for r in self.receta.all():
+            if r.ingrediente.stock < r.cantidad:
+                return True
+        return False
+
+    @property
+    def dias_restantes(self):
+        if self.tipo != 'simple':
+            return None
+        hace_30 = timezone.now() - datetime.timedelta(days=30)
+        vendidos = DetallePedido.objects.filter(
+            producto=self, pedido__fecha_pedido__gte=hace_30, pedido__estado='entregado'
+        ).aggregate(total=models.Sum('cantidad'))['total'] or 0
+        if vendidos == 0:
+            return None
+        consumo_diario = float(vendidos) / 30
+        return round(self.stock / consumo_diario) if consumo_diario > 0 else None
+
+    def esta_disponible(self):
+        return self.disponible and not self.sin_stock
+
+    def __str__(self):
+        return f'{self.nombre} [{self.get_tipo_display()}]'
+
+    class Meta:
+        verbose_name = 'Producto'
+        verbose_name_plural = 'Productos'
+        ordering = ['categoria', 'nombre']
+
+
+# ─── RECETA ───────────────────────────────────────────────────────────────────
+
+class RecetaIngrediente(models.Model):
+    producto    = models.ForeignKey(Producto, on_delete=models.CASCADE, related_name='receta')
+    ingrediente = models.ForeignKey(Ingrediente, on_delete=models.PROTECT, related_name='en_recetas')
+    cantidad    = models.DecimalField(max_digits=10, decimal_places=2)
+
+    @property
+    def costo_linea(self):
+        return round(float(self.cantidad) * float(self.ingrediente.precio_unitario), 4)
+
+    def __str__(self):
+        return f'{self.cantidad} {self.ingrediente.unidad} de {self.ingrediente.nombre} → {self.producto.nombre}'
+
+    class Meta:
+        verbose_name = 'Ingrediente de Receta'
+        verbose_name_plural = 'Ingredientes de Receta'
+        unique_together = ['producto', 'ingrediente']
+
+
+# ─── MOVIMIENTO DE INVENTARIO ─────────────────────────────────────────────────
+
+class MovimientoInventario(models.Model):
+    TIPO_CHOICES = [
+        ('entrada', 'Entrada de stock'),
+        ('salida',  'Salida (venta)'),
+        ('ajuste',  'Ajuste manual'),
+        ('merma',   'Merma / Pérdida'),
+    ]
+    producto  = models.ForeignKey(Producto, on_delete=models.CASCADE, related_name='movimientos')
+    tipo      = models.CharField(max_length=10, choices=TIPO_CHOICES)
+    cantidad  = models.DecimalField(max_digits=10, decimal_places=2)
+    nota      = models.CharField(max_length=200, blank=True)
+    compra    = models.ForeignKey(
+        'CompraProveedor', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='movimientos_producto'
+    )
+    fecha     = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.get_tipo_display()} {self.cantidad}u — {self.producto.nombre}'
+
+    class Meta:
+        verbose_name = 'Movimiento de Inventario'
+        verbose_name_plural = 'Movimientos de Inventario'
+        ordering = ['-fecha']
+
+
+# ─── COMPRA A PROVEEDOR ───────────────────────────────────────────────────────
+
+class CompraProveedor(models.Model):
+    proveedor  = models.ForeignKey(Proveedor, on_delete=models.PROTECT, related_name='compras')
+    fecha      = models.DateField(default=timezone.now)
+    total      = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    nota       = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def recalcular_total(self):
+        self.total = sum(d.subtotal for d in self.detalles.all())
+        self.save(update_fields=['total'])
+
+    def __str__(self):
+        return f'Compra #{self.pk} — {self.proveedor} ({self.fecha})'
+
+    class Meta:
+        verbose_name = 'Compra a Proveedor'
+        verbose_name_plural = 'Compras a Proveedores'
+        ordering = ['-fecha']
+
+
+class DetalleCompra(models.Model):
+    compra          = models.ForeignKey(CompraProveedor, on_delete=models.CASCADE, related_name='detalles')
+    producto        = models.ForeignKey(Producto, on_delete=models.PROTECT, null=True, blank=True, related_name='compras')
+    ingrediente     = models.ForeignKey(Ingrediente, on_delete=models.PROTECT, null=True, blank=True, related_name='compras')
+    cantidad        = models.DecimalField(max_digits=10, decimal_places=2)
+    precio_unitario = models.DecimalField(max_digits=10, decimal_places=4)
+
+    @property
+    def subtotal(self):
+        return round(float(self.cantidad) * float(self.precio_unitario), 2)
+
+    def __str__(self):
+        return f'{self.cantidad} × {self.producto or self.ingrediente}'
+
+    class Meta:
+        verbose_name = 'Detalle de Compra'
+        verbose_name_plural = 'Detalles de Compra'
+
+
+# ─── PEDIDO ───────────────────────────────────────────────────────────────────
+
+class Pedido(models.Model):
+    ESTADO_CHOICES = [
+        ('pendiente',  'Pendiente'),
+        ('preparando', 'En preparación'),
+        ('listo',      'Listo para recoger'),
+        ('entregado',  'Entregado'),
+        ('cancelado',  'Cancelado'),
+    ]
+
+    ticket        = models.CharField(max_length=20, unique=True, editable=False)
+    estudiante    = models.ForeignKey(Estudiante, on_delete=models.PROTECT, related_name='pedidos')
+    estado        = models.CharField(max_length=15, choices=ESTADO_CHOICES, default='pendiente')
+    total         = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    costo_total   = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    nota          = models.TextField(blank=True)
+    fecha_pedido  = models.DateTimeField(default=timezone.now)
+    fecha_entrega = models.DateTimeField(null=True, blank=True)
+    created_at    = models.DateTimeField(auto_now_add=True)
+    updated_at    = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if not self.ticket:
+            año = timezone.now().year
+            ultimo = Pedido.objects.filter(ticket__startswith=f'PA-{año}-').order_by('-ticket').first()
+            num = (int(ultimo.ticket.split('-')[-1]) + 1) if ultimo else 1
+            self.ticket = f'PA-{año}-{num:05d}'
+        super().save(*args, **kwargs)
+
+    def recalcular_totales(self):
+        self.total       = sum(d.subtotal for d in self.detalles.all())
+        self.costo_total = sum(d.costo_linea for d in self.detalles.all())
+        self.save(update_fields=['total', 'costo_total'])
+
+    @property
+    def ganancia(self):
+        return round(float(self.total) - float(self.costo_total), 2)
+
+    def __str__(self):
+        return f'{self.ticket} — {self.estudiante} [{self.get_estado_display()}]'
+
+    class Meta:
+        verbose_name = 'Pedido'
+        verbose_name_plural = 'Pedidos'
+        ordering = ['-fecha_pedido']
+
+
+class DetallePedido(models.Model):
+    pedido          = models.ForeignKey(Pedido, on_delete=models.CASCADE, related_name='detalles')
+    producto        = models.ForeignKey(Producto, on_delete=models.PROTECT, related_name='detalles')
+    cantidad        = models.PositiveIntegerField(default=1)
+    precio_unitario = models.DecimalField(max_digits=10, decimal_places=2)
+    costo_unitario  = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    @property
+    def subtotal(self):
+        return round(float(self.cantidad) * float(self.precio_unitario), 2)
+
+    @property
+    def costo_linea(self):
+        return round(float(self.cantidad) * float(self.costo_unitario), 2)
+
+    @property
+    def ganancia_linea(self):
+        return round(self.subtotal - self.costo_linea, 2)
+
+    def save(self, *args, **kwargs):
+        if not self.precio_unitario:
+            self.precio_unitario = self.producto.precio_venta
+        if not self.costo_unitario:
+            self.costo_unitario = self.producto.costo_calculado
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.cantidad}× {self.producto.nombre} en {self.pedido.ticket}'
+
+    class Meta:
+        verbose_name = 'Detalle de Pedido'
+        verbose_name_plural = 'Detalles de Pedido'
+
+
+# ─── PERFIL ADMIN ─────────────────────────────────────────────────────────────
+
+class PerfilAdmin(models.Model):
+    """Datos extendidos del administrador de la cafetería."""
+    perfil           = models.OneToOneField(
+        'authentication.Perfil', on_delete=models.CASCADE,
+        related_name='perfil_admin'
+    )
+    documento        = models.CharField(max_length=20, blank=True, verbose_name='N° Documento (CC)')
+    telefono         = models.CharField(max_length=20, blank=True)
+    direccion        = models.CharField(max_length=200, blank=True)
+    fecha_nacimiento = models.DateField(null=True, blank=True)
+    foto             = models.ImageField(upload_to='perfiles/', blank=True, null=True)
+    cargo            = models.CharField(max_length=100, blank=True, default='Administrador de Cafetería')
+
+    def __str__(self):
+        return f'Perfil Admin — {self.perfil}'
+
+    class Meta:
+        verbose_name = 'Perfil Administrador'
+        verbose_name_plural = 'Perfiles Administrador'

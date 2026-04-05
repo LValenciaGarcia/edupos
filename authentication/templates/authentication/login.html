@@ -1,0 +1,205 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Acceso — Punto Asis · EduPos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --black:       #0a0a0a;
+      --off-black:   #111111;
+      --white:       #f8f8f6;
+      --off-white:   #efefec;
+      --green-dark:  #1a3d2b;
+      --green-mid:   #2d6a4f;
+      --green-vivid: #40c074;
+      --green-pale:  #e8f5ee;
+      --green-light: #b7e4c7;
+      --gray-200:    #e2e2dd;
+      --gray-400:    #b0b0a8;
+      --gray-500:    #8a8a82;
+      --serif: 'DM Serif Display', Georgia, serif;
+      --sans:  'DM Sans', system-ui, sans-serif;
+      --ease:  cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body { font-family: var(--sans); min-height: 100vh; display: grid; grid-template-columns: 46fr 54fr; }
+
+    /* ══ PANEL IZQUIERDO ══ */
+    .left-panel { background: var(--off-black); padding: 3.4rem 4rem 3rem; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; }
+    .left-panel::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--green-vivid), var(--green-mid), transparent); }
+    .left-panel::after  { content: ''; position: absolute; bottom: -120px; left: -80px; width: 440px; height: 440px; background: radial-gradient(circle, rgba(64,192,116,0.07) 0%, transparent 62%); pointer-events: none; }
+    .left-glow { position: absolute; top: -60px; right: -60px; width: 300px; height: 300px; background: radial-gradient(circle, rgba(64,192,116,0.05) 0%, transparent 65%); pointer-events: none; }
+    .left-logo { font-family: var(--serif); font-size: 1.55rem; color: var(--white); text-decoration: none; display: inline-flex; align-items: center; gap: 8px; position: relative; z-index: 1; }
+    .logo-dot  { width: 8px; height: 8px; background: var(--green-vivid); border-radius: 50%; animation: blink 2.5s ease-in-out infinite; }
+    @keyframes blink { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.6); } }
+    .left-content { position: relative; z-index: 1; }
+    .product-chip { display: inline-flex; align-items: center; gap: 7px; background: rgba(64,192,116,0.07); border: 1px solid rgba(64,192,116,0.2); color: var(--green-vivid); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.11em; text-transform: uppercase; padding: 5px 12px; border-radius: 50px; margin-bottom: 1.4rem; }
+    .chip-dot { width: 5px; height: 5px; background: var(--green-vivid); border-radius: 50%; animation: blink 2s infinite; }
+    .left-content h1 { font-family: var(--serif); font-size: clamp(3.2rem, 4.4vw, 4.8rem); color: var(--white); line-height: 1.04; letter-spacing: -0.02em; }
+    .left-content h1 em { font-style: italic; color: var(--green-vivid); }
+    .left-content p { font-weight: 300; color: rgba(255,255,255,0.48); margin-top: 1.4rem; line-height: 1.82; font-size: 1.02rem; }
+    .left-features { margin-top: 2.2rem; display: flex; flex-direction: column; gap: 0.7rem; }
+    .left-feat { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; color: rgba(255,255,255,0.42); }
+    .feat-check { width: 18px; height: 18px; background: rgba(64,192,116,0.08); border: 1px solid rgba(64,192,116,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .feat-check svg { width: 8px; height: 8px; stroke: var(--green-vivid); fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+    .left-footer { font-size: 0.7rem; font-weight: 300; color: rgba(255,255,255,0.14); position: relative; z-index: 1; }
+
+    /* ══ PANEL DERECHO ══ */
+    .right-panel { background: var(--black); display: flex; align-items: center; justify-content: center; padding: 3rem 3.5rem; position: relative; overflow: hidden; }
+    .right-panel::before { content: ''; position: absolute; bottom: -140px; left: -100px; width: 520px; height: 520px; background: radial-gradient(circle, rgba(64,192,116,0.11) 0%, transparent 65%); pointer-events: none; }
+    .right-panel::after  { content: ''; position: absolute; top: -80px; right: -80px; width: 340px; height: 340px; background: radial-gradient(circle, rgba(64,192,116,0.06) 0%, transparent 65%); pointer-events: none; }
+    .right-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px); background-size: 40px 40px; pointer-events: none; }
+
+    /* ══ CARD ══ */
+    .login-card { width: 100%; max-width: 460px; position: relative; z-index: 1; animation: cardIn 0.9s var(--ease) 0.1s both; }
+    @keyframes cardIn { from { opacity: 0; transform: translateY(36px); } to { opacity: 1; transform: translateY(0); } }
+    .card-logo { display: flex; justify-content: center; margin-bottom: 2rem; }
+    .card-logo img { height: 120px; max-width: 300px; object-fit: contain; filter: drop-shadow(0 8px 24px rgba(64,192,116,0.2)); animation: logoIn 1s var(--ease) 0.2s both; }
+    @keyframes logoIn { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
+    .card-inner { background: var(--white); border-radius: 20px; overflow: hidden; box-shadow: 0 0 0 1px rgba(255,255,255,0.07), 0 24px 64px rgba(0,0,0,0.55), 0 4px 16px rgba(0,0,0,0.35); }
+    .card-band  { height: 5px; background: var(--green-vivid); }
+    .card-header { padding: 2rem 2.6rem 0; }
+    .card-header h2 { font-family: var(--serif); font-size: 2rem; color: var(--black); letter-spacing: -0.02em; line-height: 1.1; }
+    .card-header p  { margin-top: 0.4rem; font-size: 0.88rem; color: var(--gray-500); font-weight: 300; }
+    .card-form   { padding: 1.8rem 2.6rem 0; }
+    .form-group  { margin-bottom: 1.1rem; }
+    .field-label { display: block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--black); margin-bottom: 0.5rem; }
+    .input-wrap  { position: relative; display: flex; align-items: center; }
+    .input-wrap input { width: 100%; height: 52px; padding: 0 46px 0 46px; background: var(--off-white); border: 1.5px solid var(--gray-200); border-left: 3px solid var(--gray-200); border-radius: 12px; font-family: var(--sans); font-size: 0.95rem; font-weight: 500; color: var(--black); outline: none; transition: border-color 0.2s var(--ease), background 0.2s var(--ease), box-shadow 0.2s var(--ease); }
+    .input-wrap input:focus { border-color: var(--green-vivid); border-left-color: var(--green-vivid); background: #fff; box-shadow: 0 0 0 3px rgba(64,192,116,0.12); }
+    .input-wrap input::placeholder { color: var(--gray-400); font-weight: 400; }
+    .input-wrap input[type="password"]::-ms-reveal, .input-wrap input[type="password"]::-ms-clear { display: none; }
+    .i-left { position: absolute; left: 14px; color: var(--gray-400); pointer-events: none; transition: color 0.2s; line-height: 0; }
+    .input-wrap:focus-within .i-left { color: var(--green-mid); }
+    .i-left svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .eye-btn { position: absolute; right: 10px; width: 28px; height: 28px; background: none; border: none; cursor: pointer; border-radius: 7px; display: flex; align-items: center; justify-content: center; color: var(--gray-400); transition: color 0.18s, background 0.18s; padding: 0; }
+    .eye-btn:hover { color: var(--green-mid); background: var(--green-pale); }
+    .eye-btn svg   { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; display: block; pointer-events: none; }
+    .card-footer { padding: 1.6rem 2.6rem 2.2rem; }
+    .btn-login { width: 100%; height: 52px; background: var(--black); color: var(--white); border: none; border-radius: 12px; font-family: var(--sans); font-size: 0.97rem; font-weight: 700; cursor: pointer; letter-spacing: 0.02em; position: relative; overflow: hidden; transition: transform 0.18s var(--ease), box-shadow 0.22s var(--ease); }
+    .btn-login::before { content: ''; position: absolute; inset: 0; background: var(--green-vivid); transform: translateY(100%); transition: transform 0.3s var(--ease); border-radius: 12px; }
+    .btn-login:hover::before { transform: translateY(0); }
+    .btn-login:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(64,192,116,0.28); }
+    .btn-login span  { position: relative; z-index: 1; }
+    .register-row { margin-top: 1.4rem; display: flex; align-items: center; justify-content: center; gap: 0.4rem; font-size: 0.85rem; }
+    .register-row span { color: var(--gray-500); }
+    .register-row a    { color: var(--green-mid); font-weight: 700; text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.2s, color 0.2s; }
+    .register-row a:hover { color: var(--green-vivid); border-color: var(--green-vivid); }
+    .back-link { margin-top: 1rem; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 0.79rem; color: var(--gray-400); text-decoration: none; transition: color 0.18s; }
+    .back-link:hover { color: var(--gray-500); }
+    .back-link svg   { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    .messages { list-style: none; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.4rem; }
+    .messages li { background: #fff5f5; border: 1px solid #ffd0d0; color: #c0392b; border-radius: 10px; padding: 10px 14px; font-size: 0.82rem; display: flex; align-items: center; gap: 8px; }
+    .messages li.success { background: var(--green-pale); border-color: var(--green-light); color: var(--green-dark); }
+    @media (max-width: 860px) { body { grid-template-columns: 1fr; } .left-panel { display: none; } .right-panel { padding: 2rem 1.2rem; } }
+  </style>
+</head>
+<body>
+
+<!-- ══ PANEL IZQUIERDO ══ -->
+<div class="left-panel">
+  <div class="left-glow"></div>
+  <a class="left-logo" href="{% url 'core:home' %}">EduPos<span class="logo-dot"></span></a>
+  <div class="left-content">
+    <div class="product-chip"><span class="chip-dot"></span>Punto Asis</div>
+    <h1>Tu tienda,<br><em>bajo control</em></h1>
+    <p>El sistema de gestión para tiendas escolares de EduPos. Administra ventas, inventario y reportes desde un solo lugar.</p>
+    <div class="left-features">
+      <div class="left-feat"><div class="feat-check"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>Registro de ventas en tiempo real</div>
+      <div class="left-feat"><div class="feat-check"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>Control de inventario automático</div>
+      <div class="left-feat"><div class="feat-check"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>Reportes y cierres de caja</div>
+      <div class="left-feat"><div class="feat-check"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>Gestión de usuarios y roles</div>
+    </div>
+  </div>
+  <div class="left-footer">© 2025 EduPos · Software Educativo Colombiano</div>
+</div>
+
+<!-- ══ PANEL DERECHO ══ -->
+<div class="right-panel">
+  <div class="right-grid"></div>
+  <div class="login-card">
+    <div class="card-logo">
+      <img src="{% static 'authentication/img/logo.webp' %}" alt="Colegio San Francisco de Asís" />
+    </div>
+    <div class="card-inner">
+      <div class="card-band"></div>
+      <div class="card-header">
+        <h2>Bienvenido</h2>
+        <p>Ingresa tus credenciales para continuar</p>
+      </div>
+      <div class="card-form">
+        {% if messages %}
+          <ul class="messages">
+            {% for message in messages %}
+              <li class="{{ message.tags }}">
+                <svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                {{ message }}
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+        <form method="post" action="{% url 'authentication:login' %}">
+          {% csrf_token %}
+          <div class="form-group">
+            <label class="field-label" for="username">Usuario</label>
+            <div class="input-wrap">
+              <span class="i-left"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+              <input type="text" id="username" name="username" placeholder="Tu nombre de usuario" autocomplete="username" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="field-label" for="password">Contraseña</label>
+            <div class="input-wrap">
+              <span class="i-left"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+              <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="current-password" required />
+              <button type="button" class="eye-btn" onclick="togglePass()">
+                <svg id="eye-icon" viewBox="0 0 24 24">
+                  <path id="eye-path-main" d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle id="eye-circle" cx="12" cy="12" r="3"/>
+                  <line id="eye-slash" x1="1" y1="1" x2="23" y2="23" style="display:none"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+      </div>
+      <div class="card-footer">
+          <button type="submit" class="btn-login"><span>Entrar al sistema</span></button>
+        </form>
+        <div class="register-row">
+          <span>¿Eres padre de familia?</span>
+          <a href="{% url 'authentication:registro_padre' %}">Regístrate aquí</a>
+        </div>
+        <a href="{% url 'core:home' %}" class="back-link">
+          <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+          Volver al inicio
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let passVisible = false;
+  function togglePass() {
+    const input = document.getElementById('password');
+    const slash = document.getElementById('eye-slash');
+    const circle = document.getElementById('eye-circle');
+    const mainPth = document.getElementById('eye-path-main');
+    passVisible = !passVisible;
+    input.type = passVisible ? 'text' : 'password';
+    if (passVisible) {
+      mainPth.setAttribute('d', 'M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19');
+      circle.style.display = 'none'; slash.style.display = '';
+    } else {
+      mainPth.setAttribute('d', 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z');
+      circle.style.display = ''; slash.style.display = 'none';
+    }
+  }
+</script>
+</body>
+</html>

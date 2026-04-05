@@ -1,0 +1,153 @@
+{% extends 'app_padre/base_padre.html' %}
+{% load filtros %}
+{% block title %}Mis Hijos{% endblock %}
+{% block page_title %}Mis Hijos{% endblock %}
+{% block nav_hijos %}active{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'app_padre:crear_estudiante' %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-person-plus"></i> Registrar hijo
+  </a>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .hijos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr));
+    gap: 1.2rem;
+  }
+
+  /* ── Hijo card ──────────────────────────────────────────────────────────── */
+  .hijo-card {
+    background: var(--ivory); border: 1px solid var(--mist);
+    border-radius: 12px; overflow: hidden;
+    transition: box-shadow 0.2s, border-color 0.2s;
+  }
+  .hijo-card:hover { box-shadow: 0 6px 28px rgba(0,0,0,0.07); border-color: var(--fog); }
+
+  .hijo-card-head {
+    padding: 1.4rem 1.5rem 1.1rem;
+    display: flex; align-items: center; gap: 1rem;
+    border-bottom: 1px solid var(--mist);
+  }
+  .hijo-big-avatar {
+    width: 3.2rem; height: 3.2rem; border-radius: 50%;
+    background: var(--leaf-tint); border: 2px solid var(--leaf-pale);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--serif); font-size: 1.35rem;
+    color: var(--leaf-dark); flex-shrink: 0;
+  }
+  .hijo-head-info { flex: 1; min-width: 0; }
+  .hijo-full-name { font-family: var(--serif); font-size: 1.1rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hijo-username  { font-size: 0.73rem; color: var(--ash); margin-top: 0.1rem; }
+  .hijo-badges    { display: flex; gap: 0.4rem; margin-top: 0.38rem; flex-wrap: wrap; }
+
+  .hijo-card-saldo {
+    padding: 1rem 1.5rem;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; background: var(--cream); border-bottom: 1px solid var(--mist);
+  }
+  .saldo-label { font-size: 0.63rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ash); margin-bottom: 0.2rem; }
+  .saldo-value { font-family: var(--serif); font-size: 1.8rem; color: var(--leaf); line-height: 1; }
+  .saldo-sub { font-size: 0.69rem; color: var(--ash); margin-top: 0.15rem; }
+
+  .hijo-card-body { padding: 1rem 1.5rem; }
+  .mini-section-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ash); margin-bottom: 0.5rem; }
+
+  .mini-row { display: flex; align-items: center; justify-content: space-between; padding: 0.38rem 0; border-bottom: 1px solid var(--mist); font-size: 0.79rem; }
+  .mini-row:last-child { border-bottom: none; }
+  .mini-label { color: var(--stone); }
+  .mini-val { font-weight: 600; }
+  .mini-val.green { color: var(--leaf); }
+  .mini-val.amber { color: var(--amber); }
+
+  .hijo-card-footer {
+    padding: 1rem 1.5rem; border-top: 1px solid var(--mist);
+    display: flex; gap: 0.5rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% if hijos_data %}
+<div class="hijos-grid">
+  {% for item in hijos_data %}
+  {% with hijo=item.hijo %}
+  <div class="hijo-card">
+
+    <!-- Cabecera -->
+    <div class="hijo-card-head">
+      <div class="hijo-big-avatar">{{ hijo.perfil.user.first_name|slice:":1"|upper }}</div>
+      <div class="hijo-head-info">
+        <div class="hijo-full-name">{{ hijo.perfil.user.get_full_name|default:hijo.perfil.user.username }}</div>
+        <div class="hijo-username">@{{ hijo.perfil.user.username }}</div>
+        <div class="hijo-badges">
+          <span class="badge badge-ok">Grado {{ hijo.grado }}</span>
+          <span style="background:var(--sky-pale);color:var(--sky);" class="badge">{{ hijo.codigo }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Saldo -->
+    <div class="hijo-card-saldo">
+      <div>
+        <div class="saldo-label">Saldo disponible</div>
+        <div class="saldo-value">${{ hijo.saldo|miles }}</div>
+        <div class="saldo-sub">Listo para usar en la cafetería</div>
+      </div>
+      <a href="{% url 'app_padre:recargar_saldo' hijo.pk %}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Recargar
+      </a>
+    </div>
+
+    <!-- Info + mini historial -->
+    <div class="hijo-card-body">
+      {% if item.pedidos %}
+      <div class="mini-section-label">Últimos pedidos</div>
+      {% for pedido in item.pedidos %}
+      <div class="mini-row">
+        <span class="mini-label">{{ pedido.fecha_pedido|date:"d M" }} · {{ pedido.ticket }}</span>
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+          <span class="badge badge-{{ pedido.estado }}">{{ pedido.get_estado_display }}</span>
+          <span class="mini-val">${{ pedido.total|miles }}</span>
+        </div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div style="text-align:center;padding:0.75rem 0;font-size:0.79rem;color:var(--ash);">
+        Sin pedidos registrados
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Acciones -->
+    <div class="hijo-card-footer">
+      <a href="{% url 'app_padre:recargar_saldo' hijo.pk %}" class="btn btn-ghost btn-sm">
+        <i class="bi bi-clock-history"></i> Ver recargas
+      </a>
+      <a href="{% url 'app_padre:historial' %}?hijo={{ hijo.pk }}" class="btn btn-ghost btn-sm">
+        <i class="bi bi-receipt"></i> Historial
+      </a>
+    </div>
+
+  </div>
+  {% endwith %}
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="card">
+  <div class="empty-state" style="padding:4rem 1rem;">
+    <i class="bi bi-people es-icon" style="font-size:2.5rem;"></i>
+    <p style="font-size:1rem;margin-bottom:0.5rem;color:var(--stone);">Aún no has registrado ningún hijo</p>
+    <p style="margin-bottom:1.5rem;">Crea la cuenta de tu estudiante para que pueda usar la cafetería.</p>
+    <a href="{% url 'app_padre:crear_estudiante' %}" class="btn btn-primary">
+      <i class="bi bi-person-plus"></i> Registrar primer hijo
+    </a>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

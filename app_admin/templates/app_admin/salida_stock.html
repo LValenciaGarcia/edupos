@@ -1,0 +1,323 @@
+{% extends 'app_admin/base_admin.html' %}
+{% load filtros %}
+{% block title %}Registrar salida de stock{% endblock %}
+{% block page_title %}Registrar salida{% endblock %}
+{% block nav_inventario %}active{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'app_admin:inventario' %}" class="btn btn-ghost btn-sm">
+    <i class="bi bi-arrow-left"></i> Volver
+  </a>
+{% endblock %}
+
+{% block content %}
+<style>
+  .salida-wrap {
+    max-width: 680px;
+    margin: 0 auto;
+  }
+  .tipo-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.85rem;
+    margin-bottom: 1.5rem;
+  }
+  .tipo-card {
+    border: 2px solid var(--mist);
+    border-radius: 12px;
+    padding: 1.1rem 1.3rem;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: var(--ivory);
+    user-select: none;
+  }
+  .tipo-card:hover { border-color: var(--fog); box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+  .tipo-card.selected {
+    border-color: var(--amber);
+    background: var(--amber-pale);
+    box-shadow: 0 0 0 3px rgba(217,119,6,0.1);
+  }
+  .tipo-card-icon {
+    width: 2.4rem; height: 2.4rem;
+    border-radius: 50%;
+    background: var(--cream);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.05rem;
+    color: var(--ash);
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
+  }
+  .tipo-card.selected .tipo-card-icon { background: var(--amber-tint); color: var(--amber); }
+  .tipo-card-label { font-weight: 700; font-size: 0.87rem; color: var(--ink); }
+  .tipo-card-sub   { font-size: 0.72rem; color: var(--ash); margin-top: 0.1rem; }
+
+  .motivo-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.6rem;
+    margin-top: 0.5rem;
+  }
+  .motivo-opt {
+    border: 2px solid var(--mist);
+    border-radius: 8px;
+    padding: 0.65rem 0.5rem;
+    text-align: center;
+    cursor: pointer;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--stone);
+    transition: all 0.14s;
+    user-select: none;
+    background: var(--ivory);
+  }
+  .motivo-opt:hover { border-color: var(--fog); color: var(--ink); }
+  .motivo-opt.selected.salida   { border-color: var(--amber); background: var(--amber-pale); color: var(--amber); }
+  .motivo-opt.selected.merma    { border-color: var(--red);   background: var(--red-pale);   color: var(--red); }
+  .motivo-opt.selected.consumo  { border-color: var(--sky);   background: var(--sky-pale);   color: var(--sky); }
+  .motivo-opt i { display: block; font-size: 1.1rem; margin-bottom: 0.3rem; }
+
+  .stock-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 99px;
+    font-size: 0.72rem;
+    font-weight: 700;
+  }
+  .item-info-bar {
+    background: var(--cream);
+    border: 1px solid var(--mist);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.4rem;
+    font-size: 0.8rem;
+    display: none;
+  }
+  .item-info-bar.visible { display: flex; }
+</style>
+
+<div class="salida-wrap">
+  <form method="post" id="form-salida">
+    {% csrf_token %}
+    <input type="hidden" name="item_tipo" id="input-item-tipo" value="{{ item_tipo_sel }}">
+    <input type="hidden" name="motivo" id="input-motivo" value="salida">
+
+    <!-- ── Paso 1: Tipo ── -->
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="card-head">
+        <span class="card-title" style="font-size:0.95rem;">
+          <span style="background:var(--amber-tint);color:var(--amber);font-size:0.72rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:99px;margin-right:0.5rem;">1</span>
+          Selecciona el tipo
+        </span>
+      </div>
+      <div style="padding:1.2rem 1.4rem;">
+        <div class="tipo-toggle">
+          <div class="tipo-card {% if item_tipo_sel == 'ingrediente' or not item_tipo_sel %}selected{% endif %}"
+               onclick="seleccionarTipo('ingrediente')" id="card-ingrediente">
+            <div class="tipo-card-icon"><i class="bi bi-basket"></i></div>
+            <div>
+              <div class="tipo-card-label">Ingrediente</div>
+              <div class="tipo-card-sub">Materias primas y suministros</div>
+            </div>
+          </div>
+          <div class="tipo-card {% if item_tipo_sel == 'producto' %}selected{% endif %}"
+               onclick="seleccionarTipo('producto')" id="card-producto">
+            <div class="tipo-card-icon"><i class="bi bi-box-seam"></i></div>
+            <div>
+              <div class="tipo-card-label">Producto</div>
+              <div class="tipo-card-sub">Productos simples con stock</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Paso 2: Ítem ── -->
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="card-head">
+        <span class="card-title" style="font-size:0.95rem;">
+          <span style="background:var(--amber-tint);color:var(--amber);font-size:0.72rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:99px;margin-right:0.5rem;">2</span>
+          Selecciona el ítem
+        </span>
+      </div>
+      <div style="padding:1.2rem 1.4rem;">
+        <div class="field">
+          <label>Ítem <span style="color:var(--red);">*</span></label>
+          <select name="item_id" id="sel-item" required onchange="mostrarInfoItem()">
+            <option value="">— Seleccionar —</option>
+          </select>
+        </div>
+        <div class="item-info-bar" id="info-bar">
+          <div>
+            <span id="info-nombre" style="font-weight:700;"></span>
+            <span id="info-unidad" style="color:var(--ash);margin-left:0.4rem;font-size:0.75rem;"></span>
+          </div>
+          <div>
+            Stock actual: <span id="info-stock" class="stock-badge" style="background:var(--leaf-pale);color:var(--leaf-dark);">—</span>
+          </div>
+          {% if item_pk_sel %}
+          <div style="font-size:0.73rem;color:var(--leaf);font-weight:600;">
+            <i class="bi bi-check-circle-fill"></i> Preseleccionado desde inventario
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Paso 3: Cantidad y motivo ── -->
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="card-head">
+        <span class="card-title" style="font-size:0.95rem;">
+          <span style="background:var(--amber-tint);color:var(--amber);font-size:0.72rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:99px;margin-right:0.5rem;">3</span>
+          Cantidad y motivo
+        </span>
+      </div>
+      <div style="padding:1.2rem 1.4rem;display:grid;gap:1rem;">
+
+        <div class="field">
+          <label>Motivo de salida</label>
+          <div class="motivo-grid">
+            <div class="motivo-opt selected salida" onclick="seleccionarMotivo('salida', this)">
+              <i class="bi bi-box-arrow-up"></i>
+              Salida
+            </div>
+            <div class="motivo-opt" onclick="seleccionarMotivo('merma', this)">
+              <i class="bi bi-exclamation-triangle"></i>
+              Merma / Pérdida
+            </div>
+            <div class="motivo-opt" onclick="seleccionarMotivo('consumo', this)">
+              <i class="bi bi-fire"></i>
+              Consumo
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+          <div class="field">
+            <label>Cantidad <span style="color:var(--red);">*</span></label>
+            <input type="number" name="cantidad" id="inp-cantidad" min="0.01" step="0.01"
+                   required placeholder="0" style="font-size:1.1rem;font-weight:700;">
+          </div>
+          <div class="field">
+            <label>Disponible</label>
+            <div style="padding:0.57rem 0.85rem;border:1px solid var(--mist);border-radius:7px;
+                        background:var(--cream);font-size:0.9rem;font-weight:600;color:var(--ash);"
+                 id="disp-stock">—</div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Nota u observación (opcional)</label>
+          <input type="text" name="nota" placeholder="Ej: merma por vencimiento, preparación especial…">
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Botones ── -->
+    <div style="display:flex;gap:0.75rem;justify-content:flex-end;margin-top:0.5rem;">
+      <a href="{% url 'app_admin:inventario' %}" class="btn btn-ghost">Cancelar</a>
+      <button type="submit" class="btn btn-amber" id="btn-submit" disabled>
+        <i class="bi bi-box-arrow-up"></i> Registrar salida
+      </button>
+    </div>
+
+  </form>
+</div>
+
+<!-- Datos JS -->
+<script>
+const DATA_PRODUCTOS    = {{ productos_json|safe }};
+const DATA_INGREDIENTES = {{ ingredientes_json|safe }};
+
+let currentTipo = "{{ item_tipo_sel|default:'ingrediente' }}";
+const preselItem = "{{ item_pk_sel }}";
+
+function seleccionarTipo(tipo) {
+  currentTipo = tipo;
+  document.getElementById('input-item-tipo').value = tipo;
+  document.getElementById('card-ingrediente').classList.toggle('selected', tipo === 'ingrediente');
+  document.getElementById('card-producto').classList.toggle('selected', tipo === 'producto');
+  poblarSelect();
+  ocultarInfo();
+}
+
+function poblarSelect() {
+  const lista   = currentTipo === 'producto' ? DATA_PRODUCTOS : DATA_INGREDIENTES;
+  const sel     = document.getElementById('sel-item');
+  sel.innerHTML = '<option value="">— Seleccionar —</option>' +
+    lista.map(x => {
+      const selected = preselItem && String(x.id) === String(preselItem) ? 'selected' : '';
+      const stockLabel = x.stock <= 0 ? ' ⚠ Sin stock' : ` (${x.stock} ${x.unidad})`;
+      return `<option value="${x.id}" ${selected}>${x.nombre}${stockLabel}</option>`;
+    }).join('');
+  // Establecer explícitamente el valor y mostrar info si hay item preseleccionado
+  if (preselItem) {
+    sel.value = preselItem;
+    mostrarInfoItem();
+  }
+}
+
+function mostrarInfoItem() {
+  const sel  = document.getElementById('sel-item');
+  const id   = sel.value;
+  const lista = currentTipo === 'producto' ? DATA_PRODUCTOS : DATA_INGREDIENTES;
+  const item  = lista.find(x => String(x.id) === String(id));
+  const bar   = document.getElementById('info-bar');
+
+  if (!item) { ocultarInfo(); return; }
+
+  document.getElementById('info-nombre').textContent = item.nombre;
+  document.getElementById('info-unidad').textContent = '(' + item.unidad + ')';
+  const stockEl = document.getElementById('info-stock');
+  stockEl.textContent = item.stock + ' ' + item.unidad;
+  if (item.stock <= 0) {
+    stockEl.style.background = 'var(--red-pale)';
+    stockEl.style.color = 'var(--red)';
+  } else {
+    stockEl.style.background = 'var(--leaf-pale)';
+    stockEl.style.color = 'var(--leaf-dark)';
+  }
+  document.getElementById('disp-stock').textContent = item.stock + ' ' + item.unidad;
+  bar.classList.add('visible');
+
+  // Habilitar botón
+  document.getElementById('btn-submit').disabled = false;
+}
+
+function ocultarInfo() {
+  document.getElementById('info-bar').classList.remove('visible');
+  document.getElementById('disp-stock').textContent = '—';
+  document.getElementById('btn-submit').disabled = true;
+}
+
+function seleccionarMotivo(motivo, el) {
+  document.querySelectorAll('.motivo-opt').forEach(o => o.classList.remove('selected','salida','merma','consumo'));
+  el.classList.add('selected', motivo);
+  document.getElementById('input-motivo').value = motivo === 'consumo' ? 'salida' : motivo;
+}
+
+// Init
+poblarSelect();
+
+// Validación al enviar
+document.getElementById('form-salida').addEventListener('submit', function(e) {
+  const item = document.getElementById('sel-item').value;
+  const cant = parseFloat(document.getElementById('inp-cantidad').value);
+  if (!item) { e.preventDefault(); alert('Selecciona un ítem.'); return; }
+  if (!cant || cant <= 0) { e.preventDefault(); alert('La cantidad debe ser mayor a 0.'); return; }
+});
+
+// Enable submit on item select
+document.getElementById('sel-item').addEventListener('change', mostrarInfoItem);
+</script>
+{% endblock %}

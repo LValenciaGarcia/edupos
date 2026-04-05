@@ -1,0 +1,218 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Registro — Punto Asis · EduPos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --black:       #0a0a0a;
+      --off-black:   #111111;
+      --white:       #f8f8f6;
+      --off-white:   #efefec;
+      --green-dark:  #1a3d2b;
+      --green-mid:   #2d6a4f;
+      --green-vivid: #40c074;
+      --green-pale:  #e8f5ee;
+      --green-light: #b7e4c7;
+      --gray-200:    #e2e2dd;
+      --gray-400:    #b0b0a8;
+      --gray-500:    #8a8a82;
+      --serif: 'DM Serif Display', Georgia, serif;
+      --sans:  'DM Sans', system-ui, sans-serif;
+      --ease:  cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body { font-family: var(--sans); min-height: 100vh; display: grid; grid-template-columns: 46fr 54fr; }
+
+    /* ══ PANEL IZQUIERDO ══ */
+    .left-panel { background: var(--off-black); padding: 3.4rem 4rem 3rem; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; }
+    .left-panel::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--green-vivid), var(--green-mid), transparent); }
+    .left-panel::after  { content: ''; position: absolute; bottom: -120px; left: -80px; width: 440px; height: 440px; background: radial-gradient(circle, rgba(64,192,116,0.07) 0%, transparent 62%); pointer-events: none; }
+    .left-glow { position: absolute; top: -60px; right: -60px; width: 300px; height: 300px; background: radial-gradient(circle, rgba(64,192,116,0.05) 0%, transparent 65%); pointer-events: none; }
+    .left-logo { font-family: var(--serif); font-size: 1.55rem; color: var(--white); text-decoration: none; display: inline-flex; align-items: center; gap: 8px; position: relative; z-index: 1; }
+    .logo-dot  { width: 8px; height: 8px; background: var(--green-vivid); border-radius: 50%; animation: blink 2.5s ease-in-out infinite; }
+    @keyframes blink { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.6); } }
+    .left-content { position: relative; z-index: 1; }
+    .product-chip { display: inline-flex; align-items: center; gap: 7px; background: rgba(64,192,116,0.07); border: 1px solid rgba(64,192,116,0.2); color: var(--green-vivid); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.11em; text-transform: uppercase; padding: 5px 12px; border-radius: 50px; margin-bottom: 1.4rem; }
+    .chip-dot { width: 5px; height: 5px; background: var(--green-vivid); border-radius: 50%; animation: blink 2s infinite; }
+    .left-content h1 { font-family: var(--serif); font-size: clamp(3.2rem, 4.4vw, 4.8rem); color: var(--white); line-height: 1.04; letter-spacing: -0.02em; }
+    .left-content h1 em { font-style: italic; color: var(--green-vivid); }
+    .left-content p { font-weight: 300; color: rgba(255,255,255,0.48); margin-top: 1.4rem; line-height: 1.82; font-size: 1.02rem; }
+    .left-features { margin-top: 2.2rem; display: flex; flex-direction: column; gap: 0.7rem; }
+    .left-feat { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; color: rgba(255,255,255,0.42); }
+    .feat-check { width: 18px; height: 18px; background: rgba(64,192,116,0.08); border: 1px solid rgba(64,192,116,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .feat-check svg { width: 8px; height: 8px; stroke: var(--green-vivid); fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+    .left-footer { font-size: 0.7rem; font-weight: 300; color: rgba(255,255,255,0.14); position: relative; z-index: 1; }
+
+    /* ══ PANEL DERECHO ══ */
+    .right-panel { background: var(--black); display: flex; align-items: center; justify-content: center; padding: 3rem 3.5rem; position: relative; overflow: hidden; }
+    .right-panel::before { content: ''; position: absolute; bottom: -140px; left: -100px; width: 520px; height: 520px; background: radial-gradient(circle, rgba(64,192,116,0.11) 0%, transparent 65%); pointer-events: none; }
+    .right-panel::after  { content: ''; position: absolute; top: -80px; right: -80px; width: 340px; height: 340px; background: radial-gradient(circle, rgba(64,192,116,0.06) 0%, transparent 65%); pointer-events: none; }
+    .right-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px); background-size: 40px 40px; pointer-events: none; }
+
+    /* ══ CARD ══ */
+    .login-card { width: 100%; max-width: 520px; position: relative; z-index: 1; animation: cardIn 0.9s var(--ease) 0.1s both; }
+    @keyframes cardIn { from { opacity: 0; transform: translateY(36px); } to { opacity: 1; transform: translateY(0); } }
+    .card-logo { display: flex; justify-content: center; margin-bottom: 2rem; }
+    .card-logo img { height: 100px; max-width: 300px; object-fit: contain; filter: drop-shadow(0 8px 24px rgba(64,192,116,0.2)); animation: logoIn 1s var(--ease) 0.2s both; }
+    @keyframes logoIn { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
+    .card-inner { background: var(--white); border-radius: 20px; overflow: hidden; box-shadow: 0 0 0 1px rgba(255,255,255,0.07), 0 24px 64px rgba(0,0,0,0.55), 0 4px 16px rgba(0,0,0,0.35); }
+    .card-band  { height: 5px; background: var(--green-vivid); }
+    .card-header { padding: 2rem 2.6rem 0; }
+    .card-header h2 { font-family: var(--serif); font-size: 2rem; color: var(--black); letter-spacing: -0.02em; line-height: 1.1; }
+    .card-header p  { margin-top: 0.4rem; font-size: 0.88rem; color: var(--gray-500); font-weight: 300; }
+    .card-form   { padding: 1.8rem 2.6rem 0; max-height: 65vh; overflow-y: auto; }
+    .form-group  { margin-bottom: 0.95rem; }
+    .field-label { display: block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--black); margin-bottom: 0.5rem; }
+    .input-wrap  { position: relative; display: flex; align-items: center; }
+    .input-wrap input { width: 100%; height: 44px; padding: 0 14px; background: var(--off-white); border: 1.5px solid var(--gray-200); border-radius: 12px; font-family: var(--sans); font-size: 0.9rem; font-weight: 400; color: var(--black); outline: none; transition: border-color 0.2s var(--ease), background 0.2s var(--ease), box-shadow 0.2s var(--ease); }
+    .input-wrap input:focus { border-color: var(--green-vivid); background: #fff; box-shadow: 0 0 0 3px rgba(64,192,116,0.12); }
+    .input-wrap input::placeholder { color: var(--gray-400); font-weight: 400; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+    .form-row.full { grid-column: span 2; }
+    .input-wrap input[type="email"] { grid-column: span 2; }
+    .card-footer { padding: 1.6rem 2.6rem 2.2rem; border-top: 1px solid var(--gray-200); }
+    .btn-login { width: 100%; height: 48px; background: var(--black); color: var(--white); border: none; border-radius: 12px; font-family: var(--sans); font-size: 0.97rem; font-weight: 700; cursor: pointer; letter-spacing: 0.02em; position: relative; overflow: hidden; transition: transform 0.18s var(--ease), box-shadow 0.22s var(--ease); }
+    .btn-login::before { content: ''; position: absolute; inset: 0; background: var(--green-vivid); transform: translateY(100%); transition: transform 0.3s var(--ease); border-radius: 12px; }
+    .btn-login:hover::before { transform: translateY(0); }
+    .btn-login:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(64,192,116,0.28); }
+    .btn-login span  { position: relative; z-index: 1; }
+    .register-row { margin-top: 1.4rem; display: flex; align-items: center; justify-content: center; gap: 0.4rem; font-size: 0.85rem; }
+    .register-row span { color: var(--gray-500); }
+    .register-row a    { color: var(--green-mid); font-weight: 700; text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.2s, color 0.2s; }
+    .register-row a:hover { color: var(--green-vivid); border-color: var(--green-vivid); }
+    .back-link { margin-top: 1rem; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 0.79rem; color: var(--gray-400); text-decoration: none; transition: color 0.18s; }
+    .back-link:hover { color: var(--gray-500); }
+    .back-link svg   { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    .messages { list-style: none; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.4rem; }
+    .messages li { background: #fff5f5; border: 1px solid #ffd0d0; color: #c0392b; border-radius: 10px; padding: 10px 14px; font-size: 0.82rem; display: flex; align-items: center; gap: 8px; }
+    .messages li.success { background: var(--green-pale); border-color: var(--green-light); color: var(--green-dark); }
+    @media (max-width: 860px) { body { grid-template-columns: 1fr; } .left-panel { display: none; } .right-panel { padding: 2rem 1.2rem; } .login-card { max-width: 100%; } }
+  </style>
+</head>
+<body>
+
+<!-- ══ PANEL IZQUIERDO ══ -->
+<div class="left-panel">
+  <div class="left-glow"></div>
+  <a class="left-logo" href="{% url 'core:home' %}">EduPos<span class="logo-dot"></span></a>
+  <div class="left-content">
+    <div class="product-chip"><span class="chip-dot"></span>Punto Asis</div>
+    <h1>Bienvenido<br><em>padre de familia</em></h1>
+    <p>Crea tu cuenta en Punto Asis para controlar el saldo de tus hijos, hacer recargas y seguir sus compras en tiempo real.</p>
+    <div class="left-features">
+      <div class="left-feat"><div class="feat-check"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>Control de saldo de tus hijos</div>
+      <div class="left-feat"><div class="feat-check"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>Recarga rápida y segura</div>
+      <div class="left-feat"><div class="feat-check"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>Historial de compras</div>
+      <div class="left-feat"><div class="feat-check"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>Gestión de múltiples estudiantes</div>
+    </div>
+  </div>
+  <div class="left-footer">© 2025 EduPos · Software Educativo Colombiano</div>
+</div>
+
+<!-- ══ PANEL DERECHO ══ -->
+<div class="right-panel">
+  <div class="right-grid"></div>
+  <div class="login-card">
+    <div class="card-logo">
+      <img src="{% static 'authentication/img/logo.webp' %}" alt="Colegio San Francisco de Asís" />
+    </div>
+    <div class="card-inner">
+      <div class="card-band"></div>
+      <div class="card-header">
+        <h2>Crear cuenta</h2>
+        <p>Registro exclusivo para padres de familia</p>
+      </div>
+      <div class="card-form">
+        {% if messages %}
+          <ul class="messages">
+            {% for message in messages %}
+              <li class="{{ message.tags }}">
+                <svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                {{ message }}
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+        <form method="post">
+          {% csrf_token %}
+          <div class="form-row">
+            <div class="form-group">
+              <label class="field-label">Nombre *</label>
+              <div class="input-wrap">
+                <input type="text" name="first_name" placeholder="María" required />
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="field-label">Apellido *</label>
+              <div class="input-wrap">
+                <input type="text" name="last_name" placeholder="García" required />
+              </div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="field-label">Usuario *</label>
+              <div class="input-wrap">
+                <input type="text" name="username" placeholder="mgarcia" required />
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="field-label">Documento</label>
+              <div class="input-wrap">
+                <input type="text" name="documento" placeholder="CC 100000000" />
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="field-label">Correo electrónico</label>
+            <div class="input-wrap">
+              <input type="email" name="email" placeholder="correo@email.com" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="field-label">Teléfono</label>
+              <div class="input-wrap">
+                <input type="tel" name="telefono" placeholder="300 000 0000" />
+              </div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="field-label">Contraseña *</label>
+              <div class="input-wrap">
+                <input type="password" name="password1" placeholder="Mínimo 8 caracteres" required />
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="field-label">Confirmar contraseña *</label>
+              <div class="input-wrap">
+                <input type="password" name="password2" placeholder="Repite la contraseña" required />
+              </div>
+            </div>
+          </div>
+          <div class="card-footer" style="padding-top: 1.6rem; border-top: 1px solid var(--gray-200);">
+            <button type="submit" class="btn-login"><span>Crear cuenta</span></button>
+            <div class="register-row">
+              <span>¿Ya tienes cuenta?</span>
+              <a href="{% url 'authentication:login' %}">Inicia sesión</a>
+            </div>
+            <a href="{% url 'core:home' %}" class="back-link">
+              <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+              Volver al inicio
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

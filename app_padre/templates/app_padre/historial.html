@@ -1,0 +1,150 @@
+{% extends 'app_padre/base_padre.html' %}
+{% load filtros %}
+{% block title %}Historial{% endblock %}
+{% block page_title %}Historial de Pedidos{% endblock %}
+{% block nav_historial %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── Filtros ──────────────────────────────────────────────────────────── */
+  .hist-filters {
+    display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+    margin-bottom: 1.25rem;
+  }
+  .hist-filters select {
+    font-family: var(--sans); font-size: 0.8rem;
+    padding: 0.4rem 0.8rem; border: 1px solid var(--fog);
+    border-radius: 7px; background: var(--ivory); color: var(--ink);
+    cursor: pointer;
+  }
+  .hist-filters select:focus { outline: none; border-color: var(--leaf); }
+  .active-filter-tag {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    padding: 0.22rem 0.6rem; border-radius: 99px;
+    background: var(--leaf-pale); color: var(--leaf-dark);
+    border: 1px solid var(--leaf-tint); font-size: 0.72rem; font-weight: 600;
+    text-decoration: none;
+  }
+  .active-filter-tag:hover { background: var(--leaf-tint); }
+
+  /* ── KPI tira ─────────────────────────────────────────────────────────── */
+  .hist-kpi { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0.85rem; margin-bottom: 1.4rem; }
+  .hkpi { background: var(--ivory); border: 1px solid var(--mist); border-radius: 10px; padding: 1rem 1.2rem; }
+  .hkpi-label { font-size: 0.59rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ash); margin-bottom: 0.25rem; }
+  .hkpi-val   { font-family: var(--serif); font-size: 1.75rem; color: var(--ink); line-height: 1; }
+  .hkpi-val.green { color: var(--leaf); }
+  .hkpi-val.amber { color: var(--amber); }
+
+  /* ── Pedido row ────────────────────────────────────────────────────────── */
+  .ped-row {
+    display: grid;
+    grid-template-columns: 7rem 1fr auto auto;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.95rem 1.5rem;
+    border-bottom: 1px solid var(--mist);
+    transition: background 0.1s;
+  }
+  .ped-row:last-child { border-bottom: none; }
+  .ped-row:hover { background: var(--cream); }
+
+  .ped-id { }
+  .ped-ticket { font-size: 0.7rem; font-weight: 700; color: var(--leaf); letter-spacing: 0.05em; font-family: monospace; }
+  .ped-date   { font-size: 0.68rem; color: var(--ash); margin-top: 0.12rem; }
+
+  .ped-details { min-width: 0; }
+  .ped-est    { font-size: 0.84rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ped-items  { font-size: 0.71rem; color: var(--stone); margin-top: 0.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .ped-estado { text-align: center; }
+  .ped-total  { font-family: var(--serif); font-size: 1.05rem; font-weight: 500; text-align: right; white-space: nowrap; }
+
+  @media (max-width: 700px) {
+    .ped-row { grid-template-columns: 1fr auto; }
+    .ped-estado { display: none; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- KPIs -->
+<div class="hist-kpi">
+  <div class="hkpi">
+    <div class="hkpi-label">Total gastado</div>
+    <div class="hkpi-val green">${{ gasto_total|miles }}</div>
+  </div>
+  <div class="hkpi">
+    <div class="hkpi-label">Pedidos</div>
+    <div class="hkpi-val">{{ pedidos|length }}</div>
+  </div>
+  <div class="hkpi">
+    <div class="hkpi-label">Hijos activos</div>
+    <div class="hkpi-val">{{ hijos|length }}</div>
+  </div>
+</div>
+
+<!-- Filtros -->
+<form method="get" class="hist-filters" id="filter-form">
+  <select name="hijo" onchange="this.form.submit()">
+    <option value="">Todos los hijos</option>
+    {% for hijo in hijos %}
+    <option value="{{ hijo.pk }}" {% if hijo_activo == hijo.pk|stringformat:"s" %}selected{% endif %}>
+      {{ hijo.perfil.user.get_full_name|default:hijo.perfil.user.username }}
+    </option>
+    {% endfor %}
+  </select>
+
+  <select name="estado" onchange="this.form.submit()">
+    <option value="">Todos los estados</option>
+    {% for val, lbl in ESTADO_CHOICES %}
+    <option value="{{ val }}" {% if estado_activo == val %}selected{% endif %}>{{ lbl }}</option>
+    {% endfor %}
+  </select>
+
+  {% if hijo_activo or estado_activo %}
+  <a href="{% url 'app_padre:historial' %}" class="active-filter-tag">
+    <i class="bi bi-x"></i> Limpiar
+  </a>
+  {% endif %}
+</form>
+
+<!-- Tabla -->
+<div class="card">
+  {% if pedidos %}
+    {% for pedido in pedidos %}
+    <div class="ped-row">
+      <div class="ped-id">
+        <div class="ped-ticket">{{ pedido.ticket }}</div>
+        <div class="ped-date">{{ pedido.fecha_pedido|date:"d M Y" }}<br>{{ pedido.fecha_pedido|date:"H:i" }}</div>
+      </div>
+
+      <div class="ped-details">
+        <div class="ped-est">{{ pedido.estudiante.perfil.user.get_full_name|default:pedido.estudiante.perfil.user.username }}</div>
+        <div class="ped-items">
+          {% for det in pedido.detalles.all %}{{ det.cantidad }}× {{ det.producto.nombre }}{% if not forloop.last %} · {% endif %}{% endfor %}
+        </div>
+      </div>
+
+      <div class="ped-estado">
+        <span class="badge badge-{{ pedido.estado }}">{{ pedido.get_estado_display }}</span>
+      </div>
+
+      <div class="ped-total">${{ pedido.total|miles }}</div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state">
+      <i class="bi bi-receipt es-icon"></i>
+      <p>
+        {% if hijo_activo or estado_activo %}
+          No hay pedidos con los filtros seleccionados.
+        {% else %}
+          Tus hijos aún no han realizado ningún pedido.
+        {% endif %}
+      </p>
+    </div>
+  {% endif %}
+</div>
+
+{% endblock %}

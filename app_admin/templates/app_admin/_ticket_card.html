@@ -1,0 +1,57 @@
+{% load filtros %}
+<div class="ticket-card" onclick="window.location='{% url 'app_admin:pedido_detalle' pedido.pk %}'">
+  <div class="ticket-id">{{ pedido.ticket }}</div>
+  <div class="ticket-name">{{ pedido.estudiante.perfil.user.get_full_name|default:pedido.estudiante.perfil.user.username }}</div>
+  <div class="ticket-grade">Grado {{ pedido.estudiante.grado }}</div>
+  <div class="ticket-items">
+    {% for d in pedido.detalles.all %}
+      {{ d.cantidad }}× {{ d.producto.nombre }}<br>
+    {% endfor %}
+  </div>
+  {% if pedido.nota %}
+  <div style="font-size:.72rem;background:var(--amber-pale);color:var(--amber);
+              border-radius:6px;padding:.3rem .5rem;margin-bottom:.5rem;">
+    <i class="bi bi-chat-left-text"></i> {{ pedido.nota }}
+  </div>
+  {% endif %}
+  <div class="ticket-foot">
+    <span class="ticket-total">${{ pedido.total|miles }}</span>
+    <span class="ticket-time">{{ pedido.fecha_pedido|time:"H:i" }}</span>
+  </div>
+
+  {% if next_estado %}
+  <div onclick="event.stopPropagation();" style="margin-top:.6rem;">
+    {% if confirmar and next_estado == 'entregado' %}
+      <!-- Botón entregar abre modal de confirmación -->
+      <button type="button"
+        onclick="abrirEntrega(
+          {{ pedido.pk }},
+          '{{ pedido.ticket }}',
+          [{% for d in pedido.detalles.all %}{nombre:'{{ d.producto.nombre|escapejs }}',cantidad:{{ d.cantidad }}},{% endfor %}]
+        )"
+        class="btn btn-primary btn-sm btn-full">
+        <i class="bi bi-check-lg"></i> {{ next_label }}
+      </button>
+    {% else %}
+      <form method="post" action="{% url 'app_admin:pedido_estado' pedido.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="estado" value="{{ next_estado }}">
+        <input type="hidden" name="next" value="{% url 'app_admin:pedidos' %}">
+        <button type="submit" class="btn btn-primary btn-sm btn-full">
+          <i class="bi bi-arrow-right"></i> {{ next_label }}
+        </button>
+      </form>
+    {% endif %}
+    <form method="post" action="{% url 'app_admin:pedido_estado' pedido.pk %}"
+          style="margin-top:.3rem;">
+      {% csrf_token %}
+      <input type="hidden" name="estado" value="cancelado">
+      <input type="hidden" name="next" value="{% url 'app_admin:pedidos' %}">
+      <button type="submit" class="btn btn-danger btn-sm btn-full"
+              onclick="return confirm('¿Cancelar pedido {{ pedido.ticket }}?')">
+        <i class="bi bi-x"></i> Cancelar pedido
+      </button>
+    </form>
+  </div>
+  {% endif %}
+</div>

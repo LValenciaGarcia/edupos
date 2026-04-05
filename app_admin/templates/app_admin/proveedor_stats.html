@@ -1,0 +1,80 @@
+{% extends 'app_admin/base_admin.html' %}
+{% load filtros %}
+{% block title %}Estadísticas — {{ proveedor.nombre }}{% endblock %}
+{% block page_title %}Estadísticas · {{ proveedor.nombre }}{% endblock %}
+{% block nav_proveedores %}active{% endblock %}
+{% block topbar_actions %}
+  <a href="{% url 'app_admin:proveedor_compras' proveedor.pk %}" class="btn btn-ghost btn-sm">
+    <i class="bi bi-arrow-left"></i> Historial
+  </a>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:52rem;margin:0 auto;display:flex;flex-direction:column;gap:1.2rem;">
+
+  <!-- Info proveedor -->
+  <div class="card">
+    <div class="card-body" style="display:flex;align-items:center;gap:1rem;">
+      {% if proveedor.logo %}
+        <img src="{{ proveedor.logo.url }}" style="width:3.5rem;height:3.5rem;object-fit:contain;border-radius:8px;border:1px solid var(--gray-200);">
+      {% else %}
+        <div style="width:3.5rem;height:3.5rem;background:var(--green-dark);border-radius:8px;display:flex;align-items:center;justify-content:center;">
+          <i class="bi bi-truck" style="color:var(--green-vivid);font-size:1.4rem;"></i>
+        </div>
+      {% endif %}
+      <div>
+        <div style="font-family:var(--serif);font-size:1.2rem;">{{ proveedor.nombre }}</div>
+        {% if proveedor.nit %}<div style="font-size:.8rem;color:var(--gray-500);">NIT {{ proveedor.nit }}</div>{% endif %}
+      </div>
+      <div style="margin-left:auto;text-align:right;">
+        <div style="font-size:.7rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;margin-bottom:.2rem;">Total comprado</div>
+        <div style="font-family:var(--serif);font-size:1.5rem;color:var(--green-mid);">${{ proveedor.total_compras|miles }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gráfica mensual -->
+  <div class="card">
+    <div class="card-head"><span class="card-title">Compras por mes (últimos 12 meses)</span></div>
+    <div class="card-body"><div class="chart-wrap"><canvas id="chartMensual"></canvas></div></div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function cargarGrafica() {
+  const r = await fetch("{% url 'app_admin:proveedor_stats' proveedor.pk %}");
+  const d = await r.json();
+
+  new Chart(document.getElementById('chartMensual'), {
+    type: 'bar',
+    data: {
+      labels: d.labels,
+      datasets: [{
+        label: 'Total comprado ($)',
+        data: d.values,
+        backgroundColor: 'rgba(45,106,79,0.2)',
+        borderColor: '#2d6a4f',
+        borderWidth: 2,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: {
+          beginAtZero: true,
+          grid: { color: 'rgba(0,0,0,0.04)' },
+          ticks: { callback: v => '$' + v.toLocaleString('es-CO') }
+        },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+}
+cargarGrafica();
+</script>
+{% endblock %}

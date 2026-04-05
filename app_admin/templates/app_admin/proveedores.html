@@ -1,0 +1,142 @@
+{% extends 'app_admin/base_admin.html' %}
+{% load filtros %}
+{% block title %}Proveedores{% endblock %}
+{% block page_title %}Proveedores{% endblock %}
+{% block nav_proveedores %}active{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'app_admin:entrada_stock' %}" class="btn btn-ghost btn-sm">
+    <i class="bi bi-plus-circle"></i> Registrar entrada
+  </a>
+  <a href="{% url 'app_admin:proveedor_nuevo' %}" class="btn btn-primary">
+    <i class="bi bi-plus-lg"></i> Nuevo proveedor
+  </a>
+{% endblock %}
+
+{% block content %}
+<form method="get" class="filter-bar">
+  <input type="text" name="q" value="{{ q }}" placeholder="Buscar por nombre, NIT o contacto…" style="min-width:18rem;">
+  <button type="submit" class="btn btn-ghost btn-sm"><i class="bi bi-search"></i></button>
+  {% if q %}<a href="{% url 'app_admin:proveedores' %}" class="btn btn-ghost btn-sm"><i class="bi bi-x-lg"></i></a>{% endif %}
+</form>
+
+{% if proveedores %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1.2rem;">
+  {% for prov in proveedores %}
+  <div class="card">
+    <div class="card-body" style="padding:0;">
+
+      <!-- Cabecera con logo grande -->
+      <div style="background:var(--off-black);border-radius:12px 12px 0 0;padding:1.4rem 1.4rem 1rem;
+                  display:flex;align-items:center;gap:1rem;position:relative;">
+        {% if prov.logo %}
+          <img src="{{ prov.logo.url }}"
+               style="width:4rem;height:4rem;object-fit:contain;border-radius:10px;
+                      background:var(--white);padding:4px;flex-shrink:0;
+                      border:2px solid rgba(64,192,116,0.3);">
+        {% else %}
+          <div style="width:4rem;height:4rem;background:var(--green-dark);border-radius:10px;
+                      display:flex;align-items:center;justify-content:center;flex-shrink:0;
+                      border:2px solid rgba(64,192,116,0.2);">
+            <i class="bi bi-truck" style="color:var(--green-vivid);font-size:1.6rem;"></i>
+          </div>
+        {% endif %}
+        <div style="min-width:0;flex:1;">
+          <div style="font-family:var(--serif);font-size:1.1rem;color:var(--white);
+                      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ prov.nombre }}</div>
+          {% if prov.nit %}
+          <div style="font-size:.72rem;color:rgba(64,192,116,.8);font-weight:600;margin-top:.15rem;">
+            NIT {{ prov.nit }}
+          </div>
+          {% endif %}
+          {% if prov.contacto %}
+          <div style="font-size:.78rem;color:rgba(255,255,255,.5);margin-top:.1rem;">{{ prov.contacto }}</div>
+          {% endif %}
+        </div>
+        <span class="badge {% if prov.activo %}badge-ok{% else %}badge-out{% endif %}"
+              style="flex-shrink:0;position:absolute;top:.8rem;right:.8rem;">
+          {% if prov.activo %}Activo{% else %}Inactivo{% endif %}
+        </span>
+      </div>
+
+      <!-- Datos de contacto -->
+      <div style="padding:1rem 1.2rem .8rem;display:flex;flex-direction:column;gap:.35rem;">
+        {% if prov.telefono %}
+        <div style="font-size:.82rem;display:flex;gap:.5rem;align-items:center;color:var(--gray-500);">
+          <i class="bi bi-telephone" style="color:var(--gray-400);width:1rem;flex-shrink:0;"></i>
+          <span>{{ prov.telefono }}</span>
+        </div>
+        {% endif %}
+        {% if prov.email %}
+        <div style="font-size:.82rem;display:flex;gap:.5rem;align-items:center;color:var(--gray-500);">
+          <i class="bi bi-envelope" style="color:var(--gray-400);width:1rem;flex-shrink:0;"></i>
+          <span>{{ prov.email }}</span>
+        </div>
+        {% endif %}
+        {% if prov.direccion %}
+        <div style="font-size:.82rem;display:flex;gap:.5rem;align-items:center;color:var(--gray-500);">
+          <i class="bi bi-geo-alt" style="color:var(--gray-400);width:1rem;flex-shrink:0;"></i>
+          <span>{{ prov.direccion }}</span>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Stats -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;
+                  background:var(--gray-50);border-top:1px solid var(--gray-200);
+                  border-bottom:1px solid var(--gray-200);">
+        <div style="text-align:center;padding:.7rem .5rem;">
+          <div style="font-family:var(--serif);font-size:1.3rem;color:var(--green-mid);">
+            ${{ prov.total_compras|miles }}
+          </div>
+          <div style="font-size:.65rem;color:var(--gray-400);text-transform:uppercase;letter-spacing:.06em;margin-top:.1rem;">
+            Total comprado
+          </div>
+        </div>
+        <div style="text-align:center;padding:.7rem .5rem;border-left:1px solid var(--gray-200);">
+          <div style="font-family:var(--serif);font-size:1.3rem;">{{ prov.num_productos }}</div>
+          <div style="font-size:.65rem;color:var(--gray-400);text-transform:uppercase;letter-spacing:.06em;margin-top:.1rem;">
+            Productos
+          </div>
+        </div>
+        <div style="text-align:center;padding:.7rem .5rem;border-left:1px solid var(--gray-200);">
+          <div style="font-family:var(--serif);font-size:1.3rem;">{{ prov.num_compras }}</div>
+          <div style="font-size:.65rem;color:var(--gray-400);text-transform:uppercase;letter-spacing:.06em;margin-top:.1rem;">
+            Compras
+          </div>
+        </div>
+      </div>
+
+      <!-- Acciones -->
+      <div style="padding:.85rem 1.2rem;display:flex;gap:.5rem;">
+        <!-- Botón compra directa — el más prominente -->
+        <a href="{% url 'app_admin:entrada_stock' %}?prov={{ prov.pk }}"
+           class="btn btn-primary btn-sm" style="flex:1;justify-content:center;">
+          <i class="bi bi-plus-circle"></i> Registrar entrada
+        </a>
+        <a href="{% url 'app_admin:proveedor_compras' prov.pk %}"
+           class="btn btn-ghost btn-sm" title="Historial de compras">
+          <i class="bi bi-clock-history"></i>
+        </a>
+        <a href="{% url 'app_admin:proveedor_editar' prov.pk %}"
+           class="btn btn-ghost btn-sm" title="Editar"
+           style="background:var(--amber-pale);color:var(--amber);border-color:var(--amber-pale);">
+          <i class="bi bi-pencil"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="empty-state">
+    <i class="bi bi-truck" style="font-size:2.5rem;color:var(--gray-200);display:block;margin-bottom:.5rem;"></i>
+    <p>{% if q %}Sin proveedores con "{{ q }}"{% else %}Sin proveedores registrados{% endif %}</p>
+    <a href="{% url 'app_admin:proveedor_nuevo' %}" class="btn btn-primary" style="margin-top:1rem;">
+      <i class="bi bi-plus-lg"></i> Agregar proveedor
+    </a>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

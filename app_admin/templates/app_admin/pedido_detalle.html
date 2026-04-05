@@ -1,0 +1,121 @@
+{% extends 'app_admin/base_admin.html' %}
+{% load filtros %}
+{% block title %}{{ pedido.ticket }}{% endblock %}
+{% block page_title %}{{ pedido.ticket }}{% endblock %}
+{% block nav_pedidos %}active{% endblock %}
+{% block topbar_actions %}
+  <a href="{% url 'app_admin:pedidos' %}" class="btn btn-ghost"><i class="bi bi-arrow-left"></i> Volver a pedidos</a>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:52rem;">
+<div style="display:grid;grid-template-columns:1fr 300px;gap:1.2rem;align-items:start;">
+
+  <!-- Detalle principal -->
+  <div>
+    <div class="card" style="margin-bottom:1.2rem;">
+      <div class="card-head">
+        <span class="card-title">Detalle del pedido</span>
+        <span class="badge badge-{{ pedido.estado }}">{{ pedido.get_estado_display }}</span>
+      </div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+          <div>
+            <div style="font-size:0.7rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.2rem;">Estudiante</div>
+            <div style="font-weight:600;">{{ pedido.estudiante.perfil.user.get_full_name|default:pedido.estudiante.perfil.user.username }}</div>
+            <div style="font-size:0.82rem;color:var(--gray-500);">Grado {{ pedido.estudiante.grado }} · Cód. {{ pedido.estudiante.codigo }}</div>
+          </div>
+          <div>
+            <div style="font-size:0.7rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.2rem;">Fecha y hora</div>
+            <div style="font-weight:600;">{{ pedido.fecha_pedido|date:"d/m/Y" }}</div>
+            <div style="font-size:0.82rem;color:var(--gray-500);">{{ pedido.fecha_pedido|time:"H:i" }}</div>
+          </div>
+        </div>
+        {% if pedido.nota %}
+        <div style="background:var(--amber-pale);border:1px solid #f5d0a8;border-radius:8px;padding:0.7rem 0.9rem;font-size:0.85rem;color:var(--amber);">
+          <i class="bi bi-chat-left-text"></i> <strong>Nota:</strong> {{ pedido.nota }}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-title">Productos</span></div>
+      <table class="tbl">
+        <thead>
+          <tr><th>Producto</th><th>Tipo</th><th>Cant.</th><th>Precio unit.</th><th>Costo unit.</th><th>Subtotal</th><th>Ganancia</th></tr>
+        </thead>
+        <tbody>
+        {% for d in pedido.detalles.all %}
+        <tr>
+          <td style="font-weight:600;">{{ d.producto.nombre }}</td>
+          <td><span class="badge badge-{{ d.producto.tipo }}">{{ d.producto.get_tipo_display }}</span></td>
+          <td>{{ d.cantidad }}</td>
+          <td>${{ d.precio_unitario|miles }}</td>
+          <td style="color:var(--gray-500);">${{ d.costo_unitario|miles }}</td>
+          <td style="font-weight:700;">${{ d.subtotal|miles }}</td>
+          <td style="color:var(--green-mid);font-weight:600;">${{ d.ganancia_linea|miles }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr style="background:var(--gray-50);">
+            <td colspan="5" style="font-weight:700;text-align:right;padding:0.8rem 1.1rem;">Total</td>
+            <td style="font-weight:700;font-size:1rem;">${{ pedido.total|miles }}</td>
+            <td style="color:var(--green-mid);font-weight:700;">${{ pedido.ganancia|miles }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- Sidebar del pedido -->
+  <div>
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="card-head"><span class="card-title">Resumen</span></div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:0.7rem;">
+        <div style="display:flex;justify-content:space-between;font-size:0.85rem;">
+          <span style="color:var(--gray-500);">Ticket</span>
+          <span style="font-family:monospace;font-weight:700;color:var(--green-mid);">{{ pedido.ticket }}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.85rem;">
+          <span style="color:var(--gray-500);">Ingresos</span>
+          <span style="font-weight:700;">${{ pedido.total|miles }}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.85rem;">
+          <span style="color:var(--gray-500);">Costo</span>
+          <span style="color:var(--red);">${{ pedido.costo_total|miles }}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.9rem;padding-top:0.5rem;border-top:1px solid var(--gray-200);">
+          <span style="font-weight:700;">Ganancia</span>
+          <span style="font-weight:700;color:var(--green-mid);">${{ pedido.ganancia|miles }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cambiar estado -->
+    {% if pedido.estado != 'entregado' and pedido.estado != 'cancelado' %}
+    <div class="card">
+      <div class="card-head"><span class="card-title">Cambiar estado</span></div>
+      <div class="card-body">
+        <form method="post" action="{% url 'app_admin:pedido_estado' pedido.pk %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{% url 'app_admin:pedido_detalle' pedido.pk %}">
+          <div class="field" style="margin-bottom:0.8rem;">
+            <label>Nuevo estado</label>
+            <select name="estado">
+              {% for val, label in pedido.ESTADO_CHOICES %}
+              <option value="{{ val }}" {% if val == pedido.estado %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full">Actualizar estado</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+</div>
+{% endblock %}

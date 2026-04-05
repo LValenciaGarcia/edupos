@@ -1,0 +1,156 @@
+{% extends 'app_padre/base_padre.html' %}
+{% block title %}Registrar Estudiante{% endblock %}
+{% block page_title %}Registrar Estudiante{% endblock %}
+{% block nav_crear %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+  .reg-layout {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 1.4rem;
+    align-items: start;
+  }
+  @media (max-width: 960px) { .reg-layout { grid-template-columns: 1fr; } }
+
+  .section-title {
+    font-family: var(--serif); font-size: 0.95rem; font-weight: 500;
+    letter-spacing: 0.01em; margin-bottom: 1rem;
+    padding-bottom: 0.6rem; border-bottom: 1px solid var(--mist);
+  }
+
+  .info-card {
+    background: var(--ink); border-radius: 12px;
+    padding: 1.6rem 1.5rem; color: rgba(255,255,255,0.75);
+  }
+  .info-card-title {
+    font-family: var(--serif); font-size: 1.1rem;
+    color: #fff; margin-bottom: 1rem; letter-spacing: 0.01em;
+  }
+  .info-step {
+    display: flex; gap: 0.75rem;
+    padding: 0.65rem 0; border-bottom: 1px solid rgba(255,255,255,0.07);
+  }
+  .info-step:last-child { border-bottom: none; }
+  .info-step-num {
+    width: 1.4rem; height: 1.4rem; border-radius: 50%; flex-shrink: 0;
+    background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.25);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.65rem; font-weight: 700; color: var(--leaf-bright);
+    margin-top: 0.05rem;
+  }
+  .info-step-text { font-size: 0.78rem; line-height: 1.5; }
+  .info-step-text strong { color: rgba(255,255,255,0.9); }
+
+  .info-note {
+    margin-top: 1rem; padding: 0.75rem; border-radius: 8px;
+    background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.15);
+    font-size: 0.75rem; color: rgba(255,255,255,0.55); line-height: 1.55;
+  }
+  .info-note strong { color: var(--leaf-bright); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="reg-layout">
+
+  <!-- Formulario -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Nueva cuenta de estudiante</span>
+    </div>
+    <div class="card-body">
+      <form method="post" novalidate>
+        {% csrf_token %}
+
+        <div class="section-title">Datos personales</div>
+        <div class="form-grid" style="margin-bottom:1.2rem;">
+          <div class="field">
+            <label for="first_name">Nombre *</label>
+            <input type="text" id="first_name" name="first_name"
+                   value="{{ form_data.first_name|default:'' }}"
+                   placeholder="Ej: Santiago" required>
+          </div>
+          <div class="field">
+            <label for="last_name">Apellido *</label>
+            <input type="text" id="last_name" name="last_name"
+                   value="{{ form_data.last_name|default:'' }}"
+                   placeholder="Ej: Gómez" required>
+          </div>
+        </div>
+
+        <div class="section-title">Datos escolares</div>
+        <div class="form-grid" style="margin-bottom:1.2rem;">
+          <div class="field">
+            <label for="grado">Grado *</label>
+            <input type="text" id="grado" name="grado"
+                   value="{{ form_data.grado|default:'' }}"
+                   placeholder="Ej: 8B, 10A" required>
+            <span class="hint">Grado y grupo del estudiante</span>
+          </div>
+          <div class="field">
+            <label for="codigo">Código estudiantil *</label>
+            <input type="text" id="codigo" name="codigo"
+                   value="{{ form_data.codigo|default:'' }}"
+                   placeholder="Ej: 2024-0145" required>
+            <span class="hint">Código único asignado por el colegio</span>
+          </div>
+        </div>
+
+        <div class="section-title">Credenciales de acceso</div>
+        <div class="form-grid" style="margin-bottom:1.2rem;">
+          <div class="field full">
+            <label for="username">Nombre de usuario *</label>
+            <input type="text" id="username" name="username"
+                   value="{{ form_data.username|default:'' }}"
+                   placeholder="Ej: santiago.gomez" required autocomplete="off">
+            <span class="hint">Con este usuario el estudiante iniciará sesión</span>
+          </div>
+          <div class="field">
+            <label for="password1">Contraseña *</label>
+            <input type="password" id="password1" name="password1"
+                   placeholder="Mínimo 8 caracteres" required autocomplete="new-password">
+          </div>
+          <div class="field">
+            <label for="password2">Confirmar contraseña *</label>
+            <input type="password" id="password2" name="password2"
+                   placeholder="Repite la contraseña" required>
+          </div>
+        </div>
+
+        <div class="form-footer">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-person-check"></i> Crear cuenta
+          </button>
+          <a href="{% url 'app_padre:hijos' %}" class="btn btn-ghost">Cancelar</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Panel informativo -->
+  <div class="info-card">
+    <div class="info-card-title">¿Cómo funciona?</div>
+    <div class="info-step">
+      <div class="info-step-num">1</div>
+      <div class="info-step-text">Registra la cuenta de tu estudiante con su <strong>nombre, grado y código</strong> del colegio.</div>
+    </div>
+    <div class="info-step">
+      <div class="info-step-num">2</div>
+      <div class="info-step-text">El estudiante podrá <strong>iniciar sesión</strong> con el usuario y contraseña que defines aquí.</div>
+    </div>
+    <div class="info-step">
+      <div class="info-step-num">3</div>
+      <div class="info-step-text"><strong>Recarga saldo</strong> desde tu panel para que pueda comprar en la cafetería.</div>
+    </div>
+    <div class="info-step">
+      <div class="info-step-num">4</div>
+      <div class="info-step-text">Sigue el <strong>historial de pedidos</strong> y controla el gasto desde aquí.</div>
+    </div>
+    <div class="info-note">
+      <strong>Nota:</strong> Puedes registrar más de un hijo. Cada uno tiene su propio saldo y acceso independiente.
+    </div>
+  </div>
+
+</div>
+{% endblock %}

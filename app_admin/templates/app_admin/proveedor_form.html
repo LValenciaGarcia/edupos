@@ -1,0 +1,83 @@
+{% extends 'app_admin/base_admin.html' %}
+{% block title %}{{ accion }}{% endblock %}
+{% block page_title %}{{ accion }}{% endblock %}
+{% block nav_proveedores %}active{% endblock %}
+{% block topbar_actions %}<a href="{% url 'app_admin:proveedores' %}" class="btn btn-ghost"><i class="bi bi-arrow-left"></i> Volver</a>{% endblock %}
+
+{% block content %}
+<div style="max-width:44rem;margin:0 auto;">
+<div class="card">
+  <div class="card-head"><span class="card-title">{{ accion }}</span></div>
+  <div class="card-body">
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="form-grid">
+
+      <div class="field full">
+        <label>Nombre del proveedor *</label>
+        <input type="text" name="nombre" value="{{ proveedor.nombre|default:'' }}" required placeholder="Ej: Distribuidora Los Andes">
+      </div>
+
+      <div class="field">
+        <label>NIT *</label>
+        <input type="text" name="nit" value="{{ proveedor.nit|default:'' }}" placeholder="900.123.456-7">
+        <span class="hint">Número de Identificación Tributaria</span>
+      </div>
+
+      <div class="field">
+        <label>Persona de contacto</label>
+        <input type="text" name="contacto" value="{{ proveedor.contacto|default:'' }}" placeholder="Nombre del representante">
+      </div>
+
+      <div class="field">
+        <label>Teléfono</label>
+        <input type="text" name="telefono" value="{{ proveedor.telefono|default:'' }}" placeholder="300 000 0000">
+      </div>
+
+      <div class="field">
+        <label>Correo electrónico</label>
+        <input type="email" name="email" value="{{ proveedor.email|default:'' }}" placeholder="proveedor@email.com">
+      </div>
+
+      <div class="field full">
+        <label>Dirección</label>
+        <input type="text" name="direccion" value="{{ proveedor.direccion|default:'' }}" placeholder="Calle, ciudad…">
+      </div>
+
+      <div class="field full">
+        <label>Logo de la empresa</label>
+        {% if proveedor.logo %}
+          <img src="{{ proveedor.logo.url }}" id="logo-preview"
+               style="display:block;max-width:8rem;max-height:8rem;object-fit:contain;border:1px solid var(--gray-200);border-radius:8px;margin-bottom:.5rem;">
+        {% else %}
+          <img id="logo-preview" alt="" style="display:none;max-width:8rem;max-height:8rem;object-fit:contain;border:1px solid var(--gray-200);border-radius:8px;margin-bottom:.5rem;">
+        {% endif %}
+        <input type="file" name="logo" accept="image/*" onchange="previewLogo(this)">
+        <span class="hint">PNG, JPG o WEBP. {% if proveedor.logo %}Dejar vacío para conservar el actual.{% endif %}</span>
+      </div>
+
+    </div>
+    <div class="form-footer">
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-floppy"></i>
+        {% if proveedor %}Guardar cambios{% else %}Crear proveedor{% endif %}
+      </button>
+      <a href="{% url 'app_admin:proveedores' %}" class="btn btn-ghost">Cancelar</a>
+    </div>
+  </form>
+  </div>
+</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function previewLogo(input) {
+  if (input.files && input.files[0]) {
+    const preview = document.getElementById('logo-preview');
+    preview.src = URL.createObjectURL(input.files[0]);
+    preview.style.display = 'block';
+  }
+}
+</script>
+{% endblock %}

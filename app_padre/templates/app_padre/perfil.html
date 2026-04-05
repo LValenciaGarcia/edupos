@@ -1,0 +1,201 @@
+{% extends 'app_padre/base_padre.html' %}
+{% load filtros %}
+{% block title %}Mi Perfil{% endblock %}
+{% block page_title %}Mi Perfil{% endblock %}
+
+{% block extra_css %}
+<style>
+  .perfil-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 1.4rem;
+    align-items: start;
+  }
+  @media (max-width: 860px) { .perfil-layout { grid-template-columns: 1fr; } }
+
+  /* ── Panel izquierdo ──────────────────────────────────────────────────── */
+  .perfil-aside { display: flex; flex-direction: column; gap: 1rem; }
+
+  .perfil-id-card {
+    background: var(--ink); border-radius: 12px;
+    padding: 1.8rem 1.5rem;
+    display: flex; flex-direction: column; align-items: center;
+    text-align: center; gap: 0.5rem;
+    position: relative; overflow: hidden;
+  }
+  .perfil-id-card::before {
+    content: '';
+    position: absolute; bottom: -2rem; right: -2rem;
+    width: 8rem; height: 8rem; border-radius: 50%;
+    background: radial-gradient(circle, rgba(34,197,94,0.1) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .perfil-big-avatar {
+    width: 4.5rem; height: 4.5rem; border-radius: 50%;
+    background: rgba(22,163,74,0.18); border: 2px solid rgba(34,197,94,0.25);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--serif); font-size: 1.8rem; color: var(--leaf-bright);
+    margin-bottom: 0.25rem;
+  }
+  .perfil-full-name { font-family: var(--serif); font-size: 1.1rem; color: #fff; line-height: 1.2; }
+  .perfil-username  { font-size: 0.72rem; color: rgba(255,255,255,0.4); }
+  .perfil-rol-badge {
+    margin-top: 0.3rem; padding: 0.2rem 0.7rem; border-radius: 99px;
+    background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.2);
+    font-size: 0.65rem; font-weight: 700; color: var(--leaf-bright);
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+
+  /* ── Stats card ────────────────────────────────────────────────────────── */
+  .perfil-stats { background: var(--ivory); border: 1px solid var(--mist); border-radius: 10px; overflow: hidden; }
+  .pstat-row { display: flex; align-items: center; justify-content: space-between; padding: 0.8rem 1.2rem; border-bottom: 1px solid var(--mist); }
+  .pstat-row:last-child { border-bottom: none; }
+  .pstat-label { font-size: 0.74rem; color: var(--stone); }
+  .pstat-val { font-family: var(--serif); font-size: 1.05rem; }
+  .pstat-val.green { color: var(--leaf); }
+
+  /* ── Sección con tab ────────────────────────────────────────────────────── */
+  .perfil-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--mist); margin-bottom: 1.4rem; }
+  .perfil-tab {
+    padding: 0.6rem 1.1rem; cursor: pointer; background: none; border: none;
+    font-family: var(--sans); font-size: 0.79rem; font-weight: 600;
+    color: var(--ash); border-bottom: 2px solid transparent; margin-bottom: -1px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .perfil-tab:hover { color: var(--ink); }
+  .perfil-tab.active { color: var(--leaf); border-bottom-color: var(--leaf); }
+  .perfil-panel { display: none; }
+  .perfil-panel.active { display: block; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="perfil-layout">
+
+  <!-- Aside izquierdo -->
+  <div class="perfil-aside">
+
+    <!-- ID Card -->
+    <div class="perfil-id-card">
+      <div class="perfil-big-avatar">{{ request.user.username|slice:":1"|upper }}</div>
+      <div class="perfil-full-name">{{ request.user.get_full_name|default:request.user.username }}</div>
+      <div class="perfil-username">@{{ request.user.username }}</div>
+      <div class="perfil-rol-badge">Padre de Familia</div>
+    </div>
+
+    <!-- Estadísticas -->
+    <div class="perfil-stats">
+      <div class="pstat-row">
+        <span class="pstat-label">Hijos registrados</span>
+        <span class="pstat-val">{{ n_hijos }}</span>
+      </div>
+      <div class="pstat-row">
+        <span class="pstat-label">Total recargado</span>
+        <span class="pstat-val green">${{ total_recargado|miles }}</span>
+      </div>
+      <div class="pstat-row">
+        <span class="pstat-label">Recargas realizadas</span>
+        <span class="pstat-val">{{ n_recargas }}</span>
+      </div>
+      {% if padre.documento %}
+      <div class="pstat-row">
+        <span class="pstat-label">Documento</span>
+        <span class="pstat-val" style="font-family:var(--sans);font-size:0.84rem;">{{ padre.documento }}</span>
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <!-- Panel derecho -->
+  <div class="card">
+    <div class="card-head" style="padding-bottom:0;border-bottom:none;">
+      <div class="perfil-tabs" style="width:100%;margin-bottom:0;">
+        <button class="perfil-tab active" onclick="switchTab('datos', this)">Mis datos</button>
+        <button class="perfil-tab" onclick="switchTab('password', this)">Cambiar contraseña</button>
+      </div>
+    </div>
+    <div class="card-body">
+
+      <!-- Tab: Datos -->
+      <div id="panel-datos" class="perfil-panel active">
+        <form method="post" novalidate>
+          {% csrf_token %}
+          <input type="hidden" name="action" value="datos">
+
+          <div class="form-grid" style="margin-bottom:1.1rem;">
+            <div class="field">
+              <label for="first_name">Nombre</label>
+              <input type="text" id="first_name" name="first_name" value="{{ request.user.first_name }}">
+            </div>
+            <div class="field">
+              <label for="last_name">Apellido</label>
+              <input type="text" id="last_name" name="last_name" value="{{ request.user.last_name }}">
+            </div>
+            <div class="field">
+              <label for="email">Correo electrónico</label>
+              <input type="email" id="email" name="email" value="{{ request.user.email }}">
+            </div>
+            <div class="field">
+              <label for="telefono">Teléfono</label>
+              <input type="text" id="telefono" name="telefono" value="{{ request.user.perfil.telefono }}">
+            </div>
+            <div class="field">
+              <label for="documento">N° documento</label>
+              <input type="text" id="documento" name="documento" value="{{ padre.documento }}">
+            </div>
+          </div>
+
+          <div class="form-footer">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-lg"></i> Guardar cambios
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Tab: Contraseña -->
+      <div id="panel-password" class="perfil-panel">
+        <form method="post" novalidate>
+          {% csrf_token %}
+          <input type="hidden" name="action" value="password">
+
+          <div style="display:flex;flex-direction:column;gap:1rem;max-width:22rem;">
+            <div class="field">
+              <label for="old_password">Contraseña actual *</label>
+              <input type="password" id="old_password" name="old_password" placeholder="Tu contraseña actual" required>
+            </div>
+            <div class="field">
+              <label for="new_password1">Nueva contraseña *</label>
+              <input type="password" id="new_password1" name="new_password1" placeholder="Mínimo 8 caracteres" required>
+            </div>
+            <div class="field">
+              <label for="new_password2">Confirmar nueva contraseña *</label>
+              <input type="password" id="new_password2" name="new_password2" placeholder="Repite la nueva contraseña" required>
+            </div>
+          </div>
+
+          <div class="form-footer">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-shield-lock"></i> Actualizar contraseña
+            </button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function switchTab(id, btn) {
+    document.querySelectorAll('.perfil-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.perfil-tab').forEach(b => b.classList.remove('active'));
+    document.getElementById('panel-' + id).classList.add('active');
+    btn.classList.add('active');
+  }
+</script>
+{% endblock %}

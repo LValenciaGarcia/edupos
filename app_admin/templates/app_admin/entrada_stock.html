@@ -1,0 +1,488 @@
+{% extends 'app_admin/base_admin.html' %}
+{% load filtros %}
+{% block title %}Registrar entrada de stock{% endblock %}
+{% block page_title %}Registrar entrada{% endblock %}
+{% block nav_inventario %}active{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'app_admin:inventario' %}" class="btn btn-ghost btn-sm">
+    <i class="bi bi-arrow-left"></i> Volver
+  </a>
+{% endblock %}
+
+{% block content %}
+<style>
+  .entrada-wrap {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  .step-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    background: var(--amber-tint);
+    color: var(--amber);
+    font-size: 0.72rem;
+    font-weight: 700;
+    margin-right: 0.5rem;
+    flex-shrink: 0;
+  }
+  .compra-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    padding: 1.2rem 1.4rem;
+  }
+  .compra-grid .field-full { grid-column: 1 / -1; }
+
+  .items-wrap { padding: 0 1.4rem 1.4rem; }
+
+  .item-fila {
+    display: grid;
+    grid-template-columns: 120px 1fr 100px 120px 110px 36px;
+    gap: 0.6rem;
+    align-items: center;
+    padding: 0.7rem 0.9rem;
+    border: 1.5px solid var(--mist);
+    border-radius: 10px;
+    background: var(--ivory);
+    margin-bottom: 0.55rem;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .item-fila:hover {
+    border-color: var(--fog);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+  }
+  .item-fila:focus-within {
+    border-color: var(--amber);
+    box-shadow: 0 0 0 3px rgba(217,119,6,0.08);
+  }
+  .fila-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--stone);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.2rem;
+  }
+  .fila-cell { display: flex; flex-direction: column; }
+  .fila-cell select,
+  .fila-cell input {
+    border: none;
+    background: transparent;
+    padding: 0.1rem 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--ink);
+    outline: none;
+    width: 100%;
+  }
+  .fila-cell select { cursor: pointer; }
+  .fila-cell input::placeholder { color: var(--fog); font-weight: 400; }
+  .subtotal-val {
+    font-size: 0.92rem;
+    font-weight: 800;
+    color: var(--leaf-dark, #166534);
+  }
+  .btn-del {
+    width: 2rem; height: 2rem;
+    border-radius: 6px;
+    border: 1.5px solid var(--mist);
+    background: transparent;
+    color: var(--stone);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: all 0.14s;
+    flex-shrink: 0;
+  }
+  .btn-del:hover { border-color: var(--red); color: var(--red); background: var(--red-pale); }
+
+  .add-row-btn {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    border: 1.5px dashed var(--fog);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--ash);
+    font-size: 0.82rem; font-weight: 600;
+    cursor: pointer;
+    transition: all 0.14s;
+    width: 100%; justify-content: center;
+    margin-top: 0.2rem;
+  }
+  .add-row-btn:hover { border-color: var(--amber); color: var(--amber); background: var(--amber-pale); }
+
+  .total-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.85rem 1.4rem;
+    border-top: 1px solid var(--mist);
+    background: var(--cream);
+    border-radius: 0 0 12px 12px;
+  }
+  .total-label { font-size: 0.82rem; font-weight: 700; color: var(--stone); text-transform: uppercase; letter-spacing: 0.05em; }
+  .total-amount { font-size: 1.15rem; font-weight: 800; color: var(--leaf-dark, #166534); }
+
+  @media (max-width: 640px) {
+    .item-fila { grid-template-columns: 1fr 1fr; }
+    .fila-cell-item { grid-column: 1 / -1; }
+    .compra-grid { grid-template-columns: 1fr; }
+  }
+</style>
+
+<div class="entrada-wrap">
+<form method="post" id="form-entrada">
+{% csrf_token %}
+
+  <!-- ── Paso 1: Datos de la compra ── -->
+  <div class="card" style="margin-bottom:1rem;">
+    <div class="card-head">
+      <span class="card-title" style="font-size:0.95rem;">
+        <span class="step-badge">1</span>
+        Datos de la compra
+      </span>
+    </div>
+    <div class="compra-grid">
+
+      <div class="field">
+        <label>Proveedor <span style="color:var(--red);">*</span></label>
+        <select name="proveedor" id="sel-proveedor" required>
+          <option value="">— Seleccionar —</option>
+          {% for prov in proveedores %}
+          <option value="{{ prov.pk }}"
+            {% if prov_get_pk and prov_get_pk == prov.pk|stringformat:"s" %}selected
+            {% elif prov_sel and prov_sel.pk == prov.pk %}selected
+            {% elif producto_sel and producto_sel.proveedor and producto_sel.proveedor.pk == prov.pk %}selected
+            {% elif ingrediente_sel and ingrediente_sel.proveedor and ingrediente_sel.proveedor.pk == prov.pk %}selected
+            {% endif %}>
+            {{ prov.nombre }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Fecha</label>
+        <input type="date" name="fecha" id="inp-fecha" required>
+      </div>
+
+      <div class="field field-full">
+        <label>Nota (opcional)</label>
+        <input type="text" name="nota" id="inp-nota" placeholder="Ej: factura #123, compra semanal…">
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Paso 2: Ítems ── -->
+  <div class="card" style="margin-bottom:1rem; overflow:hidden;">
+    <div class="card-head">
+      <span class="card-title" style="font-size:0.95rem;">
+        <span class="step-badge">2</span>
+        Ítems comprados
+      </span>
+    </div>
+
+    <div class="items-wrap" style="padding-top:1rem;">
+
+      <!-- Encabezado columnas -->
+      <div style="display:grid;grid-template-columns:120px 1fr 100px 120px 110px 36px;gap:0.6rem;padding:0 0.9rem 0.3rem;">
+        <span class="fila-label">Tipo</span>
+        <span class="fila-label">Ítem</span>
+        <span class="fila-label">Cantidad</span>
+        <span class="fila-label">Precio / u</span>
+        <span class="fila-label">Subtotal</span>
+        <span></span>
+      </div>
+
+      <div id="filas-body">
+
+        {% if producto_sel %}
+        <div class="item-fila">
+          <div class="fila-cell fila-cell-tipo">
+            <select name="item_tipo" class="tipo-sel" onchange="actualizarSelectItem(this)">
+              <option value="producto" selected>Producto</option>
+              <option value="ingrediente">Ingrediente</option>
+            </select>
+          </div>
+          <div class="fila-cell fila-cell-item">
+            <select name="item_id" class="item-sel" onchange="autocompletarPrecio(this)">
+              {% for p in productos %}
+              <option value="{{ p.pk }}" data-precio="{{ p.precio_costo|default:0 }}" {% if p.pk == producto_sel.pk %}selected{% endif %}>{{ p.nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="fila-cell fila-cell-cant">
+            <input type="number" name="item_cantidad" min="0.01" step="0.01" class="cant-inp" oninput="calcularSubtotal(this)" placeholder="0">
+          </div>
+          <div class="fila-cell fila-cell-precio">
+            <input type="number" name="item_precio" min="0" step="0.01" class="precio-inp" oninput="calcularSubtotal(this)" placeholder="0">
+          </div>
+          <div class="fila-cell fila-cell-sub">
+            <span class="subtotal-val">$0</span>
+          </div>
+          <button type="button" class="btn-del" onclick="eliminarFila(this)" title="Eliminar">
+            <i class="bi bi-trash" style="font-size:0.8rem;"></i>
+          </button>
+        </div>
+
+        {% elif ingrediente_sel %}
+        <div class="item-fila">
+          <div class="fila-cell fila-cell-tipo">
+            <select name="item_tipo" class="tipo-sel" onchange="actualizarSelectItem(this)">
+              <option value="producto">Producto</option>
+              <option value="ingrediente" selected>Ingrediente</option>
+            </select>
+          </div>
+          <div class="fila-cell fila-cell-item">
+            <select name="item_id" class="item-sel" onchange="autocompletarPrecio(this)">
+              {% for ing in ingredientes %}
+              <option value="{{ ing.pk }}" data-precio="{{ ing.precio_unitario }}" {% if ing.pk == ingrediente_sel.pk %}selected{% endif %}>{{ ing.nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="fila-cell fila-cell-cant">
+            <input type="number" name="item_cantidad" min="0.01" step="0.01" class="cant-inp" oninput="calcularSubtotal(this)" placeholder="0">
+          </div>
+          <div class="fila-cell fila-cell-precio">
+            <input type="number" name="item_precio" min="0" step="1" class="precio-inp" oninput="calcularSubtotal(this)" placeholder="0" value="{{ ingrediente_sel.precio_unitario }}">
+          </div>
+          <div class="fila-cell fila-cell-sub">
+            <span class="subtotal-val">$0</span>
+          </div>
+          <button type="button" class="btn-del" onclick="eliminarFila(this)" title="Eliminar">
+            <i class="bi bi-trash" style="font-size:0.8rem;"></i>
+          </button>
+        </div>
+
+        {% else %}
+        <div class="item-fila">
+          <div class="fila-cell fila-cell-tipo">
+            <select name="item_tipo" class="tipo-sel" onchange="actualizarSelectItem(this)">
+              <option value="producto">Producto</option>
+              <option value="ingrediente">Ingrediente</option>
+            </select>
+          </div>
+          <div class="fila-cell fila-cell-item">
+            <select name="item_id" class="item-sel" onchange="autocompletarPrecio(this)">
+              {% for p in productos %}
+              <option value="{{ p.pk }}" data-precio="{{ p.precio_costo|default:0 }}">{{ p.nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="fila-cell fila-cell-cant">
+            <input type="number" name="item_cantidad" min="0.01" step="0.01" class="cant-inp" oninput="calcularSubtotal(this)" placeholder="0">
+          </div>
+          <div class="fila-cell fila-cell-precio">
+            <input type="number" name="item_precio" min="0" step="0.01" class="precio-inp" oninput="calcularSubtotal(this)" placeholder="0">
+          </div>
+          <div class="fila-cell fila-cell-sub">
+            <span class="subtotal-val">$0</span>
+          </div>
+          <button type="button" class="btn-del" onclick="eliminarFila(this)" title="Eliminar">
+            <i class="bi bi-trash" style="font-size:0.8rem;"></i>
+          </button>
+        </div>
+        {% endif %}
+
+      </div>
+
+      <button type="button" class="add-row-btn" onclick="agregarFila()">
+        <i class="bi bi-plus-lg"></i> Agregar ítem
+      </button>
+    </div>
+
+    <div class="total-bar">
+      <span class="total-label">Total estimado</span>
+      <span class="total-amount" id="total-general">$0</span>
+    </div>
+  </div>
+
+  <!-- ── Botones ── -->
+  <div style="display:flex;gap:0.75rem;justify-content:flex-end;margin-top:0.5rem;">
+    <a href="{% url 'app_admin:inventario' %}" class="btn btn-ghost">Cancelar</a>
+    <button type="submit" class="btn btn-primary">
+      <i class="bi bi-check-lg"></i> Guardar compra
+    </button>
+  </div>
+
+</form>
+</div>
+
+<script>
+const PRODUCTOS = [
+  {% for p in productos %}{"id": {{ p.pk }}, "nombre": "{{ p.nombre|escapejs }}", "precio": {{ p.precio_costo|default:0 }}},{% endfor %}
+];
+const INGREDIENTES = [
+  {% for ing in ingredientes %}{"id": {{ ing.pk }}, "nombre": "{{ ing.nombre|escapejs }}", "precio": {{ ing.precio_unitario }}},{% endfor %}
+];
+
+// ── FIX: al cambiar tipo, reconstruye el select de ítem con la lista correcta
+function actualizarSelectItem(tipoSel) {
+  const fila      = tipoSel.closest('.item-fila');
+  const itemSel   = fila.querySelector('.item-sel');
+  const precioInp = fila.querySelector('.precio-inp');
+  const cantInp   = fila.querySelector('.cant-inp');
+  const lista     = tipoSel.value === 'producto' ? PRODUCTOS : INGREDIENTES;
+
+  // Reconstruir opciones con la lista nueva
+  itemSel.innerHTML = lista.map(x =>
+    `<option value="${x.id}" data-precio="${x.precio || 0}">${x.nombre}</option>`
+  ).join('');
+
+  // Limpiar precio y cantidad al cambiar de tipo
+  if (precioInp) precioInp.value = '';
+  if (cantInp)   cantInp.value   = '';
+  fila.querySelector('.subtotal-val').textContent = '$0';
+  recalcularTotal();
+
+  // Sugerir precio del primer ítem de la lista nueva
+  autocompletarPrecio(itemSel);
+}
+
+function autocompletarPrecio(itemSel) {
+  const fila      = itemSel.closest('.item-fila');
+  const opt       = itemSel.options[itemSel.selectedIndex];
+  const precio    = opt ? parseFloat(opt.dataset.precio) || 0 : 0;
+  const precioInp = fila.querySelector('.precio-inp');
+  if (precioInp && precio >= 0) {
+    precioInp.value = precio;
+    calcularSubtotal(precioInp);
+  }
+}
+
+function calcularSubtotal(inp) {
+  const fila   = inp.closest('.item-fila');
+  const cant   = parseFloat(fila.querySelector('.cant-inp').value)   || 0;
+  const precio = parseFloat(fila.querySelector('.precio-inp').value) || 0;
+  const sub    = cant * precio;
+  fila.querySelector('.subtotal-val').textContent = '$' + sub.toLocaleString('es-CO');
+  recalcularTotal();
+}
+
+function recalcularTotal() {
+  let total = 0;
+  document.querySelectorAll('.item-fila').forEach(fila => {
+    const cant = parseFloat(fila.querySelector('.cant-inp').value) || 0;
+    const precio = parseFloat(fila.querySelector('.precio-inp').value) || 0;
+    total += cant * precio;
+  });
+  document.getElementById('total-general').textContent = '$' + total.toLocaleString('es-CO');
+}
+
+function crearFila() {
+  const div = document.createElement('div');
+  div.className = 'item-fila';
+  div.innerHTML = `
+    <div class="fila-cell fila-cell-tipo">
+      <select name="item_tipo" class="tipo-sel" onchange="actualizarSelectItem(this)">
+        <option value="producto">Producto</option>
+        <option value="ingrediente">Ingrediente</option>
+      </select>
+    </div>
+    <div class="fila-cell fila-cell-item">
+      <select name="item_id" class="item-sel" onchange="autocompletarPrecio(this)">
+        ${PRODUCTOS.map(p => `<option value="${p.id}" data-precio="${p.precio || 0}">${p.nombre}</option>`).join('')}
+      </select>
+    </div>
+    <div class="fila-cell fila-cell-cant">
+      <input type="number" name="item_cantidad" min="0.01" step="0.01" class="cant-inp" oninput="calcularSubtotal(this)" placeholder="0">
+    </div>
+    <div class="fila-cell fila-cell-precio">
+      <input type="number" name="item_precio" min="0" step="1" class="precio-inp" oninput="calcularSubtotal(this)" placeholder="0">
+    </div>
+    <div class="fila-cell fila-cell-sub">
+      <span class="subtotal-val">$0</span>
+    </div>
+    <button type="button" class="btn-del" onclick="eliminarFila(this)" title="Eliminar">
+      <i class="bi bi-trash" style="font-size:0.8rem;"></i>
+    </button>
+  `;
+  return div;
+}
+
+function agregarFila() {
+  const body = document.getElementById('filas-body');
+  const fila = crearFila();
+  fila.style.opacity = '0';
+  fila.style.transform = 'translateY(-6px)';
+  body.appendChild(fila);
+  requestAnimationFrame(() => {
+    fila.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+    fila.style.opacity = '1';
+    fila.style.transform = 'translateY(0)';
+    // Autocompletar precio de la nueva fila
+    const itemSel = fila.querySelector('.item-sel');
+    if (itemSel) autocompletarPrecio(itemSel);
+  });
+}
+
+function eliminarFila(btn) {
+  const filas = document.querySelectorAll('.item-fila');
+  if (filas.length <= 1) { alert('Debe haber al menos un ítem.'); return; }
+  const fila = btn.closest('.item-fila');
+  fila.style.transition = 'opacity 0.15s ease, transform 0.15s ease';
+  fila.style.opacity = '0';
+  fila.style.transform = 'translateX(8px)';
+  setTimeout(() => { fila.remove(); recalcularTotal(); }, 150);
+}
+
+document.getElementById('form-entrada').addEventListener('submit', function(e) {
+  const filas = document.querySelectorAll('.item-fila');
+
+  // Validar que hay al menos una fila con datos completos
+  let tieneItems = false;
+  for (let fila of filas) {
+    const itemId = fila.querySelector('.item-sel').value;
+    const cant = parseFloat(fila.querySelector('.cant-inp').value) || 0;
+    const precio = parseFloat(fila.querySelector('.precio-inp').value) || 0;
+
+    if (itemId && cant > 0 && precio > 0) {
+      tieneItems = true;
+      break;
+    }
+  }
+
+  if (!tieneItems) {
+    e.preventDefault();
+    alert('Ingresa al menos un ítem con cantidad y precio mayor a 0.');
+  }
+});
+
+// ── Init: fecha de hoy automática + nota personalizada editable + cálculo inicial
+(function init() {
+  // Fecha de hoy en formato YYYY-MM-DD (local, no UTC)
+  const hoy = new Date();
+  const yyyy = hoy.getFullYear();
+  const mm   = String(hoy.getMonth() + 1).padStart(2, '0');
+  const dd   = String(hoy.getDate()).padStart(2, '0');
+  const fechaHoy = `${yyyy}-${mm}-${dd}`;
+
+  const inpFecha = document.getElementById('inp-fecha');
+  if (inpFecha) {
+    inpFecha.value = fechaHoy;
+    inpFecha.max   = fechaHoy;  // no permitir fechas futuras
+  }
+
+  // Nota personalizada con día y mes en español, editable
+  const dias   = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const meses  = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const diaNom = dias[hoy.getDay()];
+  const mesNom = meses[hoy.getMonth()];
+  const notaDef = `Compra del ${diaNom} ${dd} de ${mesNom}`;
+
+  const inpNota = document.getElementById('inp-nota');
+  if (inpNota && !inpNota.value) {
+    inpNota.value = notaDef;
+  }
+
+  // Calcular subtotales iniciales y total
+  document.querySelectorAll('.precio-inp').forEach(inp => {
+    if (inp.value) calcularSubtotal(inp);
+  });
+  recalcularTotal();
+})();
+</script>
+{% endblock %}

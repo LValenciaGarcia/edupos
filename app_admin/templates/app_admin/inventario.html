@@ -1,0 +1,690 @@
+{% extends 'app_admin/base_admin.html' %}
+{% load filtros %}
+{% block title %}Inventario{% endblock %}
+{% block page_title %}Inventario{% endblock %}
+{% block nav_inventario %}active{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'app_admin:entrada_stock' %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-box-arrow-in-down"></i> Registrar entrada
+  </a>
+  <a href="{% url 'app_admin:salida_stock' %}" class="btn btn-amber btn-sm">
+    <i class="bi bi-box-arrow-up"></i> Registrar salida
+  </a>
+{% endblock %}
+
+{% block content %}
+<style>
+  /* ── KPI strip ── */
+  .inv-kpi {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 0.85rem;
+    margin-bottom: 1.5rem;
+  }
+  .inv-kpi-card {
+    background: var(--ivory);
+    border: 1px solid var(--mist);
+    border-radius: 10px;
+    padding: 1.1rem 1.3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    position: relative;
+    overflow: hidden;
+    transition: box-shadow 0.18s, border-color 0.18s;
+  }
+  .inv-kpi-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.06); border-color: var(--fog); }
+  .inv-kpi-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    border-radius: 99px 0 0 99px;
+  }
+  .inv-kpi-card.green::before { background: var(--leaf); }
+  .inv-kpi-card.amber::before { background: var(--amber); }
+  .inv-kpi-card.red::before   { background: var(--red); }
+  .inv-kpi-card.blue::before  { background: var(--sky); }
+  .inv-kpi-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ash); }
+  .inv-kpi-val   { font-family: var(--serif); font-size: 1.9rem; line-height: 1; }
+  .inv-kpi-card.green .inv-kpi-val { color: var(--leaf); }
+  .inv-kpi-card.amber .inv-kpi-val { color: var(--amber); }
+  .inv-kpi-card.red   .inv-kpi-val { color: var(--red); }
+  .inv-kpi-card.blue  .inv-kpi-val { color: var(--sky); }
+  .inv-kpi-sub   { font-size: 0.69rem; color: var(--ash); }
+
+  /* ── Section tabs ── */
+  .inv-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid var(--mist);
+    margin-bottom: 1.25rem;
+  }
+  .inv-tab {
+    padding: 0.6rem 1.25rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--ash);
+    cursor: pointer;
+    border: none;
+    background: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: color 0.15s, border-color 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    letter-spacing: 0.01em;
+  }
+  .inv-tab:hover { color: var(--ink); }
+  .inv-tab.active { color: var(--leaf); border-bottom-color: var(--leaf); }
+  .inv-tab .tab-count {
+    background: var(--cream);
+    color: var(--stone);
+    font-size: 0.62rem;
+    font-weight: 700;
+    padding: 0.07rem 0.42rem;
+    border-radius: 99px;
+    min-width: 1.4rem;
+    text-align: center;
+  }
+  .inv-tab.active .tab-count { background: var(--leaf-tint); color: var(--leaf-dark); }
+
+  .inv-panel { display: none; }
+  .inv-panel.active { display: block; }
+
+  /* ── Action buttons ── */
+  .action-group {
+    display: flex;
+    gap: 0.3rem;
+    flex-wrap: nowrap;
+  }
+  .action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.28rem;
+    padding: 0.28rem 0.55rem;
+    border-radius: 6px;
+    font-size: 0.69rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    border: 1px solid transparent;
+    transition: all 0.14s;
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+  }
+  .action-btn.entrada  { background: var(--leaf-pale);   color: var(--leaf-dark); border-color: var(--leaf-tint); }
+  .action-btn.entrada:hover  { background: var(--leaf); color: #fff; border-color: var(--leaf); }
+  .action-btn.salida   { background: var(--amber-pale);  color: var(--amber);      border-color: var(--amber-tint); }
+  .action-btn.salida:hover   { background: var(--amber); color: #fff; border-color: var(--amber); }
+  .action-btn.editar   { background: var(--sky-pale);    color: var(--sky);        border-color: var(--sky-tint); }
+  .action-btn.editar:hover   { background: var(--sky);   color: #fff; border-color: var(--sky); }
+  .action-btn.historial { background: var(--cream);      color: var(--stone);      border-color: var(--mist); }
+  .action-btn.historial:hover { background: var(--fog);  color: var(--ink);        border-color: var(--fog); }
+  .action-btn.eliminar { background: var(--red-pale);    color: var(--red);        border-color: var(--red-tint); }
+  .action-btn.eliminar:hover { background: var(--red);   color: #fff;              border-color: var(--red); }
+
+  /* ── Stock pill ── */
+  .stock-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.22rem 0.62rem;
+    border-radius: 99px;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+  .stock-pill.ok  { background: var(--leaf-pale);  color: var(--leaf-dark); }
+  .stock-pill.low { background: var(--amber-pale); color: var(--amber); }
+  .stock-pill.out { background: var(--red-pale);   color: var(--red); }
+  .stock-pill i   { font-size: 0.65rem; }
+
+  /* ── Movimientos recientes ── */
+  .mov-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.2rem;
+    margin-top: 1.5rem;
+  }
+  @media (max-width: 900px) { .mov-grid { grid-template-columns: 1fr; } }
+
+  /* ── Search in table ── */
+  .table-search {
+    position: relative;
+    max-width: 280px;
+  }
+  .table-search i {
+    position: absolute;
+    left: 0.65rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--ash);
+    font-size: 0.8rem;
+    pointer-events: none;
+  }
+  .table-search input {
+    padding-left: 2rem !important;
+    font-size: 0.8rem !important;
+  }
+
+  /* ── Vencimiento pills ── */
+  .venc-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+  }
+  .venc-ok      { color: var(--ash); }
+  .venc-pronto  { color: var(--amber); }
+  .venc-vencido { color: var(--red); }
+
+  /* ── Empty state ── */
+  .inv-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 2rem;
+    gap: 0.75rem;
+    color: var(--ash);
+  }
+  .inv-empty i { font-size: 2.8rem; opacity: 0.35; }
+  .inv-empty p { font-size: 0.84rem; }
+
+  /* ── Confirm modal (eliminar) ── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15,15,14,0.55);
+    z-index: 300;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-box {
+    background: var(--ivory);
+    border-radius: 14px;
+    padding: 1.8rem;
+    width: 100%;
+    max-width: 380px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.22);
+    border: 1px solid var(--mist);
+  }
+  .modal-icon {
+    width: 2.8rem; height: 2.8rem;
+    border-radius: 50%;
+    background: var(--red-pale);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem; color: var(--red);
+    margin-bottom: 1rem;
+  }
+  .modal-title { font-family: var(--serif); font-size: 1.1rem; margin-bottom: 0.3rem; }
+  .modal-desc  { font-size: 0.82rem; color: var(--stone); margin-bottom: 1.4rem; line-height: 1.55; }
+  .modal-actions { display: flex; gap: 0.65rem; }
+
+  /* Animación filas entrada */
+  @keyframes fadeInRow {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .tbl tbody tr { animation: fadeInRow 0.18s var(--ease) both; }
+</style>
+
+<!-- ── KPI strip ─────────────────────────────────────────────────────────── -->
+<div class="inv-kpi">
+  <div class="inv-kpi-card green">
+    <div class="inv-kpi-label">Total ítems</div>
+    <div class="inv-kpi-val">{{ productos.count|add:ingredientes.count }}</div>
+    <div class="inv-kpi-sub">{{ productos.count }} prod. · {{ ingredientes.count }} ing.</div>
+  </div>
+  <div class="inv-kpi-card red">
+    <div class="inv-kpi-label">Sin stock</div>
+    <div class="inv-kpi-val">
+      {% with sin_p=productos|length sin_i=ingredientes|length %}
+      {% comment %}Count in template is limited; we use queryset counts{% endcomment %}
+      {{ alertas.stock_prod|add:alertas.stock_ing }}
+      {% endwith %}
+    </div>
+    <div class="inv-kpi-sub">{{ alertas.stock_prod }} prod. · {{ alertas.stock_ing }} ing.</div>
+  </div>
+  <div class="inv-kpi-card amber">
+    <div class="inv-kpi-label">Vence pronto</div>
+    <div class="inv-kpi-val">{{ alertas.vence_pronto }}</div>
+    <div class="inv-kpi-sub">Próximos 7 días</div>
+  </div>
+  <div class="inv-kpi-card red">
+    <div class="inv-kpi-label">Vencidos</div>
+    <div class="inv-kpi-val">{{ alertas.vencidos }}</div>
+    <div class="inv-kpi-sub">Requieren atención inmediata</div>
+  </div>
+</div>
+
+<!-- ── Filtros ───────────────────────────────────────────────────────────── -->
+<form method="get" class="filter-bar" style="flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;">
+  <select name="categoria" onchange="this.form.submit()" style="min-width:150px;">
+    <option value="">Todas las categorías</option>
+    {% for cat in categorias %}
+    <option value="{{ cat.nombre }}" {% if cat.nombre == cat_f %}selected{% endif %}>{{ cat }}</option>
+    {% endfor %}
+  </select>
+  <select name="tipo" onchange="this.form.submit()" style="min-width:140px;">
+    <option value="">Todos los tipos</option>
+    <option value="simple"    {% if tipo_f == 'simple'    %}selected{% endif %}>Simple</option>
+    <option value="elaborado" {% if tipo_f == 'elaborado' %}selected{% endif %}>Elaborado</option>
+  </select>
+  <div class="table-search" style="flex:1;max-width:320px;">
+    <i class="bi bi-search"></i>
+    <input type="text" name="q" value="{{ q }}" placeholder="Buscar producto o ingrediente…"
+           style="width:100%;padding:0.41rem 0.8rem 0.41rem 2rem;border:1px solid var(--fog);border-radius:7px;background:var(--ivory);font-family:var(--sans);font-size:0.81rem;">
+  </div>
+  <button type="submit" class="btn btn-ghost btn-sm"><i class="bi bi-search"></i> Buscar</button>
+  {% if cat_f or tipo_f or q %}
+  <a href="{% url 'app_admin:inventario' %}" class="btn btn-ghost btn-sm">
+    <i class="bi bi-x-lg"></i> Limpiar
+  </a>
+  {% endif %}
+</form>
+
+<!-- ── Tabs ──────────────────────────────────────────────────────────────── -->
+<div class="inv-tabs">
+  <button class="inv-tab active" data-tab="productos" onclick="switchTab('productos', this)">
+    <i class="bi bi-box-seam"></i> Productos
+    <span class="tab-count">{{ productos.count }}</span>
+  </button>
+  <button class="inv-tab" data-tab="ingredientes" onclick="switchTab('ingredientes', this)">
+    <i class="bi bi-basket"></i> Ingredientes
+    <span class="tab-count">{{ ingredientes.count }}</span>
+  </button>
+  <button class="inv-tab" data-tab="movimientos" onclick="switchTab('movimientos', this)">
+    <i class="bi bi-clock-history"></i> Movimientos recientes
+  </button>
+</div>
+
+<!-- ══ PANEL PRODUCTOS ══════════════════════════════════════════════════════ -->
+<div id="panel-productos" class="inv-panel active">
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title" style="display:flex;align-items:center;gap:0.5rem;">
+        <i class="bi bi-box-seam" style="color:var(--leaf);font-size:1rem;"></i>
+        Productos
+      </span>
+      <div style="display:flex;gap:0.5rem;align-items:center;">
+        <a href="{% url 'app_admin:ingredientes' %}" class="btn btn-ghost btn-sm">
+          <i class="bi bi-basket"></i> Ir a ingredientes
+        </a>
+      </div>
+    </div>
+
+    {% if productos %}
+    <div style="overflow-x:auto;">
+    <table class="tbl" id="tbl-productos">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Categoría</th>
+          <th>Tipo</th>
+          <th>Stock</th>
+          <th>Mínimo</th>
+          <th>Estado</th>
+          <th style="text-align:center;">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for p in productos %}
+      <tr>
+        <td>
+          <div style="font-weight:600;font-size:0.85rem;">{{ p.nombre }}</div>
+          {% if p.proveedor %}
+          <div style="font-size:0.71rem;color:var(--ash);margin-top:0.1rem;">
+            <i class="bi bi-truck" style="font-size:0.65rem;"></i> {{ p.proveedor.nombre }}
+          </div>
+          {% endif %}
+        </td>
+        <td>
+          <span style="font-size:0.78rem;color:var(--stone);">{{ p.categoria }}</span>
+        </td>
+        <td>
+          {% if p.tipo == 'simple' %}
+            <span class="badge badge-simple">Simple</span>
+          {% else %}
+            <span class="badge badge-elaborado">Elaborado</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if p.stock == 0 %}
+            <span class="stock-pill out"><i class="bi bi-x-circle-fill"></i> 0</span>
+          {% elif p.stock_bajo %}
+            <span class="stock-pill low"><i class="bi bi-exclamation-triangle-fill"></i> {{ p.stock }}</span>
+          {% else %}
+            <span class="stock-pill ok"><i class="bi bi-check-circle-fill"></i> {{ p.stock }}</span>
+          {% endif %}
+        </td>
+        <td style="color:var(--ash);font-size:0.8rem;">{{ p.stock_minimo }}</td>
+        <td>
+          {% if p.stock == 0 %}<span class="badge badge-out">Sin stock</span>
+          {% elif p.stock_bajo %}<span class="badge badge-low">Stock bajo</span>
+          {% else %}<span class="badge badge-ok">OK</span>{% endif %}
+        </td>
+        <td>
+          <div class="action-group" style="justify-content:center;">
+            {% if p.tipo == 'simple' %}
+            <a href="{% url 'app_admin:entrada_stock_producto' p.pk %}" class="action-btn entrada" title="Registrar entrada">
+              <i class="bi bi-box-arrow-in-down"></i> Entrada
+            </a>
+            <a href="{% url 'app_admin:salida_stock' %}?tipo=producto&item={{ p.pk }}" class="action-btn salida" title="Registrar salida">
+              <i class="bi bi-box-arrow-up"></i> Salida
+            </a>
+            {% endif %}
+            <a href="{% url 'app_admin:producto_editar' p.pk %}" class="action-btn editar" title="Editar producto">
+              <i class="bi bi-pencil"></i>
+            </a>
+            <a href="{% url 'app_admin:inventario_historial' p.pk %}" class="action-btn historial" title="Ver historial">
+              <i class="bi bi-clock-history"></i>
+            </a>
+            <button class="action-btn eliminar" title="Eliminar producto"
+                    onclick="confirmarEliminar('{{ p.nombre|escapejs }}', '{% url 'app_admin:producto_eliminar' p.pk %}')">
+              <i class="bi bi-trash3"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <div class="inv-empty">
+      <i class="bi bi-box-seam"></i>
+      <p>Sin productos registrados{% if q or cat_f or tipo_f %} para los filtros aplicados{% endif %}.</p>
+      {% if q or cat_f or tipo_f %}
+      <a href="{% url 'app_admin:inventario' %}" class="btn btn-ghost btn-sm">Limpiar filtros</a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ══ PANEL INGREDIENTES ════════════════════════════════════════════════════ -->
+<div id="panel-ingredientes" class="inv-panel">
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title" style="display:flex;align-items:center;gap:0.5rem;">
+        <i class="bi bi-basket" style="color:var(--amber);font-size:1rem;"></i>
+        Ingredientes
+      </span>
+      <a href="{% url 'app_admin:ingrediente_nuevo' %}" class="btn btn-ghost btn-sm">
+        <i class="bi bi-plus-lg"></i> Nuevo ingrediente
+      </a>
+    </div>
+
+    {% if ingredientes %}
+    <div style="overflow-x:auto;">
+    <table class="tbl" id="tbl-ingredientes">
+      <thead>
+        <tr>
+          <th>Ingrediente</th>
+          <th>Unidad</th>
+          <th>Stock</th>
+          <th>Mínimo</th>
+          <th>Vencimiento</th>
+          <th>Estado</th>
+          <th style="text-align:center;">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for ing in ingredientes %}
+      <tr>
+        <td>
+          <div style="font-weight:600;font-size:0.85rem;">{{ ing.nombre }}</div>
+          {% if ing.proveedor %}
+          <div style="font-size:0.71rem;color:var(--ash);margin-top:0.1rem;">
+            <i class="bi bi-truck" style="font-size:0.65rem;"></i> {{ ing.proveedor.nombre }}
+          </div>
+          {% endif %}
+        </td>
+        <td>
+          <span style="font-size:0.78rem;color:var(--stone);">{{ ing.get_unidad_display }}</span>
+        </td>
+        <td>
+          {% if ing.stock == 0 %}
+            <span class="stock-pill out"><i class="bi bi-x-circle-fill"></i> 0</span>
+          {% elif ing.stock <= ing.stock_minimo %}
+            <span class="stock-pill low"><i class="bi bi-exclamation-triangle-fill"></i> {{ ing.stock }}</span>
+          {% else %}
+            <span class="stock-pill ok"><i class="bi bi-check-circle-fill"></i> {{ ing.stock }}</span>
+          {% endif %}
+        </td>
+        <td style="color:var(--ash);font-size:0.8rem;">{{ ing.stock_minimo }}</td>
+        <td>
+          {% if ing.fecha_vencimiento %}
+            {% if ing.vencido %}
+              <span class="venc-pill venc-vencido">
+                <i class="bi bi-x-circle-fill"></i> {{ ing.fecha_vencimiento|date:"d/m/Y" }}
+              </span>
+            {% elif ing.vence_pronto %}
+              <span class="venc-pill venc-pronto">
+                <i class="bi bi-exclamation-triangle-fill"></i> {{ ing.fecha_vencimiento|date:"d/m/Y" }}
+              </span>
+            {% else %}
+              <span class="venc-pill venc-ok">{{ ing.fecha_vencimiento|date:"d/m/Y" }}</span>
+            {% endif %}
+          {% else %}
+            <span style="color:var(--fog);font-size:0.8rem;">—</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if ing.stock == 0 %}<span class="badge badge-out">Sin stock</span>
+          {% elif ing.stock <= ing.stock_minimo %}<span class="badge badge-low">Stock bajo</span>
+          {% else %}<span class="badge badge-ok">OK</span>{% endif %}
+        </td>
+        <td>
+          <div class="action-group" style="justify-content:center;">
+            <a href="{% url 'app_admin:entrada_stock' %}?ing={{ ing.pk }}" class="action-btn entrada" title="Registrar entrada">
+              <i class="bi bi-box-arrow-in-down"></i> Entrada
+            </a>
+            <a href="{% url 'app_admin:salida_stock' %}?tipo=ingrediente&item={{ ing.pk }}" class="action-btn salida" title="Registrar salida">
+              <i class="bi bi-box-arrow-up"></i> Salida
+            </a>
+            <a href="{% url 'app_admin:ingrediente_editar' ing.pk %}" class="action-btn editar" title="Editar ingrediente">
+              <i class="bi bi-pencil"></i>
+            </a>
+            <a href="{% url 'app_admin:ingrediente_historial' ing.pk %}" class="action-btn historial" title="Ver historial">
+              <i class="bi bi-clock-history"></i>
+            </a>
+            <button class="action-btn eliminar" title="Desactivar ingrediente"
+                    onclick="confirmarEliminarIng('{{ ing.nombre|escapejs }}', '{% url 'app_admin:ingrediente_eliminar' ing.pk %}')">
+              <i class="bi bi-trash3"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <div class="inv-empty">
+      <i class="bi bi-basket"></i>
+      <p>Sin ingredientes registrados{% if q %} para "{{ q }}"{% endif %}.</p>
+      <a href="{% url 'app_admin:ingrediente_nuevo' %}" class="btn btn-ghost btn-sm">
+        <i class="bi bi-plus-lg"></i> Crear primer ingrediente
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ══ PANEL MOVIMIENTOS RECIENTES ═════════════════════════════════════════ -->
+<div id="panel-movimientos" class="inv-panel">
+  <div class="mov-grid">
+
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title" style="font-size:0.95rem;">
+          <i class="bi bi-box-seam" style="color:var(--leaf);margin-right:0.3rem;"></i>
+          Últimos movimientos — Productos
+        </span>
+        <a href="{% url 'app_admin:historial' %}" class="btn btn-ghost btn-sm">
+          Ver todo <i class="bi bi-arrow-right"></i>
+        </a>
+      </div>
+      {% if movimientos %}
+      <div style="overflow-y:auto;max-height:420px;">
+      <table class="tbl">
+        <thead>
+          <tr><th>Producto</th><th>Tipo</th><th>Cant.</th><th>Fecha</th></tr>
+        </thead>
+        <tbody>
+        {% for m in movimientos %}
+        <tr>
+          <td style="font-weight:600;font-size:0.8rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            {{ m.producto.nombre }}
+          </td>
+          <td>
+            {% if m.tipo == 'entrada' %}<span class="badge badge-ok">Entrada</span>
+            {% elif m.tipo == 'salida' %}<span class="badge badge-entregado">Salida</span>
+            {% elif m.tipo == 'merma'  %}<span class="badge badge-out">Merma</span>
+            {% else %}<span class="badge badge-pendiente">Ajuste</span>{% endif %}
+          </td>
+          <td style="font-weight:700;font-size:0.82rem;">{{ m.cantidad }}</td>
+          <td style="font-size:0.73rem;color:var(--ash);">{{ m.fecha|date:"d/m H:i" }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% else %}
+      <div class="inv-empty" style="padding:2rem;"><i class="bi bi-inbox"></i><p>Sin movimientos aún.</p></div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title" style="font-size:0.95rem;">
+          <i class="bi bi-basket" style="color:var(--amber);margin-right:0.3rem;"></i>
+          Últimos movimientos — Ingredientes
+        </span>
+        <a href="{% url 'app_admin:historial' %}" class="btn btn-ghost btn-sm">
+          Ver todo <i class="bi bi-arrow-right"></i>
+        </a>
+      </div>
+      {% if movimientos_ings %}
+      <div style="overflow-y:auto;max-height:420px;">
+      <table class="tbl">
+        <thead>
+          <tr><th>Ingrediente</th><th>Tipo</th><th>Cant.</th><th>Fecha</th></tr>
+        </thead>
+        <tbody>
+        {% for m in movimientos_ings %}
+        <tr>
+          <td style="font-weight:600;font-size:0.8rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            {{ m.ingrediente.nombre }}
+          </td>
+          <td>
+            {% if m.tipo == 'entrada' %}<span class="badge badge-ok">Entrada</span>
+            {% elif m.tipo == 'salida' %}<span class="badge badge-entregado">Salida</span>
+            {% elif m.tipo == 'merma'  %}<span class="badge badge-out">Merma</span>
+            {% else %}<span class="badge badge-pendiente">Ajuste</span>{% endif %}
+          </td>
+          <td style="font-weight:700;font-size:0.82rem;">{{ m.cantidad }}</td>
+          <td style="font-size:0.73rem;color:var(--ash);">{{ m.fecha|date:"d/m H:i" }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% else %}
+      <div class="inv-empty" style="padding:2rem;"><i class="bi bi-inbox"></i><p>Sin movimientos aún.</p></div>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ MODAL CONFIRMAR ELIMINACIÓN ═════════════════════════════════════════ -->
+<div id="modal-eliminar" class="modal-overlay" onclick="if(event.target===this)cerrarModal()">
+  <div class="modal-box">
+    <div class="modal-icon"><i class="bi bi-trash3-fill"></i></div>
+    <div class="modal-title">¿Eliminar elemento?</div>
+    <p class="modal-desc" id="modal-eliminar-desc">
+      Esta acción desactivará el elemento del inventario. Podrás reactivarlo más tarde.
+    </p>
+    <form id="form-eliminar" method="post">
+      {% csrf_token %}
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" style="flex:1;" onclick="cerrarModal()">Cancelar</button>
+        <button type="submit" class="btn btn-danger" style="flex:1;">
+          <i class="bi bi-trash3"></i> Eliminar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Tabs ─────────────────────────────────────────────────────────────────
+function switchTab(name, btn) {
+  document.querySelectorAll('.inv-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.inv-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  btn.classList.add('active');
+  // Persist in sessionStorage
+  sessionStorage.setItem('inv_tab', name);
+}
+
+// Restore last tab
+(function() {
+  const saved = sessionStorage.getItem('inv_tab');
+  if (saved) {
+    const btn = document.querySelector(`[data-tab="${saved}"]`);
+    if (btn) switchTab(saved, btn);
+  }
+})();
+
+// ── Confirm modals ────────────────────────────────────────────────────────
+function confirmarEliminar(nombre, url) {
+  document.getElementById('modal-eliminar-desc').innerHTML =
+    `Vas a eliminar el producto <strong>${nombre}</strong>. Esta acción es reversible desde el módulo de productos.`;
+  document.getElementById('form-eliminar').action = url;
+  document.getElementById('modal-eliminar').classList.add('open');
+}
+
+function confirmarEliminarIng(nombre, url) {
+  document.getElementById('modal-eliminar-desc').innerHTML =
+    `Vas a desactivar el ingrediente <strong>${nombre}</strong>. No aparecerá en el inventario pero conservará su historial.`;
+  document.getElementById('form-eliminar').action = url;
+  document.getElementById('modal-eliminar').classList.add('open');
+}
+
+function cerrarModal() {
+  document.getElementById('modal-eliminar').classList.remove('open');
+}
+
+// ── Búsqueda en tabla (client-side) ──────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  const searchInput = document.querySelector('input[name="q"]');
+  if (searchInput) {
+    searchInput.addEventListener('input', function() {
+      const q = this.value.toLowerCase();
+      // Filtrar tabla activa
+      const activePanel = document.querySelector('.inv-panel.active');
+      if (!activePanel) return;
+      const rows = activePanel.querySelectorAll('tbody tr');
+      rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(q) ? '' : 'none';
+      });
+    });
+  }
+});
+</script>
+{% endblock %}

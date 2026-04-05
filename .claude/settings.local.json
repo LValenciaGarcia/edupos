@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import django; import os; os.environ.setdefault\\('DJANGO_SETTINGS_MODULE', 'edupos.settings'\\); django.setup\\(\\); from app_admin import views; print\\('OK - views import'\\)\")",
+      "Bash(python -c ':*)",
+      "Bash(python manage.py check --deploy)",
+      "Bash(python manage.py shell -c ':*)"
+    ]
+  }
+}

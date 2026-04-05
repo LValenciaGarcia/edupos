@@ -1,0 +1,192 @@
+{% extends 'app_admin/base_admin.html' %}
+{% block title %}{{ accion }}{% endblock %}
+{% block page_title %}{{ accion }}{% endblock %}
+{% block nav_productos %}active{% endblock %}
+{% block topbar_actions %}<a href="{% url 'app_admin:productos' %}" class="btn btn-ghost"><i class="bi bi-arrow-left"></i> Volver</a>{% endblock %}
+
+{% block content %}
+<div style="max-width:54rem;margin:0 auto;">
+<div class="card">
+  <div class="card-head"><span class="card-title">{{ accion }}</span></div>
+  <div class="card-body">
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    <!-- Tipo de producto -->
+    <div class="field full" style="margin-bottom:1.2rem;">
+      <label>Tipo de producto</label>
+      <div style="display:flex;gap:1rem;margin-top:0.4rem;">
+        <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;text-transform:none;font-size:0.9rem;font-weight:500;">
+          <input type="radio" name="tipo" value="simple"
+            {% if not producto or producto.tipo == 'simple' %}checked{% endif %}
+            onchange="toggleTipo(this.value)" style="accent-color:var(--green-mid);">
+          <i class="bi bi-cart3"></i> <strong>Simple</strong> — Se compra al proveedor y se vende directo
+        </label>
+        <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;text-transform:none;font-size:0.9rem;font-weight:500;">
+          <input type="radio" name="tipo" value="elaborado"
+            {% if producto and producto.tipo == 'elaborado' %}checked{% endif %}
+            onchange="toggleTipo(this.value)" style="accent-color:var(--green-mid);">
+          <i class="bi bi-fire"></i> <strong>Elaborado</strong> — Se prepara en la tienda con ingredientes
+        </label>
+      </div>
+    </div>
+
+    <div class="form-grid">
+      <div class="field full">
+        <label>Nombre del producto *</label>
+        <input type="text" name="nombre" value="{{ producto.nombre|default:'' }}" required placeholder="Ej: Jugo de naranja, Almuerzo ejecutivo…">
+      </div>
+      <div class="field">
+        <label>Categoría *</label>
+        <select name="categoria" required>
+          <option value="">— Selecciona —</option>
+          {% for cat in categorias %}
+          <option value="{{ cat.pk }}" {% if producto and producto.categoria_id == cat.pk %}selected{% endif %}>{{ cat }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>Precio de venta (COP) *</label>
+        <input type="number" name="precio_venta" value="{{ producto.precio_venta|default:'' }}" min="0" step="50" required placeholder="3500">
+      </div>
+      <div class="field full">
+        <label>Descripción</label>
+        <textarea name="descripcion" placeholder="Descripción breve del producto…">{{ producto.descripcion|default:'' }}</textarea>
+      </div>
+    </div>
+
+    <!-- BLOQUE SIMPLE -->
+    <div id="bloque-simple" style="margin-top:1.2rem;">
+      <div style="font-size:0.78rem;font-weight:700;color:var(--gray-500);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:0.8rem;padding-bottom:0.5rem;border-bottom:1px solid var(--gray-200);">
+        <i class="bi bi-box-seam"></i> Datos del producto simple
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Precio de costo (COP)</label>
+          <input type="number" name="precio_costo" value="{{ producto.precio_costo|default:'' }}" min="0" step="50" placeholder="0">
+          <span class="hint">Precio al que compras este producto al proveedor</span>
+        </div>
+        <div class="field">
+          <label>Proveedor</label>
+          <select name="proveedor">
+            <option value="">— Sin asignar —</option>
+            {% for prov in proveedores %}
+            <option value="{{ prov.pk }}" {% if producto and producto.proveedor_id == prov.pk %}selected{% endif %}>{{ prov.nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label>Stock actual</label>
+          <input type="number" name="stock" value="{{ producto.stock|default:'0' }}" min="0">
+        </div>
+        <div class="field">
+          <label>Stock mínimo (alerta)</label>
+          <input type="number" name="stock_minimo" value="{{ producto.stock_minimo|default:'5' }}" min="0">
+          <span class="hint">Recibirás alerta cuando el stock baje de este número</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- BLOQUE ELABORADO -->
+    <div id="bloque-elaborado" style="margin-top:1.2rem;display:none;">
+      <div style="font-size:0.78rem;font-weight:700;color:var(--gray-500);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:0.8rem;padding-bottom:0.5rem;border-bottom:1px solid var(--gray-200);">
+        <i class="bi bi-fire"></i> Receta — Ingredientes
+      </div>
+      <div style="font-size:0.82rem;color:var(--gray-400);margin-bottom:0.8rem;">
+        El costo del producto se calculará automáticamente a partir de los ingredientes.
+      </div>
+      <div id="receta-container">
+        {% if receta %}
+          {% for r in receta %}
+          <div class="receta-row">
+            <select name="ingrediente_id">
+              <option value="">— Ingrediente —</option>
+              {% for ing in ingredientes %}
+              <option value="{{ ing.pk }}" {% if ing.pk == r.ingrediente_id %}selected{% endif %}>{{ ing.nombre }} ({{ ing.get_unidad_display }})</option>
+              {% endfor %}
+            </select>
+            <input type="number" name="ingrediente_cant" value="{{ r.cantidad }}" min="0.01" step="0.01" placeholder="Cantidad">
+            <button type="button" class="btn-rm-row" onclick="this.closest('.receta-row').remove()"><i class="bi bi-x-lg"></i></button>
+          </div>
+          {% endfor %}
+        {% endif %}
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm" onclick="agregarIngrediente()" style="margin-top:0.5rem;">
+        + Agregar ingrediente
+      </button>
+    </div>
+
+    <!-- Imagen -->
+    <div style="margin-top:1.2rem;padding-top:1.2rem;border-top:1px solid var(--gray-200);">
+      <div class="field">
+        <label>Imagen del producto</label>
+        {% if producto and producto.imagen %}
+        <img src="{{ producto.imagen.url }}" id="img-preview" style="display:block;">
+        {% else %}
+        <img id="img-preview" alt="">
+        {% endif %}
+        <input type="file" name="imagen" accept="image/*" onchange="previewImg(this)">
+        <span class="hint">JPG, PNG o WEBP. Max 2MB. {% if producto and producto.imagen %}Dejar vacío para conservar la actual.{% endif %}</span>
+      </div>
+    </div>
+
+    <!-- Disponible -->
+    <div style="margin-top:1rem;">
+      <div class="check-row">
+        <input type="checkbox" name="disponible" id="disponible"
+          {% if not producto or producto.disponible %}checked{% endif %}>
+        <span>Visible para estudiantes (disponible en el menú)</span>
+      </div>
+    </div>
+
+    <div class="form-footer">
+      <button type="submit" class="btn btn-primary">
+        {% if producto %}<i class="bi bi-floppy"></i> Guardar cambios{% else %}<i class="bi bi-plus-lg"></i> Crear producto{% endif %}
+      </button>
+      <a href="{% url 'app_admin:productos' %}" class="btn btn-ghost">Cancelar</a>
+    </div>
+  </form>
+  </div>
+</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const ingredientesData = [
+  {% for ing in ingredientes %}
+  { id: {{ ing.pk }}, nombre: "{{ ing.nombre }}", unidad: "{{ ing.get_unidad_display }}" },
+  {% endfor %}
+];
+
+function toggleTipo(tipo) {
+  document.getElementById('bloque-simple').style.display    = tipo === 'simple'    ? '' : 'none';
+  document.getElementById('bloque-elaborado').style.display = tipo === 'elaborado' ? '' : 'none';
+}
+
+// Inicializar
+const tipoInicial = document.querySelector('input[name="tipo"]:checked')?.value || 'simple';
+toggleTipo(tipoInicial);
+
+function agregarIngrediente() {
+  const container = document.getElementById('receta-container');
+  const opts = ingredientesData.map(i => `<option value="${i.id}">${i.nombre} (${i.unidad})</option>`).join('');
+  const row = document.createElement('div');
+  row.className = 'receta-row';
+  row.innerHTML = `
+    <select name="ingrediente_id"><option value="">— Ingrediente —</option>${opts}</select>
+    <input type="number" name="ingrediente_cant" min="0.01" step="0.01" placeholder="Cantidad">
+    <button type="button" class="btn-rm-row" onclick="this.closest('.receta-row').remove()"><i class="bi bi-x-lg"></i></button>
+  `;
+  container.appendChild(row);
+}
+
+function previewImg(input) {
+  const preview = document.getElementById('img-preview');
+  if (input.files && input.files[0]) {
+    preview.src = URL.createObjectURL(input.files[0]);
+    preview.style.display = 'block';
+  }
+}
+</script>
+{% endblock %}

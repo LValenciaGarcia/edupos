@@ -1,0 +1,65 @@
+{% extends 'app_admin/base_admin.html' %}
+{% block title %}Usuarios{% endblock %}
+{% block page_title %}Usuarios{% endblock %}
+{% block nav_usuarios %}active{% endblock %}
+
+{% block content %}
+<form method="get" class="filter-bar">
+  <select name="rol" onchange="this.form.submit()">
+    <option value="">Todos los roles</option>
+    {% for val, label in roles %}
+    <option value="{{ val }}" {% if val == rol_f %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  {% if rol_f %}<a href="{% url 'app_admin:usuarios' %}" class="btn btn-ghost btn-sm"><i class="bi bi-x-lg"></i> Limpiar</a>{% endif %}
+</form>
+
+<div class="card">
+  <div class="card-head">
+    <span class="card-title">{{ perfiles.count }} usuario{{ perfiles.count|pluralize }}</span>
+  </div>
+  {% if perfiles %}
+  <table class="tbl">
+    <thead>
+      <tr><th>Usuario</th><th>Nombre completo</th><th>Rol</th><th>Estado</th><th>Registro</th><th>Acciones</th></tr>
+    </thead>
+    <tbody>
+    {% for perfil in perfiles %}
+    <tr>
+      <td style="font-family:monospace;font-size:0.85rem;font-weight:600;">{{ perfil.user.username }}</td>
+      <td style="font-weight:500;">{{ perfil.user.get_full_name|default:"—" }}</td>
+      <td>
+        {% if perfil.rol == 'admin' %}<span class="badge badge-elaborado">Administrador</span>
+        {% elif perfil.rol == 'padre' %}<span class="badge badge-preparando">Padre</span>
+        {% elif perfil.rol == 'estudiante' %}<span class="badge badge-ok">Estudiante</span>
+        {% else %}<span class="badge badge-entregado">{{ perfil.get_rol_display }}</span>{% endif %}
+      </td>
+      <td>
+        <span class="badge {% if perfil.activo %}badge-activo{% else %}badge-inactivo{% endif %}">
+          {% if perfil.activo %}Activo{% else %}Inactivo{% endif %}
+        </span>
+      </td>
+      <td style="font-size:0.8rem;color:var(--gray-400);">{{ perfil.created_at|date:"d/m/Y" }}</td>
+      <td>
+        <div style="display:flex;gap:0.4rem;">
+          <a href="{% url 'app_admin:usuario_detalle' perfil.pk %}" class="btn btn-ghost btn-xs">Ver</a>
+          {% if perfil.rol != 'admin' %}
+          <form method="post" action="{% url 'app_admin:usuario_toggle' perfil.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-xs {% if perfil.activo %}btn-danger{% else %}btn-primary{% endif %}"
+                    onclick="return confirm('¿{% if perfil.activo %}Desactivar{% else %}Activar{% endif %} a {{ perfil.user.username }}?')">
+              {% if perfil.activo %}Desactivar{% else %}Activar{% endif %}
+            </button>
+          </form>
+          {% endif %}
+        </div>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state"><i class="bi bi-people" style="font-size:2.5rem;color:var(--gray-200);display:block;margin-bottom:0.5rem;"></i><p>No hay usuarios con esos filtros.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

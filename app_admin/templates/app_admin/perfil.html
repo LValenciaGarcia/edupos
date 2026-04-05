@@ -1,0 +1,279 @@
+{% extends 'app_admin/base_admin.html' %}
+{% block title %}Mi perfil{% endblock %}
+{% block page_title %}Mi perfil{% endblock %}
+{% block nav_perfil %}active{% endblock %}
+
+{% block content %}
+<style>
+  /* ── Photo Upload Component ───────────────────────────────── */
+  .avatar-upload-wrapper {
+    position: relative;
+    width: 128px;
+    height: 128px;
+    margin: 0 auto 1.25rem;
+  }
+
+  .avatar-img {
+    width: 128px;
+    height: 128px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid var(--green-light);
+    display: block;
+    transition: filter 0.25s ease;
+  }
+
+  .avatar-placeholder {
+    width: 128px;
+    height: 128px;
+    border-radius: 50%;
+    background: var(--green-pale);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid var(--green-light);
+    transition: filter 0.25s ease;
+  }
+
+  .avatar-placeholder i {
+    font-size: 3rem;
+    color: var(--green-mid);
+  }
+
+  /* Overlay that appears on hover */
+  .avatar-overlay {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    opacity: 0;
+    transition: opacity 0.22s ease;
+    cursor: pointer;
+    color: #fff;
+  }
+
+  .avatar-overlay i {
+    font-size: 1.5rem;
+  }
+
+  .avatar-overlay span {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .avatar-upload-wrapper:hover .avatar-overlay {
+    opacity: 1;
+  }
+
+  .avatar-upload-wrapper:hover .avatar-img,
+  .avatar-upload-wrapper:hover .avatar-placeholder {
+    filter: brightness(0.75);
+  }
+
+  /* Hidden real input */
+  #foto-input {
+    display: none;
+  }
+
+  /* File name pill shown after selection */
+  .foto-filename {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    color: var(--green-mid);
+    background: var(--green-pale);
+    border-radius: 999px;
+    padding: 0.25rem 0.7rem;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 0.1rem;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+
+  .foto-filename.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* ── General form polish ───────────────────────────────────── */
+  .perfil-grid {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 1.4rem;
+    align-items: start;
+    max-width: 820px;
+    margin: 0 auto;
+  }
+
+  .side-card {
+    text-align: center;
+    padding: 1.8rem 1.2rem 1.4rem;
+  }
+
+  .user-name {
+    font-family: var(--serif);
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin-bottom: 0.3rem;
+  }
+
+  .fields-col {
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+  }
+
+  @media (max-width: 640px) {
+    .perfil-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<form method="post" enctype="multipart/form-data">
+{% csrf_token %}
+
+<div class="perfil-grid">
+
+  <!-- ── Columna foto ── -->
+  <div class="card side-card">
+
+    <div class="avatar-upload-wrapper" onclick="document.getElementById('foto-input').click()" title="Cambiar foto">
+      {% if perfil_admin.foto %}
+        <img src="{{ perfil_admin.foto.url }}" alt="Foto de perfil" class="avatar-img" id="avatar-preview">
+      {% else %}
+        <div class="avatar-placeholder" id="avatar-preview">
+          <i class="bi bi-person-fill"></i>
+        </div>
+      {% endif %}
+
+      <div class="avatar-overlay">
+        <i class="bi bi-camera-fill"></i>
+        <span>Cambiar</span>
+      </div>
+    </div>
+
+    <!-- Hidden real file input -->
+    <input type="file" name="foto" id="foto-input" accept="image/*">
+
+    <!-- Filename pill (shown after selection) -->
+    <div class="foto-filename" id="foto-filename">
+      <i class="bi bi-image"></i>
+      <span id="foto-filename-text">—</span>
+    </div>
+
+    <div class="user-name">
+      {{ perfil_auth.user.get_full_name|default:perfil_auth.user.username }}
+    </div>
+    <span class="badge" style="background:var(--green-pale);color:var(--green-mid);display:inline-block;">
+      {{ perfil_auth.get_rol_display }}
+    </span>
+
+  </div>
+
+  <!-- ── Columna datos ── -->
+  <div class="fields-col">
+
+    <div class="card">
+      <div class="card-head"><span class="card-title">Datos personales</span></div>
+      <div style="padding:1.2rem 1.4rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div class="field">
+          <label>Nombre</label>
+          <input type="text" name="first_name" value="{{ perfil_auth.user.first_name }}" placeholder="Nombre">
+        </div>
+        <div class="field">
+          <label>Apellido</label>
+          <input type="text" name="last_name" value="{{ perfil_auth.user.last_name }}" placeholder="Apellido">
+        </div>
+        <div class="field">
+          <label>Correo electrónico</label>
+          <input type="email" name="email" value="{{ perfil_auth.user.email }}" placeholder="correo@ejemplo.com">
+        </div>
+        <div class="field">
+          <label>Teléfono</label>
+          <input type="text" name="telefono" value="{{ perfil_auth.telefono|default:'' }}" placeholder="Ej: 300 000 0000">
+        </div>
+        <div class="field">
+          <label>Documento (CC)</label>
+          <input type="text" name="documento" value="{{ perfil_admin.documento }}" placeholder="Número de documento">
+        </div>
+        <div class="field">
+          <label>Fecha de nacimiento</label>
+          <input type="date" name="fecha_nacimiento"
+                 value="{% if perfil_admin.fecha_nacimiento %}{{ perfil_admin.fecha_nacimiento|date:'Y-m-d' }}{% endif %}">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-title">Información laboral</span></div>
+      <div style="padding:1.2rem 1.4rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div class="field">
+          <label>Cargo</label>
+          <input type="text" name="cargo" value="{{ perfil_admin.cargo }}" placeholder="Ej: Administrador de cafetería">
+        </div>
+        <div class="field">
+          <label>Dirección</label>
+          <input type="text" name="direccion" value="{{ perfil_admin.direccion }}" placeholder="Dirección">
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check-lg"></i> Guardar cambios
+      </button>
+    </div>
+
+  </div>
+</div>
+
+</form>
+
+<script>
+(function () {
+  const input    = document.getElementById('foto-input');
+  const pill     = document.getElementById('foto-filename');
+  const pillText = document.getElementById('foto-filename-text');
+  const preview  = document.getElementById('avatar-preview');
+
+  input.addEventListener('change', function () {
+    const file = this.files[0];
+    if (!file) return;
+
+    /* Show filename pill */
+    pillText.textContent = file.name.length > 22 ? file.name.slice(0, 20) + '…' : file.name;
+    pill.classList.add('visible');
+
+    /* Live-preview the chosen image */
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      if (preview.tagName === 'IMG') {
+        preview.src = e.target.result;
+      } else {
+        /* Replace placeholder div with an img */
+        const img = document.createElement('img');
+        img.src = e.target.result;
+        img.className = 'avatar-img';
+        img.id = 'avatar-preview';
+        img.alt = 'Foto de perfil';
+        preview.replaceWith(img);
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+})();
+</script>
+{% endblock %}

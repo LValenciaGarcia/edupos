@@ -1,0 +1,137 @@
+{% extends 'app_admin/base_admin.html' %}
+{% block title %}Nueva compra{% endblock %}
+{% block page_title %}Registrar compra{% endblock %}
+{% block nav_proveedores %}active{% endblock %}
+{% block topbar_actions %}<a href="{% url 'app_admin:proveedores' %}" class="btn btn-ghost"><i class="bi bi-arrow-left"></i> Volver</a>{% endblock %}
+
+{% block content %}
+<div style="max-width:56rem;">
+<div class="card">
+  <div class="card-head"><span class="card-title">Nueva compra a proveedor</span></div>
+  <div class="card-body">
+  <form method="post" id="form-compra">
+    {% csrf_token %}
+    <div class="form-grid" style="margin-bottom:1.2rem;">
+      <div class="field">
+        <label>Proveedor *</label>
+        <select name="proveedor" required>
+          <option value="">— Selecciona —</option>
+          {% for prov in proveedores %}
+          <option value="{{ prov.pk }}">{{ prov.nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>Fecha de compra *</label>
+        <input type="date" name="fecha" value="{% now 'Y-m-d' %}" required>
+      </div>
+      <div class="field full">
+        <label>Nota / observación</label>
+        <input type="text" name="nota" placeholder="Opcional…">
+      </div>
+    </div>
+
+    <div style="font-size:0.78rem;font-weight:700;color:var(--gray-500);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:0.8rem;padding-bottom:0.5rem;border-top:1px solid var(--gray-200);padding-top:1rem;">
+      <i class="bi bi-box-seam"></i> Ítems comprados
+    </div>
+
+    <div style="display:grid;grid-template-columns:auto 1fr 1fr 1fr 2rem;gap:0.5rem;margin-bottom:0.5rem;padding:0 0.2rem;">
+      <span style="font-size:0.68rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;">Tipo</span>
+      <span style="font-size:0.68rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;">Producto / Ingrediente</span>
+      <span style="font-size:0.68rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;">Cantidad</span>
+      <span style="font-size:0.68rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;">Precio/u (COP)</span>
+      <span></span>
+    </div>
+
+    <div id="items-container">
+      <!-- Fila inicial -->
+      <div class="compra-row" style="display:grid;grid-template-columns:auto 1fr 1fr 1fr 2rem;gap:0.5rem;margin-bottom:0.5rem;align-items:center;">
+        <select name="item_tipo" onchange="actualizarSelect(this)" style="font-family:var(--sans);font-size:0.82rem;padding:0.45rem 0.6rem;border:1.5px solid var(--gray-200);border-radius:8px;">
+          <option value="producto">Producto</option>
+          <option value="ingrediente">Ingrediente</option>
+        </select>
+        <select name="item_id" style="font-family:var(--sans);font-size:0.82rem;padding:0.45rem 0.6rem;border:1.5px solid var(--gray-200);border-radius:8px;">
+          <option value="">— Selecciona —</option>
+          {% for p in productos %}
+          <option value="{{ p.pk }}" data-tipo="producto">{{ p.nombre }}</option>
+          {% endfor %}
+        </select>
+        <input type="number" name="item_cantidad" min="0.01" step="0.01" placeholder="Cantidad"
+               style="font-family:var(--sans);font-size:0.82rem;padding:0.45rem 0.6rem;border:1.5px solid var(--gray-200);border-radius:8px;">
+        <input type="number" name="item_precio" min="0" step="0.01" placeholder="Precio unit."
+               style="font-family:var(--sans);font-size:0.82rem;padding:0.45rem 0.6rem;border:1.5px solid var(--gray-200);border-radius:8px;">
+        <button type="button" class="btn-rm-row" onclick="this.closest('.compra-row').remove()"><i class="bi bi-x-lg"></i></button>
+      </div>
+    </div>
+
+    <button type="button" class="btn btn-ghost btn-sm" onclick="agregarFila()" style="margin-top:0.3rem;">
+      + Agregar ítem
+    </button>
+
+    <div style="background:var(--gray-50);border-radius:10px;padding:1rem;margin-top:1.2rem;display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:0.85rem;color:var(--gray-500);">El stock se actualizará automáticamente al guardar</span>
+      <span id="total-label" style="font-family:var(--serif);font-size:1.2rem;color:var(--green-mid);">Total: $0</span>
+    </div>
+
+    <div class="form-footer">
+      <button type="submit" class="btn btn-primary"><i class="bi bi-floppy"></i> Registrar compra</button>
+      <a href="{% url 'app_admin:proveedores' %}" class="btn btn-ghost">Cancelar</a>
+    </div>
+  </form>
+  </div>
+</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const productosData    = [{% for p in productos %}{ id: {{ p.pk }}, nombre: "{{ p.nombre }}", tipo: "producto" },{% endfor %}];
+const ingredientesData = [{% for i in ingredientes %}{ id: {{ i.pk }}, nombre: "{{ i.nombre }}", tipo: "ingrediente" },{% endfor %}];
+
+function getOpts(tipo) {
+  const data = tipo === 'producto' ? productosData : ingredientesData;
+  return data.map(d => `<option value="${d.id}">${d.nombre}</option>`).join('');
+}
+
+function actualizarSelect(sel) {
+  const row = sel.closest('.compra-row');
+  row.querySelector('select[name="item_id"]').innerHTML = '<option value="">— Selecciona —</option>' + getOpts(sel.value);
+}
+
+function agregarFila() {
+  const container = document.getElementById('items-container');
+  const row = document.createElement('div');
+  row.className = 'compra-row';
+  row.style.cssText = 'display:grid;grid-template-columns:auto 1fr 1fr 1fr 2rem;gap:0.5rem;margin-bottom:0.5rem;align-items:center;';
+  row.innerHTML = `
+    <select name="item_tipo" onchange="actualizarSelect(this)" style="font-family:var(--sans);font-size:0.82rem;padding:0.45rem 0.6rem;border:1.5px solid var(--gray-200);border-radius:8px;">
+      <option value="producto">Producto</option>
+      <option value="ingrediente">Ingrediente</option>
+    </select>
+    <select name="item_id" style="font-family:var(--sans);font-size:0.82rem;padding:0.45rem 0.6rem;border:1.5px solid var(--gray-200);border-radius:8px;">
+      <option value="">— Selecciona —</option>
+      ${getOpts('producto')}
+    </select>
+    <input type="number" name="item_cantidad" min="0.01" step="0.01" placeholder="Cantidad"
+           style="font-family:var(--sans);font-size:0.82rem;padding:0.45rem 0.6rem;border:1.5px solid var(--gray-200);border-radius:8px;">
+    <input type="number" name="item_precio" min="0" step="0.01" placeholder="Precio unit."
+           style="font-family:var(--sans);font-size:0.82rem;padding:0.45rem 0.6rem;border:1.5px solid var(--gray-200);border-radius:8px;"
+           oninput="calcularTotal()">
+    <button type="button" class="btn-rm-row" onclick="this.closest('.compra-row').remove();calcularTotal()"><i class="bi bi-x-lg"></i></button>
+  `;
+  container.appendChild(row);
+}
+
+function calcularTotal() {
+  let total = 0;
+  document.querySelectorAll('.compra-row').forEach(row => {
+    const cant  = parseFloat(row.querySelector('[name="item_cantidad"]')?.value || 0);
+    const prec  = parseFloat(row.querySelector('[name="item_precio"]')?.value || 0);
+    total += cant * prec;
+  });
+  document.getElementById('total-label').textContent = 'Total: $' + total.toLocaleString('es-CO', { maximumFractionDigits: 0 });
+}
+
+document.getElementById('form-compra').addEventListener('input', calcularTotal);
+</script>
+{% endblock %}

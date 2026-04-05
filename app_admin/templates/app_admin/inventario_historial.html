@@ -1,0 +1,197 @@
+{% extends 'app_admin/base_admin.html' %}
+{% load filtros %}
+{% block title %}Historial — {{ producto.nombre }}{% endblock %}
+{% block page_title %}Historial de movimientos{% endblock %}
+{% block nav_inventario %}active{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'app_admin:inventario' %}" class="btn btn-ghost btn-sm">
+    <i class="bi bi-arrow-left"></i> Volver al inventario
+  </a>
+  <a href="{% url 'app_admin:entrada_stock_producto' producto.pk %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-box-arrow-in-down"></i> Registrar entrada
+  </a>
+{% endblock %}
+
+{% block content %}
+<style>
+  .hist-header {
+    background: var(--ivory);
+    border: 1px solid var(--mist);
+    border-radius: 10px;
+    padding: 1.3rem 1.6rem;
+    margin-bottom: 1.4rem;
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+    flex-wrap: wrap;
+  }
+  .hist-avatar {
+    width: 3.2rem; height: 3.2rem;
+    border-radius: 10px;
+    background: var(--leaf-pale);
+    border: 1px solid var(--leaf-tint);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.4rem;
+    color: var(--leaf);
+    flex-shrink: 0;
+    overflow: hidden; /* Mantiene la imagen dentro de los bordes redondeados */
+  }
+  /* Estilo para que la imagen del producto se vea bien */
+  .hist-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .hist-name { font-family: var(--serif); font-size: 1.3rem; font-weight: 500; }
+  .hist-meta { font-size: 0.76rem; color: var(--ash); margin-top: 0.2rem; }
+  .hist-stats {
+    margin-left: auto;
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .hist-stat { text-align: right; }
+  .hist-stat-val { font-family: var(--serif); font-size: 1.5rem; line-height: 1; }
+  .hist-stat-label { font-size: 0.63rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ash); margin-top: 0.2rem; }
+
+  .mov-tipo-entrada   { background: var(--leaf-pale);   color: var(--leaf-dark); }
+  .mov-tipo-salida    { background: var(--mist);        color: var(--stone); }
+  .mov-tipo-merma     { background: var(--red-pale);    color: var(--red); }
+  .mov-tipo-ajuste    { background: var(--amber-pale);  color: var(--amber); }
+
+  .timeline-dot {
+    width: 0.65rem; height: 0.65rem;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 0.15rem;
+  }
+  .dot-entrada  { background: var(--leaf); }
+  .dot-salida   { background: var(--ash); }
+  .dot-merma    { background: var(--red); }
+  .dot-ajuste   { background: var(--amber); }
+
+  .empty-hist {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 4rem 2rem; gap: 0.75rem; color: var(--ash);
+  }
+  .empty-hist i { font-size: 3rem; opacity: 0.3; }
+</style>
+
+<div class="hist-header">
+  <div class="hist-avatar">
+    {% if producto.imagen %}
+      <img src="{{ producto.imagen.url }}" alt="{{ producto.nombre }}">
+    {% else %}
+      <i class="bi bi-box-seam"></i>
+    {% endif %}
+  </div>
+  <div>
+    <div class="hist-name">{{ producto.nombre }}</div>
+    <div class="hist-meta">
+      {{ producto.categoria }} ·
+      {% if producto.tipo == 'simple' %}
+        <span class="badge badge-simple">Simple</span>
+      {% else %}
+        <span class="badge badge-elaborado">Elaborado</span>
+      {% endif %}
+      {% if producto.proveedor %}
+        · <i class="bi bi-truck"></i> {{ producto.proveedor.nombre }}
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="hist-stats">
+    <div class="hist-stat">
+      <div class="hist-stat-val" style="color:{% if producto.stock == 0 %}var(--red){% elif producto.stock_bajo %}var(--amber){% else %}var(--leaf){% endif %};">
+        {{ producto.stock }}
+      </div>
+      <div class="hist-stat-label">Stock actual</div>
+    </div>
+    <div class="hist-stat">
+      <div class="hist-stat-val" style="color:var(--ash);">{{ producto.stock_minimo }}</div>
+      <div class="hist-stat-label">Stock mínimo</div>
+    </div>
+    <div class="hist-stat">
+      <div class="hist-stat-val">{{ movimientos.count }}</div>
+      <div class="hist-stat-label">Movimientos</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <span class="card-title">Historial de movimientos</span>
+    <div style="display:flex;gap:0.5rem;">
+      <a href="{% url 'app_admin:historial' %}" class="btn btn-ghost btn-sm">
+        <i class="bi bi-clock-history"></i> Historial completo
+      </a>
+    </div>
+  </div>
+
+  {% if movimientos %}
+  <div style="overflow-x:auto;">
+  <table class="tbl">
+    <thead>
+      <tr>
+        <th style="width:2rem;"></th>
+        <th>Tipo</th>
+        <th>Cantidad</th>
+        <th>Proveedor / Compra</th>
+        <th>Nota</th>
+        <th>Fecha</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for m in movimientos %}
+    <tr>
+      <td style="padding-left:1.4rem;">
+        <div class="timeline-dot dot-{{ m.tipo }}"></div>
+      </td>
+      <td>
+        <span class="badge mov-tipo-{{ m.tipo }}">
+          {{ m.get_tipo_display }}
+        </span>
+      </td>
+      <td>
+        <span style="font-size:1rem;font-weight:700;
+          color:{% if m.tipo == 'entrada' %}var(--leaf){% elif m.tipo == 'merma' %}var(--red){% else %}var(--ink){% endif %};">
+          {% if m.tipo == 'entrada' %}+{% elif m.tipo in 'salida,merma' %}-{% endif %}{{ m.cantidad }}
+        </span>
+      </td>
+      <td style="font-size:0.8rem;color:var(--stone);">
+        {% if m.compra %}
+          <a href="{% url 'app_admin:proveedor_compras' m.compra.proveedor.pk %}"
+             style="color:var(--sky);text-decoration:none;font-weight:600;">
+            {{ m.compra.proveedor.nombre }}
+          </a>
+          <span style="color:var(--ash);font-size:0.73rem;"> · Compra #{{ m.compra.pk }}</span>
+        {% elif producto.proveedor %}
+          <span style="color:var(--stone);">{{ producto.proveedor.nombre }}</span>
+        {% else %}
+          <span style="color:var(--fog);">—</span>
+        {% endif %}
+      </td>
+      <td style="font-size:0.8rem;color:var(--stone);max-width:200px;">
+        {{ m.nota|default:"—" }}
+      </td>
+      <td style="font-size:0.77rem;color:var(--ash);white-space:nowrap;">
+        <div>{{ m.fecha|date:"d/m/Y" }}</div>
+        <div style="color:var(--fog);font-size:0.71rem;">{{ m.fecha|date:"H:i" }}</div>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <div class="empty-hist">
+    <i class="bi bi-clock-history"></i>
+    <p>No hay movimientos registrados para este producto.</p>
+    <a href="{% url 'app_admin:entrada_stock_producto' producto.pk %}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg"></i> Registrar primera entrada
+    </a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,698 @@
+{% extends 'app_admin/base_admin.html' %}
+{% load filtros %}
+{% block title %}Productos{% endblock %}
+{% block page_title %}Productos{% endblock %}
+{% block nav_productos %}active{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'app_admin:entrada_stock' %}" class="btn btn-ghost btn-sm">
+    <i class="bi bi-box-arrow-in-down"></i> Entrada stock
+  </a>
+  <a href="{% url 'app_admin:salida_stock' %}?tipo=producto" class="btn btn-amber btn-sm">
+    <i class="bi bi-box-arrow-up"></i> Salida stock
+  </a>
+  <a href="{% url 'app_admin:producto_nuevo' %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg"></i> Nuevo producto
+  </a>
+{% endblock %}
+
+{% block content %}
+<style>
+  /* ── KPI strip ────────────────────────────────────────────────────────── */
+  .prod-kpi {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    gap: 0.85rem;
+    margin-bottom: 1.4rem;
+  }
+  .prod-kpi-card {
+    background: var(--ivory);
+    border: 1px solid var(--mist);
+    border-radius: 10px;
+    padding: 1.05rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+    position: relative;
+    overflow: hidden;
+    transition: box-shadow 0.18s, border-color 0.18s;
+  }
+  .prod-kpi-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.06); border-color: var(--fog); }
+  .prod-kpi-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    border-radius: 99px 0 0 99px;
+  }
+  .prod-kpi-card.green::before  { background: var(--leaf); }
+  .prod-kpi-card.amber::before  { background: var(--amber); }
+  .prod-kpi-card.red::before    { background: var(--red); }
+  .prod-kpi-card.violet::before { background: var(--violet); }
+  .prod-kpi-label { font-size: 0.59rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ash); }
+  .prod-kpi-val   { font-family: var(--serif); font-size: 1.85rem; line-height: 1; }
+  .prod-kpi-card.green  .prod-kpi-val { color: var(--leaf); }
+  .prod-kpi-card.amber  .prod-kpi-val { color: var(--amber); }
+  .prod-kpi-card.red    .prod-kpi-val { color: var(--red); }
+  .prod-kpi-card.violet .prod-kpi-val { color: var(--violet); }
+  .prod-kpi-sub { font-size: 0.68rem; color: var(--ash); }
+
+  /* ── Layout ───────────────────────────────────────────────────────────── */
+  .prod-layout {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 1.2rem;
+    align-items: start;
+  }
+  @media (max-width: 1100px) { .prod-layout { grid-template-columns: 1fr; } }
+
+  /* ── Filter bar ───────────────────────────────────────────────────────── */
+  .prod-filterbar {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+  .prod-search {
+    position: relative;
+    flex: 1;
+    min-width: 200px;
+    max-width: 300px;
+  }
+  .prod-search i {
+    position: absolute;
+    left: 0.65rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--ash);
+    font-size: 0.8rem;
+    pointer-events: none;
+  }
+  .prod-search input {
+    width: 100%;
+    padding: 0.42rem 0.8rem 0.42rem 2rem;
+    border: 1px solid var(--fog);
+    border-radius: 7px;
+    background: var(--ivory);
+    font-family: var(--sans);
+    font-size: 0.81rem;
+    color: var(--ink);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    outline: none;
+  }
+  .prod-search input:focus { border-color: var(--leaf); box-shadow: 0 0 0 3px var(--leaf-tint); }
+
+  /* ── Action buttons ───────────────────────────────────────────────────── */
+  .action-group {
+    display: flex;
+    gap: 0.3rem;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    align-items: center;
+  }
+  .action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.26rem;
+    padding: 0.26rem 0.54rem;
+    border-radius: 6px;
+    font-size: 0.69rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    border: 1px solid transparent;
+    transition: all 0.14s;
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+    background: none;
+    font-family: var(--sans);
+  }
+  .action-btn.entrada   { background: var(--leaf-pale);   color: var(--leaf-dark); border-color: var(--leaf-tint); }
+  .action-btn.entrada:hover   { background: var(--leaf);  color: #fff; border-color: var(--leaf); }
+  .action-btn.salida    { background: var(--amber-pale);  color: var(--amber);     border-color: var(--amber-tint); }
+  .action-btn.salida:hover    { background: var(--amber); color: #fff; border-color: var(--amber); }
+  .action-btn.toggle-on { background: var(--leaf-pale);   color: var(--leaf-dark); border-color: var(--leaf-tint); }
+  .action-btn.toggle-on:hover { background: var(--amber); color: #fff; border-color: var(--amber); }
+  .action-btn.toggle-off{ background: var(--amber-pale);  color: var(--amber);     border-color: var(--amber-tint); }
+  .action-btn.toggle-off:hover{ background: var(--leaf);  color: #fff; border-color: var(--leaf); }
+  .action-btn.editar    { background: var(--sky-pale);    color: var(--sky);       border-color: var(--sky-tint); }
+  .action-btn.editar:hover    { background: var(--sky);   color: #fff; border-color: var(--sky); }
+  .action-btn.historial { background: var(--cream);       color: var(--stone);     border-color: var(--mist); }
+  .action-btn.historial:hover { background: var(--fog);   color: var(--ink);       border-color: var(--fog); }
+  .action-btn.eliminar  { background: var(--red-pale);    color: var(--red);       border-color: var(--red-tint); }
+  .action-btn.eliminar:hover  { background: var(--red);   color: #fff;             border-color: var(--red); }
+  .action-btn.info      { background: var(--violet-pale); color: var(--violet);    border-color: #e9d5ff; }
+  .action-btn.info:hover      { background: var(--violet);color: #fff;             border-color: var(--violet); }
+
+  /* ── Stock pill ───────────────────────────────────────────────────────── */
+  .stock-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.22rem 0.62rem;
+    border-radius: 99px;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+  .stock-pill.ok  { background: var(--leaf-pale);  color: var(--leaf-dark); }
+  .stock-pill.low { background: var(--amber-pale); color: var(--amber); }
+  .stock-pill.out { background: var(--red-pale);   color: var(--red); }
+  .stock-pill i   { font-size: 0.65rem; }
+  .stock-pill.elab { background: var(--violet-pale); color: var(--violet); }
+
+  /* ── Badges ───────────────────────────────────────────────────────────── */
+  .badge-tipo {
+    display: inline-flex; align-items: center; gap: 0.22rem;
+    padding: 0.15rem 0.5rem; border-radius: 99px;
+    font-size: 0.62rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  .badge-simple   { background: var(--sky-pale);    color: var(--sky); }
+  .badge-elaborado{ background: var(--violet-pale); color: var(--violet); }
+  .badge-oculto   { background: var(--cream);       color: var(--ash); border: 1px solid var(--mist); }
+
+  /* ── Profit chip ──────────────────────────────────────────────────────── */
+  .profit-chip {
+    display: inline-flex; align-items: center; gap: 0.2rem;
+    font-size: 0.7rem; font-weight: 600; color: var(--leaf-dark);
+  }
+  .profit-chip i { font-size: 0.62rem; }
+
+  /* ── Empty state ──────────────────────────────────────────────────────── */
+  .prod-empty {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 3rem 2rem; gap: 0.75rem; color: var(--ash);
+  }
+  .prod-empty i { font-size: 2.8rem; opacity: 0.35; }
+  .prod-empty p { font-size: 0.84rem; }
+
+  /* ── Row animation ────────────────────────────────────────────────────── */
+  @keyframes fadeInRow {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .tbl tbody tr { animation: fadeInRow 0.18s var(--ease) both; }
+
+  /* ── Movimientos recientes (sidebar) ──────────────────────────────────── */
+  .mov-list { max-height: 520px; overflow-y: auto; }
+  .mov-item {
+    display: flex; align-items: flex-start; gap: 0.65rem;
+    padding: 0.65rem 1rem; border-bottom: 1px solid var(--cream);
+    transition: background 0.12s;
+  }
+  .mov-item:last-child { border-bottom: none; }
+  .mov-item:hover { background: var(--cream); }
+  .mov-dot {
+    width: 0.55rem; height: 0.55rem; border-radius: 50%;
+    flex-shrink: 0; margin-top: 0.28rem;
+  }
+  .mov-dot.entrada { background: var(--leaf); }
+  .mov-dot.salida  { background: var(--amber); }
+  .mov-dot.ajuste  { background: var(--sky); }
+  .mov-dot.merma   { background: var(--red); }
+  .mov-info { flex: 1; min-width: 0; }
+  .mov-nombre { font-size: 0.78rem; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mov-meta   { font-size: 0.69rem; color: var(--ash); margin-top: 0.08rem; }
+  .mov-cant   { font-size: 0.8rem; font-weight: 700; color: var(--stone); flex-shrink: 0; }
+
+  /* ── Confirm modal (eliminar) ─────────────────────────────────────────── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(15,15,14,0.55); z-index: 300;
+    align-items: center; justify-content: center;
+    backdrop-filter: blur(2px);
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-box {
+    background: var(--ivory); border-radius: 14px; padding: 1.8rem;
+    width: 100%; max-width: 380px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.22);
+    border: 1px solid var(--mist);
+  }
+  .modal-icon {
+    width: 2.8rem; height: 2.8rem; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem; margin-bottom: 1rem;
+  }
+  .modal-icon.red    { background: var(--red-pale);    color: var(--red); }
+  .modal-icon.violet { background: var(--violet-pale); color: var(--violet); }
+  .modal-title { font-family: var(--serif); font-size: 1.1rem; margin-bottom: 0.3rem; }
+  .modal-desc  { font-size: 0.82rem; color: var(--stone); margin-bottom: 1.4rem; line-height: 1.55; }
+  .modal-actions { display: flex; gap: 0.65rem; }
+
+  /* ── Info modal ───────────────────────────────────────────────────────── */
+  .info-modal-box {
+    background: var(--ivory); border-radius: 16px;
+    width: 100%; max-width: 500px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.22);
+    border: 1px solid var(--mist); overflow: hidden;
+    max-height: 90vh; overflow-y: auto;
+  }
+  .info-img-wrap {
+    width: 100%; aspect-ratio: 16/8; overflow: hidden;
+    background: var(--cream); position: relative;
+  }
+  .info-img-wrap img {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+  }
+  .info-img-placeholder {
+    width: 100%; height: 100%; display: flex;
+    align-items: center; justify-content: center;
+    background: var(--cream); color: var(--fog); font-size: 3rem;
+  }
+  .info-body { padding: 1.4rem 1.6rem 1.6rem; }
+  .info-category { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--leaf); margin-bottom: 0.3rem; }
+  .info-name { font-family: var(--serif); font-size: 1.35rem; line-height: 1.2; margin-bottom: 0.5rem; }
+  .info-desc { font-size: 0.8rem; color: var(--stone); line-height: 1.6; margin-bottom: 1rem; }
+  .info-badges { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .info-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 0.6rem 1rem; margin-bottom: 1rem;
+  }
+  .info-field { display: flex; flex-direction: column; gap: 0.12rem; }
+  .info-label { font-size: 0.58rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ash); }
+  .info-value { font-size: 0.88rem; font-weight: 600; color: var(--ink); }
+  .info-value.profit { color: var(--leaf-dark); }
+  .info-value.price  { font-family: var(--serif); font-size: 1.05rem; }
+  .info-divider { border: none; border-top: 1px solid var(--mist); margin: 0.85rem 0; }
+  .info-recipe-title { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ash); margin-bottom: 0.5rem; }
+  .info-recipe-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.3rem 0; border-bottom: 1px solid var(--cream); font-size: 0.8rem;
+  }
+  .info-recipe-row:last-child { border-bottom: none; }
+  .info-close {
+    position: absolute; top: 0.75rem; right: 0.75rem;
+    width: 1.8rem; height: 1.8rem; border-radius: 50%;
+    background: rgba(15,15,14,0.45); border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 0.85rem; transition: background 0.15s;
+  }
+  .info-close:hover { background: rgba(15,15,14,0.7); }
+</style>
+
+<!-- ── KPI strip ──────────────────────────────────────────────────────────── -->
+<div class="prod-kpi">
+  <div class="prod-kpi-card green">
+    <div class="prod-kpi-label">Total</div>
+    <div class="prod-kpi-val">{{ kpi.total }}</div>
+    <div class="prod-kpi-sub">productos registrados</div>
+  </div>
+  <div class="prod-kpi-card red">
+    <div class="prod-kpi-label">Sin stock</div>
+    <div class="prod-kpi-val">{{ kpi.sin_stock }}</div>
+    <div class="prod-kpi-sub">requieren reposición</div>
+  </div>
+  <div class="prod-kpi-card amber">
+    <div class="prod-kpi-label">Stock bajo</div>
+    <div class="prod-kpi-val">{{ kpi.stock_bajo }}</div>
+    <div class="prod-kpi-sub">bajo el mínimo</div>
+  </div>
+  <div class="prod-kpi-card violet">
+    <div class="prod-kpi-label">Elaborados</div>
+    <div class="prod-kpi-val">{{ kpi.elaborados }}</div>
+    <div class="prod-kpi-sub">con receta propia</div>
+  </div>
+</div>
+
+<div class="prod-layout">
+
+  <!-- ── Tabla principal ───────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-head" style="flex-wrap:wrap;gap:0.5rem;">
+      <span class="card-title" style="display:flex;align-items:center;gap:0.5rem;">
+        <i class="bi bi-bag" style="color:var(--leaf);font-size:1rem;"></i>
+        Productos
+        <span style="font-family:var(--sans);font-size:0.72rem;font-weight:600;color:var(--ash);background:var(--cream);padding:0.1rem 0.5rem;border-radius:99px;">{{ productos.count }}</span>
+      </span>
+
+      <!-- Filtros -->
+      <div style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;">
+        <form method="get" style="display:contents;">
+          <div class="prod-search">
+            <i class="bi bi-search"></i>
+            <input type="text" name="q" id="prod-buscar" value="{{ q }}" placeholder="Buscar producto…" autocomplete="off">
+          </div>
+          <select name="categoria" onchange="this.form.submit()" style="padding:0.42rem 0.65rem;border:1px solid var(--fog);border-radius:7px;background:var(--ivory);font-family:var(--sans);font-size:0.78rem;color:var(--ink);outline:none;">
+            <option value="">Todas las categorías</option>
+            {% for cat in categorias %}
+            <option value="{{ cat.nombre }}" {% if cat.nombre == cat_f %}selected{% endif %}>{{ cat }}</option>
+            {% endfor %}
+          </select>
+          <select name="tipo" onchange="this.form.submit()" style="padding:0.42rem 0.65rem;border:1px solid var(--fog);border-radius:7px;background:var(--ivory);font-family:var(--sans);font-size:0.78rem;color:var(--ink);outline:none;">
+            <option value="">Todos los tipos</option>
+            <option value="simple"    {% if tipo_f == 'simple' %}selected{% endif %}>Simple</option>
+            <option value="elaborado" {% if tipo_f == 'elaborado' %}selected{% endif %}>Elaborado</option>
+          </select>
+          <select name="disponible" onchange="this.form.submit()" style="padding:0.42rem 0.65rem;border:1px solid var(--fog);border-radius:7px;background:var(--ivory);font-family:var(--sans);font-size:0.78rem;color:var(--ink);outline:none;">
+            <option value="">Disponibilidad</option>
+            <option value="1" {% if disp_f == '1' %}selected{% endif %}>Disponibles</option>
+            <option value="0" {% if disp_f == '0' %}selected{% endif %}>Ocultos</option>
+          </select>
+          <button type="submit" class="btn btn-ghost btn-sm"><i class="bi bi-funnel"></i></button>
+          {% if q or cat_f or tipo_f or disp_f %}
+          <a href="{% url 'app_admin:productos' %}" class="btn btn-ghost btn-sm" title="Limpiar filtros"><i class="bi bi-x-lg"></i></a>
+          {% endif %}
+        </form>
+      </div>
+    </div>
+
+    {% if productos %}
+    <div style="overflow-x:auto;">
+    <table class="tbl" id="tbl-productos">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Categoría</th>
+          <th>Stock</th>
+          <th>Precio venta</th>
+          <th>Ganancia</th>
+          <th style="text-align:right;padding-right:1rem;">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for p in productos %}
+      <tr>
+        <!-- Nombre + badges -->
+        <td style="min-width:200px;">
+          <div style="font-weight:600;font-size:0.85rem;">{{ p.nombre }}</div>
+          <div style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-top:0.25rem;">
+            <span class="badge-tipo {% if p.tipo == 'simple' %}badge-simple{% else %}badge-elaborado{% endif %}">
+              {{ p.get_tipo_display }}
+            </span>
+            {% if not p.disponible %}
+            <span class="badge-tipo badge-oculto"><i class="bi bi-eye-slash" style="font-size:0.55rem;"></i> Oculto</span>
+            {% endif %}
+          </div>
+        </td>
+
+        <!-- Categoría -->
+        <td style="font-size:0.8rem;color:var(--stone);">{{ p.categoria }}</td>
+
+        <!-- Stock -->
+        <td>
+          {% if p.tipo == 'elaborado' %}
+            {% if p.sin_stock %}
+              <span class="stock-pill out"><i class="bi bi-x-circle-fill"></i> Sin ingredientes</span>
+            {% else %}
+              <span class="stock-pill elab"><i class="bi bi-fire"></i> {{ p.receta.count }} ing.</span>
+            {% endif %}
+          {% elif p.sin_stock %}
+            <span class="stock-pill out"><i class="bi bi-x-circle-fill"></i> {{ p.stock }}</span>
+          {% elif p.stock_bajo %}
+            <span class="stock-pill low"><i class="bi bi-exclamation-triangle-fill"></i> {{ p.stock }}</span>
+          {% else %}
+            <span class="stock-pill ok"><i class="bi bi-check-circle-fill"></i> {{ p.stock }}</span>
+          {% endif %}
+          {% if p.tipo == 'simple' and p.dias_restantes %}
+          <div style="font-size:0.67rem;color:var(--ash);margin-top:0.18rem;">~{{ p.dias_restantes }}d</div>
+          {% endif %}
+        </td>
+
+        <!-- Precio venta -->
+        <td style="font-size:0.88rem;font-weight:700;color:var(--ink);">${{ p.precio_venta|miles }}</td>
+
+        <!-- Ganancia -->
+        <td>
+          <span class="profit-chip">
+            <i class="bi bi-graph-up-arrow"></i>
+            ${{ p.ganancia|miles }} · {{ p.margen }}%
+          </span>
+        </td>
+
+        <!-- Acciones -->
+        <td>
+          <div class="action-group">
+            {% if p.tipo == 'simple' %}
+            <a href="{% url 'app_admin:entrada_stock_producto' p.pk %}" class="action-btn entrada" title="Registrar entrada">
+              <i class="bi bi-box-arrow-in-down"></i> Entrada
+            </a>
+            <a href="{% url 'app_admin:salida_stock' %}?tipo=producto&item={{ p.pk }}" class="action-btn salida" title="Registrar salida">
+              <i class="bi bi-box-arrow-up"></i> Salida
+            </a>
+            {% endif %}
+            <a href="{% url 'app_admin:producto_editar' p.pk %}" class="action-btn editar" title="Editar producto">
+              <i class="bi bi-pencil"></i>
+            </a>
+            <a href="{% url 'app_admin:inventario_historial' p.pk %}" class="action-btn historial" title="Ver historial">
+              <i class="bi bi-clock-history"></i>
+            </a>
+            <form method="post" action="{% url 'app_admin:producto_toggle' p.pk %}" style="display:contents;">
+              {% csrf_token %}
+              <button type="submit"
+                      class="action-btn {% if p.disponible %}toggle-on{% else %}toggle-off{% endif %}"
+                      title="{% if p.disponible %}Ocultar del menú{% else %}Mostrar en menú{% endif %}">
+                <i class="bi {% if p.disponible %}bi-eye{% else %}bi-eye-slash{% endif %}"></i>
+              </button>
+            </form>
+            <button class="action-btn eliminar" title="Eliminar producto"
+                    onclick="confirmarEliminar('{{ p.nombre|escapejs }}', '{% url 'app_admin:producto_eliminar' p.pk %}')">
+              <i class="bi bi-trash3"></i>
+            </button>
+            <button class="action-btn info" title="Ver información"
+                    onclick="abrirInfoProducto({{ p.pk }})">
+              <i class="bi bi-info-circle"></i>
+            </button>
+
+            <!-- Data JSON oculta para el modal de info -->
+            <script type="application/json" id="prod-data-{{ p.pk }}">
+            {
+              "nombre":    "{{ p.nombre|escapejs }}",
+              "categoria": "{{ p.categoria }}",
+              "tipo":      "{{ p.get_tipo_display }}",
+              "tipo_key":  "{{ p.tipo }}",
+              "descripcion":"{{ p.descripcion|escapejs }}",
+              "disponible": {{ p.disponible|yesno:"true,false" }},
+              "precio_venta": "${{ p.precio_venta|miles }}",
+              "precio_costo": "{% if p.tipo == 'simple' %}${{ p.precio_costo|default:0|miles }}{% else %}${{ p.costo_calculado|miles }}{% endif %}",
+              "ganancia":  "${{ p.ganancia|miles }}",
+              "margen":    "{{ p.margen }}%",
+              "stock":     "{{ p.stock }}",
+              "stock_minimo": "{{ p.stock_minimo }}",
+              "proveedor": "{{ p.proveedor|default:'—' }}",
+              "imagen_url":"{% if p.imagen %}{{ p.imagen.url }}{% endif %}",
+              "receta": [
+                {% for r in p.receta.all %}
+                {"nombre":"{{ r.ingrediente.nombre|escapejs }}","cantidad":"{{ r.cantidad }} {{ r.ingrediente.unidad }}"}{% if not forloop.last %},{% endif %}
+                {% endfor %}
+              ]
+            }
+            </script>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <div class="prod-empty">
+      <i class="bi bi-bag-x"></i>
+      <p>No hay productos{% if q or cat_f or tipo_f or disp_f %} con esos filtros{% endif %}.</p>
+      <a href="{% url 'app_admin:producto_nuevo' %}" class="btn btn-primary" style="margin-top:0.5rem;">
+        <i class="bi bi-plus-lg"></i> Crear primer producto
+      </a>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ── Movimientos recientes ──────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title" style="font-size:0.92rem;">
+        <i class="bi bi-clock-history" style="color:var(--ash);margin-right:0.3rem;"></i>
+        Movimientos recientes
+      </span>
+      <a href="{% url 'app_admin:historial' %}" class="btn btn-ghost btn-sm" style="font-size:0.72rem;">
+        Ver todo <i class="bi bi-arrow-right"></i>
+      </a>
+    </div>
+    {% if movimientos %}
+    <div class="mov-list">
+      {% for m in movimientos %}
+      <div class="mov-item">
+        <span class="mov-dot {{ m.tipo }}"></span>
+        <div class="mov-info">
+          <div class="mov-nombre">{{ m.producto.nombre }}</div>
+          <div class="mov-meta">
+            {% if m.tipo == 'entrada' %}Entrada
+            {% elif m.tipo == 'salida' %}Salida
+            {% elif m.tipo == 'merma' %}Merma
+            {% else %}Ajuste{% endif %}
+            · {{ m.fecha|date:"d/m H:i" }}
+          </div>
+        </div>
+        <span class="mov-cant">{{ m.cantidad }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="prod-empty" style="padding:2rem;">
+      <i class="bi bi-journal"></i>
+      <p>Sin movimientos aún.</p>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- ── Modal confirmar eliminación ──────────────────────────────────────── -->
+<div id="modal-eliminar" class="modal-overlay" onclick="if(event.target===this)cerrarModalEliminar()">
+  <div class="modal-box">
+    <div class="modal-icon red"><i class="bi bi-trash3-fill"></i></div>
+    <div class="modal-title">¿Eliminar producto?</div>
+    <p class="modal-desc" id="modal-eliminar-desc">
+      Esta acción eliminará el producto permanentemente.
+    </p>
+    <form id="form-eliminar" method="post">
+      {% csrf_token %}
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" style="flex:1;" onclick="cerrarModalEliminar()">Cancelar</button>
+        <button type="submit" class="btn btn-danger" style="flex:1;">
+          <i class="bi bi-trash3"></i> Eliminar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Modal info producto ───────────────────────────────────────────────── -->
+<div id="modal-info" class="modal-overlay" onclick="if(event.target===this)cerrarModalInfo()">
+  <div class="info-modal-box">
+    <div style="position:relative;">
+      <div class="info-img-wrap" id="info-img-wrap">
+        <div class="info-img-placeholder" id="info-img-placeholder">
+          <i class="bi bi-bag"></i>
+        </div>
+      </div>
+      <button class="info-close" onclick="cerrarModalInfo()"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="info-body">
+      <div class="info-category" id="info-category"></div>
+      <div class="info-name" id="info-name"></div>
+      <div class="info-badges" id="info-badges"></div>
+      <div class="info-desc" id="info-desc"></div>
+
+      <div class="info-grid" id="info-grid"></div>
+
+      <div id="info-recipe-wrap" style="display:none;">
+        <hr class="info-divider">
+        <div class="info-recipe-title"><i class="bi bi-journal-richtext"></i> Receta</div>
+        <div id="info-recipe-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Modal eliminar ────────────────────────────────────────────────────────
+function confirmarEliminar(nombre, url) {
+  document.getElementById('modal-eliminar-desc').innerHTML =
+    `Vas a eliminar el producto <strong>${nombre}</strong> permanentemente.`;
+  document.getElementById('form-eliminar').action = url;
+  document.getElementById('modal-eliminar').classList.add('open');
+}
+function cerrarModalEliminar() {
+  document.getElementById('modal-eliminar').classList.remove('open');
+}
+
+// ── Modal info producto ───────────────────────────────────────────────────
+function abrirInfoProducto(pk) {
+  const raw = document.getElementById('prod-data-' + pk);
+  if (!raw) return;
+  const d = JSON.parse(raw.textContent);
+
+  // Imagen
+  const imgWrap = document.getElementById('info-img-wrap');
+  const placeholder = document.getElementById('info-img-placeholder');
+  const existingImg = imgWrap.querySelector('img');
+  if (existingImg) existingImg.remove();
+  if (d.imagen_url) {
+    placeholder.style.display = 'none';
+    const img = document.createElement('img');
+    img.src = d.imagen_url;
+    img.alt = d.nombre;
+    imgWrap.insertBefore(img, imgWrap.querySelector('button'));
+  } else {
+    placeholder.style.display = 'flex';
+    const iconClass = d.categoria.toLowerCase().includes('bebida') ? 'bi-cup-straw'
+                    : d.categoria.toLowerCase().includes('desayuno') ? 'bi-cup-hot'
+                    : d.categoria.toLowerCase().includes('almuerzo') ? 'bi-egg-fried'
+                    : 'bi-bag';
+    placeholder.innerHTML = `<i class="bi ${iconClass}"></i>`;
+  }
+
+  // Cabecera
+  document.getElementById('info-category').textContent = d.categoria;
+  document.getElementById('info-name').textContent = d.nombre;
+  document.getElementById('info-desc').textContent = d.descripcion || '';
+  document.getElementById('info-desc').style.display = d.descripcion ? '' : 'none';
+
+  // Badges
+  const badgesEl = document.getElementById('info-badges');
+  badgesEl.innerHTML = `
+    <span class="badge-tipo ${d.tipo_key === 'simple' ? 'badge-simple' : 'badge-elaborado'}">${d.tipo}</span>
+    ${!d.disponible ? '<span class="badge-tipo badge-oculto"><i class="bi bi-eye-slash" style="font-size:0.55rem;"></i> Oculto</span>' : ''}
+  `;
+
+  // Grid de datos
+  const gridEl = document.getElementById('info-grid');
+  const fields = [
+    { label: 'Precio venta', value: d.precio_venta, cls: 'price' },
+    { label: 'Ganancia',     value: `${d.ganancia} (${d.margen})`, cls: 'profit' },
+    { label: 'Costo',        value: d.precio_costo },
+    ...(d.tipo_key === 'simple' ? [
+      { label: 'Stock actual', value: d.stock + ' uds.' },
+      { label: 'Stock mínimo', value: d.stock_minimo + ' uds.' },
+      { label: 'Proveedor',   value: d.proveedor },
+    ] : []),
+  ];
+  gridEl.innerHTML = fields.map(f => `
+    <div class="info-field">
+      <span class="info-label">${f.label}</span>
+      <span class="info-value ${f.cls || ''}">${f.value}</span>
+    </div>
+  `).join('');
+
+  // Receta
+  const recipeWrap = document.getElementById('info-recipe-wrap');
+  const recipeList = document.getElementById('info-recipe-list');
+  if (d.receta && d.receta.length > 0) {
+    recipeWrap.style.display = '';
+    recipeList.innerHTML = d.receta.map(r => `
+      <div class="info-recipe-row">
+        <span style="color:var(--stone);">${r.nombre}</span>
+        <span style="font-weight:600;">${r.cantidad}</span>
+      </div>
+    `).join('');
+  } else {
+    recipeWrap.style.display = 'none';
+  }
+
+  document.getElementById('modal-info').classList.add('open');
+}
+function cerrarModalInfo() {
+  document.getElementById('modal-info').classList.remove('open');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    cerrarModalEliminar();
+    cerrarModalInfo();
+  }
+});
+
+// ── Búsqueda client-side ───────────────────────────────────────────────────
+document.getElementById('prod-buscar').addEventListener('input', function () {
+  const q = this.value.toLowerCase();
+  document.querySelectorAll('#tbl-productos tbody tr').forEach(row => {
+    row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+});
+</script>
+{% endblock %}

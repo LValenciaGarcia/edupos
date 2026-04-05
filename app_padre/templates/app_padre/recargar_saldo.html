@@ -1,0 +1,193 @@
+{% extends 'app_padre/base_padre.html' %}
+{% load filtros %}
+{% block title %}Recargar Saldo{% endblock %}
+{% block page_title %}Recargar Saldo{% endblock %}
+{% block nav_hijos %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+  .recarga-layout {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 1.4rem;
+    align-items: start;
+  }
+  @media (max-width: 960px) { .recarga-layout { grid-template-columns: 1fr; } }
+
+  /* ── Estudiante info box ─────────────────────────────────────────────── */
+  .est-info-box {
+    display: flex; align-items: center; gap: 1.1rem;
+    background: var(--leaf-pale); border: 1px solid var(--leaf-tint);
+    border-radius: 10px; padding: 1.1rem 1.3rem; margin-bottom: 1.4rem;
+  }
+  .est-avatar {
+    width: 3rem; height: 3rem; border-radius: 50%; flex-shrink: 0;
+    background: var(--leaf-tint); border: 2px solid rgba(34,197,94,0.3);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--serif); font-size: 1.25rem; color: var(--leaf-dark);
+  }
+  .est-name { font-family: var(--serif); font-size: 1.1rem; font-weight: 500; }
+  .est-meta { font-size: 0.72rem; color: var(--stone); margin-top: 0.15rem; }
+  .est-saldo-box { margin-left: auto; text-align: right; }
+  .est-saldo-val { font-family: var(--serif); font-size: 1.5rem; color: var(--leaf); line-height: 1; }
+  .est-saldo-lbl { font-size: 0.62rem; color: var(--stone); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 0.1rem; }
+
+  /* ── Montos rápidos ────────────────────────────────────────────────────── */
+  .montos-rapidos {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem;
+    margin: 0.75rem 0 1.1rem;
+  }
+  .monto-btn {
+    padding: 0.65rem 0.5rem; border: 1px solid var(--fog);
+    border-radius: 8px; background: var(--ivory); cursor: pointer;
+    font-family: var(--sans); font-size: 0.79rem; font-weight: 600; color: var(--ink);
+    transition: all 0.15s; text-align: center;
+  }
+  .monto-btn:hover { border-color: var(--leaf); color: var(--leaf); background: var(--leaf-pale); }
+  .monto-btn.selected { border-color: var(--leaf); background: var(--leaf-pale); color: var(--leaf-dark); }
+
+  /* ── Historial lateral ───────────────────────────────────────────────── */
+  .historial-side { }
+  .hist-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--mist);
+    font-size: 0.8rem;
+  }
+  .hist-row:last-child { border-bottom: none; }
+  .hist-monto { font-family: var(--serif); font-size: 1rem; color: var(--leaf); font-weight: 500; }
+  .hist-fecha { font-size: 0.68rem; color: var(--ash); margin-top: 0.07rem; }
+  .hist-nota  { font-size: 0.71rem; color: var(--stone); margin-top: 0.1rem; font-style: italic; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="recarga-layout">
+
+  <!-- Formulario -->
+  <div>
+
+    <!-- Info del estudiante -->
+    <div class="est-info-box">
+      <div class="est-avatar">{{ estudiante.perfil.user.first_name|slice:":1"|upper }}</div>
+      <div>
+        <div class="est-name">{{ estudiante.perfil.user.get_full_name|default:estudiante.perfil.user.username }}</div>
+        <div class="est-meta">Grado {{ estudiante.grado }} · {{ estudiante.codigo }}</div>
+      </div>
+      <div class="est-saldo-box">
+        <div class="est-saldo-val">${{ estudiante.saldo|miles }}</div>
+        <div class="est-saldo-lbl">saldo actual</div>
+      </div>
+    </div>
+
+    <!-- Formulario recarga -->
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Nueva recarga</span>
+      </div>
+      <div class="card-body">
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          <div class="field" style="margin-bottom:0.75rem;">
+            <label for="monto">Monto a recargar *</label>
+            <input type="number" id="monto" name="monto"
+                   min="1000" max="1000000" step="500"
+                   placeholder="Ingresa el monto en pesos" required
+                   oninput="syncMontos(this.value)">
+            <span class="hint">Monto mínimo: $1.000 · Máximo: $1.000.000</span>
+          </div>
+
+          <!-- Montos rápidos -->
+          <div class="montos-rapidos">
+            <button type="button" class="monto-btn" onclick="setMonto(5000)">$5.000</button>
+            <button type="button" class="monto-btn" onclick="setMonto(10000)">$10.000</button>
+            <button type="button" class="monto-btn" onclick="setMonto(20000)">$20.000</button>
+            <button type="button" class="monto-btn" onclick="setMonto(50000)">$50.000</button>
+          </div>
+
+          <div class="field" style="margin-bottom:1.2rem;">
+            <label for="nota">Nota (opcional)</label>
+            <input type="text" id="nota" name="nota" placeholder="Ej: Semana del 5 al 11 de abril" maxlength="200">
+          </div>
+
+          <!-- Preview del nuevo saldo -->
+          <div id="saldo-preview" style="display:none;background:var(--leaf-pale);border:1px solid var(--leaf-tint);border-radius:8px;padding:0.85rem 1rem;margin-bottom:1.2rem;font-size:0.82rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="color:var(--stone);">Saldo actual:</span>
+              <span style="font-weight:600;">${{ estudiante.saldo|miles }}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.3rem;">
+              <span style="color:var(--stone);">+ Recarga:</span>
+              <span style="font-weight:600;color:var(--leaf);" id="monto-preview">$0</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--leaf-tint);margin-top:0.4rem;padding-top:0.4rem;">
+              <span style="font-weight:700;color:var(--leaf-dark);">Nuevo saldo:</span>
+              <span style="font-family:var(--serif);font-size:1.1rem;color:var(--leaf);font-weight:500;" id="saldo-nuevo">$0</span>
+            </div>
+          </div>
+
+          <div class="form-footer">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-plus-circle"></i> Confirmar recarga
+            </button>
+            <a href="{% url 'app_padre:hijos' %}" class="btn btn-ghost">Cancelar</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Historial lateral -->
+  <div class="card historial-side">
+    <div class="card-head">
+      <span class="card-title">Recargas anteriores</span>
+    </div>
+    {% if historial %}
+      {% for recarga in historial %}
+      <div class="hist-row">
+        <div>
+          <div class="hist-monto">+${{ recarga.monto|miles }}</div>
+          <div class="hist-fecha">{{ recarga.fecha|date:"d M Y, H:i" }}</div>
+          {% if recarga.nota %}<div class="hist-nota">{{ recarga.nota }}</div>{% endif %}
+        </div>
+        <i class="bi bi-arrow-up-circle" style="color:var(--leaf);font-size:1.1rem;flex-shrink:0;"></i>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">
+        <i class="bi bi-clock-history es-icon"></i>
+        <p>Sin recargas previas</p>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const saldoActual = {{ estudiante.saldo }};
+
+  function formatPesos(n) {
+    return '$' + Math.floor(n).toLocaleString('es-CO').replace(/,/g, '.');
+  }
+
+  function setMonto(val) {
+    document.getElementById('monto').value = val;
+    syncMontos(val);
+    document.querySelectorAll('.monto-btn').forEach(b => b.classList.remove('selected'));
+    event.target.classList.add('selected');
+  }
+
+  function syncMontos(val) {
+    const n = parseFloat(val) || 0;
+    if (n > 0) {
+      document.getElementById('saldo-preview').style.display = 'block';
+      document.getElementById('monto-preview').textContent = formatPesos(n);
+      document.getElementById('saldo-nuevo').textContent   = formatPesos(saldoActual + n);
+    } else {
+      document.getElementById('saldo-preview').style.display = 'none';
+    }
+  }
+</script>
+{% endblock %}

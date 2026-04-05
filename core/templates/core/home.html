@@ -1,0 +1,1088 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EduPos — Software para Tiendas Escolares</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --black:       #0a0a0a;
+      --off-black:   #111111;
+      --white:       #f8f8f6;
+      --off-white:   #efefec;
+      --green-dark:  #1a3d2b;
+      --green-mid:   #2d6a4f;
+      --green-vivid: #40c074;
+      --green-light: #b7e4c7;
+      --green-pale:  #e8f5ee;
+      --gray-200:    #e2e2dd;
+      --gray-500:    #8a8a82;
+      --serif: 'DM Serif Display', Georgia, serif;
+      --sans:  'DM Sans', system-ui, sans-serif;
+      --radius: 14px;
+      --ease: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { font-family: var(--sans); background: var(--white); color: var(--black); overflow-x: hidden; }
+
+    /* ══════════════════════════════════════════
+       NAVBAR — visible desde el inicio
+    ══════════════════════════════════════════ */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 200;
+      height: 66px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 5vw;
+      background: rgba(248, 248, 246, 0.92);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--gray-200);
+    }
+
+    .nav-logo {
+      font-family: var(--serif);
+      font-size: 1.55rem;
+      color: var(--black);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .logo-dot {
+      width: 9px; height: 9px;
+      background: var(--green-vivid);
+      border-radius: 50%;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      list-style: none;
+    }
+
+    .nav-links a {
+      font-size: 0.88rem;
+      font-weight: 500;
+      color: var(--gray-500);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--black); }
+
+    .nav-register {
+      font-size: 0.88rem !important;
+      font-weight: 500 !important;
+      color: var(--gray-500) !important;
+      text-decoration: none;
+      border-bottom: 1.5px solid transparent;
+      transition: color 0.2s, border-color 0.2s !important;
+      padding-bottom: 2px;
+    }
+
+    .nav-register:hover {
+      color: var(--green-mid) !important;
+      border-color: var(--green-mid) !important;
+    }
+
+    .nav-btn {
+      background: var(--black) !important;
+      color: var(--white) !important;
+      padding: 10px 22px;
+      border-radius: 50px;
+      font-weight: 600 !important;
+      font-size: 0.85rem !important;
+      transition: background 0.25s !important;
+    }
+
+    .nav-btn:hover {
+      background: var(--green-vivid) !important;
+      color: var(--black) !important;
+    }
+
+    /* ══════════════════════════════════════════
+       HERO
+    ══════════════════════════════════════════ */
+    .hero {
+      min-height: 100vh;
+      padding: 130px 5vw 90px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--gray-200) 1px, transparent 1px),
+        linear-gradient(90deg, var(--gray-200) 1px, transparent 1px);
+      background-size: 50px 50px;
+      opacity: 0.5;
+      mask-image: radial-gradient(ellipse 80% 75% at 50% 40%, black 25%, transparent 100%);
+      -webkit-mask-image: radial-gradient(ellipse 80% 75% at 50% 40%, black 25%, transparent 100%);
+    }
+
+    .hero-badge {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--green-pale);
+      border: 1px solid var(--green-light);
+      color: var(--green-dark);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      padding: 7px 18px;
+      border-radius: 50px;
+      margin-bottom: 2rem;
+      animation: fadeUp 0.7s var(--ease) both;
+    }
+
+    .badge-dot {
+      width: 6px; height: 6px;
+      background: var(--green-vivid);
+      border-radius: 50%;
+      animation: pulse 2.2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.6); opacity: 0.5; }
+    }
+
+    .hero h1 {
+      position: relative;
+      font-family: var(--serif);
+      font-size: clamp(3rem, 6.5vw, 6.2rem);
+      line-height: 1.06;
+      color: var(--black);
+      max-width: 840px;
+      animation: fadeUp 0.8s var(--ease) 0.1s both;
+    }
+
+    .hero h1 em {
+      font-style: italic;
+      color: var(--green-mid);
+    }
+
+    .hero-sub {
+      position: relative;
+      margin-top: 1.8rem;
+      font-size: clamp(1rem, 1.7vw, 1.18rem);
+      color: var(--gray-500);
+      max-width: 540px;
+      line-height: 1.75;
+      font-weight: 300;
+      animation: fadeUp 0.8s var(--ease) 0.2s both;
+    }
+
+    .hero-actions {
+      position: relative;
+      margin-top: 2.8rem;
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      animation: fadeUp 0.8s var(--ease) 0.3s both;
+    }
+
+    .btn-dark {
+      background: var(--black);
+      color: var(--white);
+      padding: 15px 34px;
+      border-radius: 50px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      transition: background 0.25s, transform 0.2s;
+    }
+
+    .btn-dark:hover {
+      background: var(--green-vivid);
+      color: var(--black);
+      transform: translateY(-2px);
+    }
+
+    .btn-outline {
+      padding: 15px 24px;
+      border-radius: 50px;
+      border: 1.5px solid var(--gray-200);
+      color: var(--black);
+      font-size: 0.88rem;
+      font-weight: 500;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: border-color 0.25s, background 0.25s;
+    }
+
+    .btn-outline:hover {
+      border-color: var(--green-mid);
+      background: var(--green-pale);
+    }
+
+    /* ══════════════════════════════════════════
+       STATS
+    ══════════════════════════════════════════ */
+    .stats-bar {
+      background: var(--black);
+      display: flex;
+      justify-content: center;
+    }
+
+    .stat-item {
+      flex: 1;
+      max-width: 260px;
+      padding: 2.6rem 2rem;
+      text-align: center;
+      border-right: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .stat-item:last-child { border-right: none; }
+
+    .stat-number {
+      font-family: var(--serif);
+      font-size: 2.8rem;
+      color: var(--green-vivid);
+      line-height: 1;
+    }
+
+    .stat-label {
+      font-size: 0.76rem;
+      color: rgba(255,255,255,0.42);
+      margin-top: 0.5rem;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    /* ══════════════════════════════════════════
+       SECTIONS COMMONS
+    ══════════════════════════════════════════ */
+    .section { padding: 7rem 5vw; }
+
+    .section-label {
+      font-size: 0.73rem;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--green-mid);
+      margin-bottom: 0.9rem;
+    }
+
+    .section-title {
+      font-family: var(--serif);
+      font-size: clamp(2.2rem, 3.8vw, 3.4rem);
+      line-height: 1.12;
+      max-width: 620px;
+    }
+
+    .section-title em { font-style: italic; color: var(--green-mid); }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(28px);
+      transition: opacity 0.7s ease, transform 0.7s ease;
+    }
+
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+
+    /* ══════════════════════════════════════════
+       ABOUT
+    ══════════════════════════════════════════ */
+    .about-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5rem;
+      align-items: center;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .about-text p {
+      color: var(--gray-500);
+      line-height: 1.85;
+      margin-top: 1.4rem;
+      font-size: 1.02rem;
+    }
+
+    .code-card {
+      background: #0e1117;
+      border-radius: var(--radius);
+      padding: 1.8rem;
+      font-family: 'Courier New', monospace;
+      font-size: 0.81rem;
+      line-height: 1.85;
+      border: 1px solid rgba(255,255,255,0.06);
+      box-shadow: 0 40px 80px rgba(0,0,0,0.18);
+      position: relative;
+      color: #cdd6f4; /* color base legible para texto sin clase */
+    }
+
+    .code-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2.5px;
+      background: linear-gradient(90deg, var(--green-vivid), var(--green-mid));
+      border-radius: var(--radius) var(--radius) 0 0;
+    }
+
+    .dots { display: flex; gap: 6px; margin-bottom: 1.2rem; }
+    .dot-r { width:10px;height:10px;border-radius:50%;background:#f38ba8; }
+    .dot-y { width:10px;height:10px;border-radius:50%;background:#f9e2af; }
+    .dot-g { width:10px;height:10px;border-radius:50%;background:var(--green-vivid); }
+
+    .kw  { color: var(--green-vivid); }
+    .fn  { color: #89dceb; }
+    .st  { color: #a6e3a1; }
+    .cm  { color: #7c8396; }   /* comentarios — legible sobre fondo oscuro */
+    .nm  { color: #fab387; }
+
+    .float-tag {
+      position: absolute;
+      bottom: -18px; right: -18px;
+      background: var(--green-pale);
+      border: 1px solid var(--green-light);
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-family: var(--sans);
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--green-dark);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.07);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    /* ══════════════════════════════════════════
+       FEATURES
+    ══════════════════════════════════════════ */
+    .features-section { background: var(--off-white); }
+
+    .features-head {
+      max-width: 1200px;
+      margin: 0 auto 3.5rem;
+    }
+
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.4rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: var(--white);
+      border-radius: var(--radius);
+      padding: 1.9rem;
+      border: 1px solid var(--gray-200);
+      transition: transform 0.45s var(--ease), box-shadow 0.45s var(--ease), border-color 0.3s;
+    }
+
+    .card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 20px 48px rgba(0,0,0,0.07);
+      border-color: var(--green-light);
+    }
+
+    .card-icon {
+      width: 46px; height: 46px;
+      background: var(--green-pale);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.1rem;
+      color: var(--green-mid);
+      flex-shrink: 0;
+    }
+
+    .card-icon svg {
+      width: 22px; height: 22px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .card h3 {
+      font-family: var(--sans);
+      font-size: 1.05rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      margin-bottom: 0.5rem;
+    }
+
+    .card p {
+      color: var(--gray-500);
+      font-size: 0.88rem;
+      line-height: 1.72;
+    }
+
+    /* ══════════════════════════════════════════
+       PUNTO ASIS — sección final rediseñada
+    ══════════════════════════════════════════ */
+    .asis-section {
+      background: var(--off-black);
+      padding: 7rem 5vw;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Grid sutil decorativo de fondo */
+    .asis-section::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+    }
+
+    /* Glow verde esquina superior derecha */
+    .asis-section::after {
+      content: '';
+      position: absolute;
+      top: -120px; right: -120px;
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(64,192,116,0.08) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .asis-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5rem;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .asis-left .section-label {
+      margin-bottom: 1rem;
+      color: var(--green-vivid);
+    }
+
+    .asis-left h2 {
+      font-family: var(--serif);
+      font-size: clamp(2.4rem, 4vw, 3.6rem);
+      line-height: 1.1;
+      color: var(--white);
+    }
+
+    .asis-left h2 em { font-style: italic; color: var(--green-vivid); }
+
+    .asis-left p {
+      color: rgba(255,255,255,0.45);
+      margin-top: 1.4rem;
+      line-height: 1.8;
+      font-size: 1rem;
+    }
+
+    .asis-register-text {
+      margin-top: 1.1rem;
+      font-size: 0.86rem;
+      color: rgba(255,255,255,0.35);
+      padding-left: 4px;
+    }
+
+    .asis-register-link {
+      color: var(--green-vivid);
+      font-weight: 600;
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+      transition: border-color 0.2s;
+    }
+
+    .asis-register-link:hover { border-color: var(--green-vivid); }
+
+    .asis-cta {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-start;
+      margin-top: 2.4rem;
+    }
+
+    .asis-btn {
+      margin-top: 0;
+      background: var(--green-vivid);
+      color: var(--black);
+      padding: 16px 36px;
+      border-radius: 50px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: background 0.25s, transform 0.2s, box-shadow 0.25s;
+      box-shadow: 0 4px 20px rgba(64,192,116,0.2);
+    }
+
+    .asis-btn:hover {
+      background: var(--white);
+      color: var(--black);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 32px rgba(64,192,116,0.15);
+    }
+
+    .asis-btn .arrow {
+      width: 28px; height: 28px;
+      background: rgba(0,0,0,0.12);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.2s;
+    }
+
+    .asis-btn:hover .arrow { transform: translateX(3px); }
+
+    /* Right: visual panel */
+    .asis-panel {
+      background: #0a0a0a;
+      border-radius: 20px;
+      padding: 2.5rem;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 40px 80px rgba(0,0,0,0.5);
+    }
+
+    /* línea verde superior */
+    .asis-panel::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--green-vivid), var(--green-mid), transparent);
+    }
+
+    /* glow esquina */
+    .asis-panel::after {
+      content: '';
+      position: absolute;
+      top: -80px; right: -80px;
+      width: 260px; height: 260px;
+      background: radial-gradient(circle, rgba(64,192,116,0.08) 0%, transparent 65%);
+      pointer-events: none;
+    }
+
+    .asis-panel-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 2rem;
+      padding-bottom: 1.6rem;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    /* Logo imagen en el panel */
+    .asis-logo-big {
+      width: 56px; height: 56px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      overflow: hidden;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .asis-logo-big img {
+      width: 100%; height: 100%;
+      object-fit: contain;
+    }
+
+    .asis-panel-header div strong {
+      display: block;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--white);
+      letter-spacing: 0.01em;
+    }
+
+    .asis-panel-header div span {
+      font-size: 0.74rem;
+      color: rgba(255,255,255,0.3);
+      margin-top: 3px;
+      display: block;
+    }
+
+    .asis-features {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+
+    .asis-feat {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 10px;
+      padding: 13px 16px;
+      transition: border-color 0.25s, background 0.25s;
+    }
+
+    .asis-feat:hover {
+      background: rgba(64,192,116,0.04);
+      border-color: rgba(64,192,116,0.2);
+    }
+
+    .feat-icon {
+      width: 34px; height: 34px;
+      background: rgba(64,192,116,0.08);
+      border: 1px solid rgba(64,192,116,0.15);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      color: var(--green-vivid);
+    }
+
+    .feat-icon svg {
+      width: 16px; height: 16px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .asis-feat span {
+      font-size: 0.84rem;
+      color: rgba(255,255,255,0.55);
+      font-weight: 400;
+    }
+
+    .asis-panel-bottom {
+      margin-top: 1.8rem;
+      padding-top: 1.4rem;
+      border-top: 1px solid rgba(255,255,255,0.05);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .asis-panel-bottom span {
+      font-size: 0.74rem;
+      color: rgba(255,255,255,0.2);
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(64,192,116,0.07);
+      border: 1px solid rgba(64,192,116,0.18);
+      border-radius: 50px;
+      padding: 5px 13px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--green-vivid);
+    }
+
+    .status-dot {
+      width: 6px; height: 6px;
+      background: var(--green-vivid);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    /* ══════════════════════════════════════════
+       FOOTER
+    ══════════════════════════════════════════ */
+    footer {
+      background: var(--off-black);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.8rem 5vw;
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.35);
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    footer a {
+      color: rgba(255,255,255,0.45);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    footer a:hover { color: var(--green-vivid); }
+
+    .footer-logo {
+      font-family: var(--serif);
+      font-size: 1.2rem;
+      color: var(--white);
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(22px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ══════════════════════════════════════════
+       RESPONSIVE
+    ══════════════════════════════════════════ */
+    @media (max-width: 960px) {
+      .about-grid, .asis-inner { grid-template-columns: 1fr; gap: 3rem; }
+      .cards-grid { grid-template-columns: 1fr 1fr; }
+      .nav-links li:not(:last-child) { display: none; }
+    }
+
+    @media (max-width: 600px) {
+      .cards-grid { grid-template-columns: 1fr; }
+      .stats-bar { flex-wrap: wrap; }
+      .stat-item { max-width: 50%; border-bottom: 1px solid rgba(255,255,255,0.07); }
+      .hero-actions { flex-direction: column; width: 100%; }
+      .btn-dark, .btn-outline { width: 100%; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════
+     NAVBAR
+════════════════════════════════════════ -->
+<nav>
+  <a class="nav-logo" href="/">
+    EduPos<span class="logo-dot"></span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="#nosotros">Nosotros</a></li>
+    <li><a href="#caracteristicas">Características</a></li>
+    <li><a href="#punto-asis">Punto Asis</a></li>
+    <li><a href="../registro/padre" class="nav-register">Regístrate</a></li>
+    <li><a href="/login/" class="nav-btn">Acceder →</a></li>
+  </ul>
+</nav>
+
+<!-- ════════════════════════════════════════
+     HERO
+════════════════════════════════════════ -->
+<section class="hero">
+  <div class="hero-badge">
+    <span class="badge-dot"></span>
+    Software Educativo · Colombia
+  </div>
+  <h1>
+    Tecnología inteligente para la<br>
+    <em>tienda de tu institución</em>
+  </h1>
+  <p class="hero-sub">
+    EduPos desarrolla sistemas de punto de venta diseñados exclusivamente
+    para entornos escolares. Simples de operar, poderosos en datos.
+  </p>
+  <div class="hero-actions">
+    <a href="#punto-asis" class="btn-dark">
+      Ver Punto Asis <span>→</span>
+    </a>
+    <a href="#caracteristicas" class="btn-outline">
+      Conocer más
+    </a>
+  </div>
+
+</section>
+
+<!-- ════════════════════════════════════════
+     STATS
+════════════════════════════════════════ -->
+<div class="stats-bar">
+  <div class="stat-item">
+    <div class="stat-number" data-target="100" data-suffix="%">0%</div>
+    <div class="stat-label">Enfocado en educación</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-number" data-target="10" data-prefix="+" data-suffix="">0</div>
+    <div class="stat-label">Modulos</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-number" data-target="24" data-suffix="/7">0</div>
+    <div class="stat-label">Datos en tiempo real</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-number" data-target="0" >0</div>
+    <div class="stat-label">Papel necesario</div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     ABOUT
+════════════════════════════════════════ -->
+<section class="section" id="nosotros">
+  <div class="about-grid">
+
+    <div class="about-text reveal">
+      <div class="section-label">Quiénes somos</div>
+      <h2 class="section-title">
+        Programadores enfocados en el <em>ecosistema escolar</em>
+      </h2>
+      <p>
+        EduPos nació con una misión clara: llevar software de calidad empresarial
+        a las instituciones educativas de Colombia. Entendemos los retos únicos
+        de una tienda escolar: turnos cortos, múltiples operadores, control de
+        inventario y trazabilidad financiera.
+      </p>
+      <p>
+        Nuestros sistemas están construidos sobre tecnología moderna, pensados
+        para crecer con cada institución y adaptarse a sus procesos sin
+        interrumpir la operación diaria.
+      </p>
+    </div>
+
+    <div style="position:relative;" class="reveal">
+      <div class="code-card">
+        <div class="dots">
+          <div class="dot-r"></div>
+          <div class="dot-y"></div>
+          <div class="dot-g"></div>
+        </div>
+        <div><span class="cm"># EduPos · punto_asis/models.py</span></div>
+        <br>
+        <div><span class="kw">class</span> <span class="fn">Venta</span>(models.Model):</div>
+        <div>&nbsp;&nbsp;fecha &nbsp;= models.<span class="fn">DateTimeField</span>(<span class="st">auto_now_add=True</span>)</div>
+        <div>&nbsp;&nbsp;total &nbsp;= models.<span class="fn">DecimalField</span>(max_digits=<span class="nm">10</span>)</div>
+        <div>&nbsp;&nbsp;cajero = models.<span class="fn">ForeignKey</span>(User, ...)</div>
+        <div>&nbsp;&nbsp;items &nbsp;= models.<span class="fn">ManyToManyField</span>(...)</div>
+        <br>
+        <div>&nbsp;&nbsp;<span class="kw">def</span> <span class="fn">__str__</span>(self):</div>
+        <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return</span> <span class="st">f"Venta #{self.id}"</span></div>
+      </div>
+      <div class="float-tag">
+        <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:var(--green-mid);fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg>
+        Django + Python
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════
+     CARACTERÍSTICAS
+════════════════════════════════════════ -->
+<section class="section features-section" id="caracteristicas">
+  <div class="features-head reveal">
+    <div class="section-label">Características</div>
+    <h2 class="section-title">Todo lo que una tienda escolar necesita</h2>
+  </div>
+  <div class="cards-grid">
+    <div class="card reveal">
+      <div class="card-icon">
+        <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      </div>
+      <h3>Punto de Venta</h3>
+      <p>Interfaz rápida y táctil para procesar ventas en segundos, incluso en los recreos más cortos.</p>
+    </div>
+    <div class="card reveal">
+      <div class="card-icon">
+        <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+      </div>
+      <h3>Control de Inventario</h3>
+      <p>Seguimiento en tiempo real de productos, alertas de stock mínimo y entradas automáticas.</p>
+    </div>
+    <div class="card reveal">
+      <div class="card-icon">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      </div>
+      <h3>Reportes Financieros</h3>
+      <p>Cierres de caja, ventas por período, productos más vendidos y más, todo exportable.</p>
+    </div>
+    <div class="card reveal">
+      <div class="card-icon">
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <h3>Multi-Usuario</h3>
+      <p>Roles diferenciados: administrador, cajero y auditor, con control de acceso granular.</p>
+    </div>
+    <div class="card reveal">
+      <div class="card-icon">
+        <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <h3>Seguridad Total</h3>
+      <p>Autenticación robusta, logs de actividad y respaldo de datos para la tranquilidad del colegio.</p>
+    </div>
+    <div class="card reveal">
+      <div class="card-icon">
+        <svg viewBox="0 0 24 24"><polyline points="13 2 13 9 20 9"/><path d="M20 14.66V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10l6 6v2.34"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="12" y1="12" x2="12" y2="18"/></svg>
+      </div>
+      <h3>Escalable</h3>
+      <p>Arquitectura modular en Django: agrega nuevas tiendas, sedes o módulos sin reescribir nada.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════
+     PUNTO ASIS — sección de acceso
+════════════════════════════════════════ -->
+<section class="asis-section" id="punto-asis">
+  <div class="asis-inner">
+
+    <!-- Texto izquierda -->
+    <div class="asis-left reveal">
+      <div class="section-label">Producto Insignia</div>
+      <h2>Conoce<br><em>Punto Asis</em></h2>
+      <p>
+        El sistema de gestión diseñado específicamente para la tienda escolar
+        de tu institución. Controla cada venta, cada producto y cada turno
+        desde un solo panel, limpio y sin complicaciones.
+      </p>
+      <div class="asis-cta">
+        <a href="/login/" class="asis-btn">
+          Ingresar al sistema
+        </a>
+        <p class="asis-register-text">
+          ¿No tienes cuenta? <a href="../registro/padre" class="asis-register-link">Regístrate</a>
+        </p>
+      </div>
+    </div>
+
+    <!-- Panel visual derecha -->
+    <div class="asis-panel reveal">
+      <div class="asis-panel-header">
+        <div class="asis-logo-big">
+          <img src="{% static 'authentication/img/logo.webp' %}" alt="Colegio San Francisco de Asís" />
+        </div>
+        <div>
+          <strong>Punto Asis</strong>
+          <span>Sistema de tienda escolar · EduPos</span>
+        </div>
+      </div>
+
+      <div class="asis-features">
+        <div class="asis-feat">
+          <div class="feat-icon">
+            <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          </div>
+          <span>Registro de ventas en tiempo real</span>
+        </div>
+        <div class="asis-feat">
+          <div class="feat-icon">
+            <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          </div>
+          <span>Control de inventario automático</span>
+        </div>
+        <div class="asis-feat">
+          <div class="feat-icon">
+            <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          </div>
+          <span>Reportes y cierres de caja</span>
+        </div>
+        <div class="asis-feat">
+          <div class="feat-icon">
+            <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <span>Gestión de usuarios y roles</span>
+        </div>
+      </div>
+
+      <div class="asis-panel-bottom">
+        <span>EduPos © 2025</span>
+        <div class="status-pill">
+          <span class="status-dot"></span>
+          Activo
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════
+     FOOTER
+════════════════════════════════════════ -->
+<footer>
+  <span class="footer-logo">EduPos</span>
+  <span>© 2025 EduPos. Software para educación colombiana.</span>
+  <span>
+    <a href="#">Privacidad</a> &nbsp;·&nbsp;
+    <a href="#">Contacto</a>
+  </span>
+</footer>
+
+<script>
+  // ── Reveal on scroll ────────────────────────────────
+  const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach((el, i) => {
+      if (el.isIntersecting) {
+        setTimeout(() => el.target.classList.add('visible'), i * 70);
+      }
+    });
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+  // ── Counter animation ────────────────────────────────
+  function animateCounter(el) {
+    const target  = parseInt(el.dataset.target, 10);
+    const prefix  = el.dataset.prefix  || '';
+    const suffix  = el.dataset.suffix  || '';
+    const duration = 1600; // ms
+    const steps    = 60;
+    const stepTime  = duration / steps;
+    let current = 0;
+
+    // Si el target es 0 queda en 0 directamente
+    if (target === 0) {
+      el.textContent = prefix + '0' + suffix;
+      return;
+    }
+
+    const interval = setInterval(() => {
+      // Easing: empieza rápido, termina lento
+      current += Math.ceil((target - current) / 6);
+      if (current >= target) {
+        current = target;
+        clearInterval(interval);
+      }
+      el.textContent = prefix + current + suffix;
+    }, stepTime);
+  }
+
+  // Observa stats-bar y dispara cuando entra en pantalla
+  const statsObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.querySelectorAll('.stat-number').forEach(animateCounter);
+        statsObserver.unobserve(entry.target); // solo una vez
+      }
+    });
+  }, { threshold: 0.4 });
+
+  const statsBar = document.querySelector('.stats-bar');
+  if (statsBar) statsObserver.observe(statsBar);
+</script>
+
+</body>
+</html>

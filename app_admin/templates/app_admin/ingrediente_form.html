@@ -1,0 +1,129 @@
+{% extends 'app_admin/base_admin.html' %}
+{% block title %}{{ accion }}{% endblock %}
+{% block page_title %}{{ accion }}{% endblock %}
+{% block nav_ingredientes %}active{% endblock %}
+{% block topbar_actions %}
+  <a href="{% url 'app_admin:ingredientes' %}" class="btn btn-ghost">
+    <i class="bi bi-arrow-left"></i> Volver
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="form-page">
+<div class="card">
+  <div class="card-head"><span class="card-title">{{ accion }}</span></div>
+  <div class="card-body">
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="form-grid">
+
+      <!-- Nombre -->
+      <div class="field full">
+        <label>Nombre del ingrediente *</label>
+        <input type="text" name="nombre" value="{{ ingrediente.nombre|default:'' }}"
+               required placeholder="Ej: Arroz, Pollo, Aceite de girasol…">
+      </div>
+
+      <!-- Imagen -->
+      <div class="field full">
+        <label>Imagen del ingrediente</label>
+        {% if ingrediente.imagen %}
+          <img src="{{ ingrediente.imagen.url }}" id="img-preview"
+               style="display:block;width:6rem;height:6rem;object-fit:cover;border-radius:8px;
+                      border:1px solid var(--gray-200);margin-bottom:.5rem;">
+        {% else %}
+          <img id="img-preview"
+               style="display:none;width:6rem;height:6rem;object-fit:cover;border-radius:8px;
+                      border:1px solid var(--gray-200);margin-bottom:.5rem;">
+        {% endif %}
+        <input type="file" name="imagen" accept="image/*" onchange="previewImg(this)">
+        <span class="hint">JPG, PNG o WEBP. {% if ingrediente.imagen %}Dejar vacío para conservar la actual.{% endif %}</span>
+      </div>
+
+      <!-- Unidad -->
+      <div class="field">
+        <label>Unidad de medida *</label>
+        <select name="unidad">
+          <option value="g"        {% if ingrediente.unidad == 'g'        %}selected{% endif %}>Gramos (g)</option>
+          <option value="kg"       {% if ingrediente.unidad == 'kg'       %}selected{% endif %}>Kilogramos (kg)</option>
+          <option value="ml"       {% if ingrediente.unidad == 'ml'       %}selected{% endif %}>Mililitros (ml)</option>
+          <option value="l"        {% if ingrediente.unidad == 'l'        %}selected{% endif %}>Litros (l)</option>
+          <option value="und"      {% if ingrediente.unidad == 'und'      %}selected{% endif %}>Unidades</option>
+          <option value="porciones"{% if ingrediente.unidad == 'porciones'%}selected{% endif %}>Porciones</option>
+        </select>
+      </div>
+
+      <!-- Precio unitario -->
+      <div class="field">
+        <label>Precio por unidad (COP) *</label>
+        <input type="number" name="precio_unitario"
+               value="{{ ingrediente.precio_unitario|default:'' }}"
+               min="0" step="0.0001" required placeholder="Ej: 3.5 (por gramo)">
+        <span class="hint">Precio de 1 unidad de medida. Ej: $3,50 por gramo.</span>
+      </div>
+
+      <!-- Stock -->
+      <div class="field">
+        <label>Stock actual</label>
+        <input type="number" name="stock"
+               value="{{ ingrediente.stock|default:'0' }}"
+               min="0" step="0.01">
+      </div>
+
+      <!-- Stock mínimo -->
+      <div class="field">
+        <label>Stock mínimo (alerta)</label>
+        <input type="number" name="stock_minimo"
+               value="{{ ingrediente.stock_minimo|default:'0' }}"
+               min="0" step="0.01">
+        <span class="hint">Se generará alerta cuando el stock baje de este valor.</span>
+      </div>
+
+      <!-- Fecha de vencimiento -->
+      <div class="field">
+        <label>Fecha de vencimiento del lote</label>
+        <input type="date" name="fecha_vencimiento"
+               value="{{ ingrediente.fecha_vencimiento|date:'Y-m-d'|default:'' }}">
+        <span class="hint">Opcional. Se alertará 7 días antes.</span>
+      </div>
+
+      <!-- Proveedor -->
+      <div class="field">
+        <label>Proveedor</label>
+        <select name="proveedor">
+          <option value="">— Sin asignar —</option>
+          {% for prov in proveedores %}
+          <option value="{{ prov.pk }}"
+            {% if ingrediente and ingrediente.proveedor_id == prov.pk %}selected{% endif %}>
+            {{ prov.nombre }}{% if prov.nit %} · {{ prov.nit }}{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+    </div><!-- /form-grid -->
+
+    <div class="form-footer">
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-floppy"></i>
+        {% if ingrediente %}Guardar cambios{% else %}Crear ingrediente{% endif %}
+      </button>
+      <a href="{% url 'app_admin:ingredientes' %}" class="btn btn-ghost">Cancelar</a>
+    </div>
+  </form>
+  </div>
+</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function previewImg(input) {
+  if (input.files && input.files[0]) {
+    const preview = document.getElementById('img-preview');
+    preview.src = URL.createObjectURL(input.files[0]);
+    preview.style.display = 'block';
+  }
+}
+</script>
+{% endblock %}
