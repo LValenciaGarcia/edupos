@@ -1,6 +1,575 @@
-from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
+import csv
+import json
+from decimal import Decimal
 
-@login_required(login_url='/login/')
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
+from django.contrib import messages
+from django.db import transaction
+from django.db.models import Sum, Count, Q, F
+from django.db.models.functions import TruncDate, TruncMonth
+from django.http import HttpResponse
+from django.utils import timezone
+
+from authentication.models import Perfil, Estudiante
+from app_admin.models import Producto, Categoria, Pedido, DetallePedido
+from app_padre.models import RestriccionAlimento, LimiteGasto, Notificacion, AlergiaEstudiante
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HELPERS
+# ══════════════════════════════════════════════════════════════════════════════
+
+def estudiante_required(view_func):
+    @login_required(login_url='/login/')
+    def wrapper(request, *args, **kwargs):
+        try:
+            if request.user.perfil.rol != 'estudiante':
+                messages.error(request, 'Acceso restringido a estudiantes.')
+                return redirect('authentication:login')
+        except Perfil.DoesNotExist:
+            return redirect('authentication:login')
+        return view_func(request, *args, **kwargs)
+    wrapper.__name__ = view_func.__name__
+    return wrapper
+
+
+def _get_estudiante(request):
+    return get_object_or_404(Estudiante, perfil=request.user.perfil)
+
+
+def _get_restricciones(estudiante):
+    """Retorna sets de IDs de productos y categorías restringidas para el estudiante."""
+    if not estudiante.padre:
+        return set(), set()
+    base_q = Q(activo=True) & (
+        Q(estudiante=estudiante) | Q(estudiante__isnull=True, padre=estudiante.padre)
+    )
+    prod_ids = set(
+        RestriccionAlimento.objects.filter(base_q, producto__isnull=False)
+        .values_list('producto_id', flat=True)
+    )
+    cat_ids = set(
+        RestriccionAlimento.objects.filter(base_q, categoria__isnull=False)
+        .values_list('categoria_id', flat=True)
+    )
+    return prod_ids, cat_ids
+
+
+def _get_limites(estudiante):
+    """Retorna los límites activos del estudiante."""
+    if not estudiante.padre:
+        return []
+    return list(LimiteGasto.objects.filter(
+        padre=estudiante.padre, estudiante=estudiante, activo=True
+    ))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DASHBOARD
+# ══════════════════════════════════════════════════════════════════════════════
+
+@estudiante_required
 def dashboard(request):
-    return render(request, 'app_estudiante/dashboard.html')
+    estudiante = _get_estudiante(request)
+    ahora = timezone.now()
+
+    pedidos_recientes = (
+        Pedido.objects.filter(estudiante=estudiante)
+        .prefetch_related('detalles__producto')
+        .order_by('-fecha_pedido')[:5]
+    )
+
+    gasto_mes = Pedido.objects.filter(
+        estudiante=estudiante, estado='entregado',
+        fecha_pedido__month=ahora.month, fecha_pedido__year=ahora.year,
+    ).aggregate(t=Sum('total'))['t'] or 0
+
+    gasto_hoy = Pedido.objects.filter(
+        estudiante=estudiante, estado='entregado',
+        fecha_pedido__date=ahora.date(),
+    ).aggregate(t=Sum('total'))['t'] or 0
+
+    n_pedidos = Pedido.objects.filter(estudiante=estudiante).count()
+
+    pedido_activo = Pedido.objects.filter(
+        estudiante=estudiante, estado__in=['pendiente', 'preparando', 'listo']
+    ).order_by('-fecha_pedido').first()
+
+    limites_data = []
+    for lim in _get_limites(estudiante):
+        limites_data.append({
+            'limite': lim,
+            'gasto': lim.gasto_actual(),
+            'pct': lim.porcentaje_uso,
+            'disponible': lim.disponible,
+        })
+
+    # Top 4 productos más pedidos por el estudiante
+    top_prods = (
+        DetallePedido.objects.filter(
+            pedido__estudiante=estudiante, pedido__estado='entregado'
+        )
+        .values('producto__id', 'producto__nombre', 'producto__precio_venta',
+                'producto__disponible', 'producto__categoria__nombre')
+        .annotate(veces=Sum('cantidad'))
+        .order_by('-veces')[:4]
+    )
+
+    return render(request, 'app_estudiante/dashboard.html', {
+        'estudiante': estudiante,
+        'pedidos_recientes': pedidos_recientes,
+        'gasto_mes': gasto_mes,
+        'gasto_hoy': gasto_hoy,
+        'n_pedidos': n_pedidos,
+        'pedido_activo': pedido_activo,
+        'limites_data': limites_data,
+        'top_prods': top_prods,
+    })
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MENU + REALIZAR PEDIDO
+# ══════════════════════════════════════════════════════════════════════════════
+
+@estudiante_required
+def menu(request):
+    estudiante = _get_estudiante(request)
+    restricciones_prod, restricciones_cat = _get_restricciones(estudiante)
+
+    if request.method == 'POST':
+        nota_ped = request.POST.get('nota', '').strip()
+        carrito = {}
+        for key, val in request.POST.items():
+            if key.startswith('qty_'):
+                try:
+                    prod_id = int(key[4:])
+                    qty = int(val)
+                    if qty > 0:
+                        carrito[prod_id] = qty
+                except (ValueError, TypeError):
+                    pass
+
+        if not carrito:
+            messages.error(request, 'El carrito esta vacio.')
+            return redirect('app_estudiante:menu')
+
+        total = Decimal('0')
+        lineas = []
+        for prod_id, qty in carrito.items():
+            try:
+                prod = Producto.objects.get(pk=prod_id, disponible=True)
+            except Producto.DoesNotExist:
+                messages.error(request, 'Uno de los productos ya no esta disponible.')
+                return redirect('app_estudiante:menu')
+
+            if prod.id in restricciones_prod or prod.categoria_id in restricciones_cat:
+                messages.error(request, f'"{prod.nombre}" esta restringido por tu acudiente.')
+                return redirect('app_estudiante:menu')
+
+            subtotal = Decimal(str(prod.precio_venta)) * qty
+            total += subtotal
+            lineas.append((prod, qty, subtotal))
+
+        # Crear pedido dentro de transacción atómica con lock
+        try:
+            with transaction.atomic():
+                # Lock del registro del estudiante para evitar race conditions
+                est_locked = Estudiante.objects.select_for_update().get(pk=estudiante.pk)
+
+                # Verificar saldo con datos frescos (después del lock)
+                if est_locked.saldo < total:
+                    messages.error(
+                        request,
+                        f'Saldo insuficiente. Disponible: ${est_locked.saldo:,.0f}, pedido: ${total:,.0f}.'
+                    )
+                    return redirect('app_estudiante:menu')
+
+                # Verificar limites de gasto dentro de la transacción
+                for lim in _get_limites(est_locked):
+                    if float(lim.gasto_actual()) + float(total) > float(lim.monto):
+                        messages.error(
+                            request,
+                            f'El pedido supera tu límite {lim.get_tipo_display().lower()} de ${lim.monto:,.0f}.'
+                        )
+                        return redirect('app_estudiante:menu')
+
+                # Crear pedido con totales iniciales en 0 (se recalculan después)
+                pedido = Pedido.objects.create(
+                    estudiante=est_locked,
+                    total=0,  # Se recalcula
+                    costo_total=0,  # Se recalcula
+                    nota=nota_ped
+                )
+                # Crear detalles con costos correctos
+                for prod, qty, _ in lineas:
+                    DetallePedido.objects.create(
+                        pedido=pedido, producto=prod,
+                        cantidad=qty, precio_unitario=prod.precio_venta,
+                        costo_unitario=prod.costo_calculado,
+                    )
+                # Recalcular totales desde detalles
+                pedido.recalcular_totales()
+
+                # Descontar saldo
+                est_locked.saldo -= total
+                est_locked.save(update_fields=['saldo'])
+                # Actualizar referencia local
+                estudiante.saldo = est_locked.saldo
+        except Exception as e:
+            messages.error(request, 'Error al procesar el pedido. Intenta de nuevo.')
+            return redirect('app_estudiante:menu')
+
+        messages.success(request, f'Pedido {pedido.ticket} realizado por ${total:,.0f}.')
+        return redirect('app_estudiante:historial')
+
+    # GET — Mostrar menu
+    cat_slug = request.GET.get('cat', '')
+    q = request.GET.get('q', '').strip()
+
+    productos_qs = (
+        Producto.objects.filter(disponible=True)
+        .select_related('categoria')
+        .order_by('categoria__nombre', 'nombre')
+    )
+    if cat_slug:
+        productos_qs = productos_qs.filter(categoria__nombre=cat_slug)
+    if q:
+        productos_qs = productos_qs.filter(nombre__icontains=q)
+
+    categorias = Categoria.objects.filter(activa=True)
+    prods_lista = [
+        (p, p.id in restricciones_prod or p.categoria_id in restricciones_cat)
+        for p in productos_qs
+    ]
+
+    return render(request, 'app_estudiante/menu.html', {
+        'estudiante': estudiante,
+        'prods_lista': prods_lista,
+        'categorias': categorias,
+        'cat_activa': cat_slug,
+        'q': q,
+        'restricciones_prod': restricciones_prod,
+        'restricciones_cat': restricciones_cat,
+    })
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HISTORIAL DE PEDIDOS
+# ══════════════════════════════════════════════════════════════════════════════
+
+@estudiante_required
+def historial(request):
+    estudiante = _get_estudiante(request)
+    estado  = request.GET.get('estado', '')
+    fecha_d = request.GET.get('desde', '')
+    fecha_h = request.GET.get('hasta', '')
+
+    pedidos = (
+        Pedido.objects.filter(estudiante=estudiante)
+        .prefetch_related('detalles__producto')
+        .order_by('-fecha_pedido')
+    )
+
+    if estado:
+        pedidos = pedidos.filter(estado=estado)
+    if fecha_d:
+        pedidos = pedidos.filter(fecha_pedido__date__gte=fecha_d)
+    if fecha_h:
+        pedidos = pedidos.filter(fecha_pedido__date__lte=fecha_h)
+
+    gasto_total = pedidos.filter(estado='entregado').aggregate(t=Sum('total'))['t'] or 0
+    n_pedidos   = pedidos.count()
+
+    return render(request, 'app_estudiante/historial.html', {
+        'estudiante': estudiante,
+        'pedidos': pedidos[:80],
+        'estado_activo': estado,
+        'fecha_desde': fecha_d,
+        'fecha_hasta': fecha_h,
+        'gasto_total': gasto_total,
+        'n_pedidos': n_pedidos,
+        'ESTADO_CHOICES': Pedido.ESTADO_CHOICES,
+    })
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PERFIL
+# ══════════════════════════════════════════════════════════════════════════════
+
+@estudiante_required
+def perfil(request):
+    estudiante = _get_estudiante(request)
+
+    if request.method == 'POST':
+        user = request.user
+        first_name = request.POST.get('first_name', '').strip()
+        last_name  = request.POST.get('last_name',  '').strip()
+        email      = request.POST.get('email',      '').strip()
+        telefono   = request.POST.get('telefono',   '').strip()
+        password1  = request.POST.get('password1',  '')
+        password2  = request.POST.get('password2',  '')
+
+        if not first_name or not last_name:
+            messages.error(request, 'Nombre y apellido son obligatorios.')
+            return redirect('app_estudiante:perfil')
+
+        user.first_name = first_name
+        user.last_name  = last_name
+        user.email      = email
+        user.save(update_fields=['first_name', 'last_name', 'email'])
+
+        perfil_obj = user.perfil
+        perfil_obj.telefono = telefono
+        perfil_obj.save(update_fields=['telefono'])
+
+        if password1:
+            if password1 != password2:
+                messages.error(request, 'Las contrasenas no coinciden.')
+                return redirect('app_estudiante:perfil')
+            if len(password1) < 8:
+                messages.error(request, 'La contrasena debe tener minimo 8 caracteres.')
+                return redirect('app_estudiante:perfil')
+            user.set_password(password1)
+            user.save()
+            messages.success(request, 'Contrasena actualizada. Inicia sesion nuevamente.')
+            return redirect('authentication:login')
+
+        messages.success(request, 'Perfil actualizado correctamente.')
+        return redirect('app_estudiante:perfil')
+
+    limites_data = []
+    for lim in _get_limites(estudiante):
+        limites_data.append({
+            'limite': lim,
+            'gasto': lim.gasto_actual(),
+            'pct': lim.porcentaje_uso,
+            'disponible': lim.disponible,
+        })
+
+    return render(request, 'app_estudiante/perfil.html', {
+        'estudiante': estudiante,
+        'limites_data': limites_data,
+    })
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ESTADÍSTICAS PERSONALES
+# ══════════════════════════════════════════════════════════════════════════════
+
+@estudiante_required
+def estadisticas(request):
+    estudiante = _get_estudiante(request)
+    ahora = timezone.now()
+
+    # Gastos por día — últimos 30 días
+    hace_30 = ahora - timezone.timedelta(days=30)
+    gastos_dia = (
+        Pedido.objects.filter(
+            estudiante=estudiante, estado='entregado',
+            fecha_pedido__gte=hace_30,
+        )
+        .annotate(dia=TruncDate('fecha_pedido'))
+        .values('dia')
+        .annotate(total=Sum('total'))
+        .order_by('dia')
+    )
+
+    # Gastos por mes — últimos 6 meses
+    hace_180 = ahora - timezone.timedelta(days=180)
+    gastos_mes = (
+        Pedido.objects.filter(
+            estudiante=estudiante, estado='entregado',
+            fecha_pedido__gte=hace_180,
+        )
+        .annotate(mes=TruncMonth('fecha_pedido'))
+        .values('mes')
+        .annotate(total=Sum('total'))
+        .order_by('mes')
+    )
+
+    # Top 6 productos más pedidos
+    top_productos = (
+        DetallePedido.objects.filter(
+            pedido__estudiante=estudiante, pedido__estado='entregado'
+        )
+        .values('producto__nombre')
+        .annotate(veces=Sum('cantidad'))
+        .order_by('-veces')[:6]
+    )
+
+    # KPIs
+    gasto_total = Pedido.objects.filter(
+        estudiante=estudiante, estado='entregado'
+    ).aggregate(t=Sum('total'))['t'] or 0
+
+    n_entregados = Pedido.objects.filter(
+        estudiante=estudiante, estado='entregado'
+    ).count()
+
+    n_cancelados = Pedido.objects.filter(
+        estudiante=estudiante, estado='cancelado'
+    ).count()
+
+    promedio = round(float(gasto_total) / n_entregados, 0) if n_entregados else 0
+
+    producto_fav = top_productos[0]['producto__nombre'] if top_productos else '—'
+
+    # Serializar para Chart.js
+    dias_labels = [str(g['dia']) for g in gastos_dia]
+    dias_data   = [float(g['total']) for g in gastos_dia]
+
+    meses_labels = [g['mes'].strftime('%b %Y') for g in gastos_mes]
+    meses_data   = [float(g['total']) for g in gastos_mes]
+
+    prods_labels = [p['producto__nombre'] for p in top_productos]
+    prods_data   = [int(p['veces']) for p in top_productos]
+
+    return render(request, 'app_estudiante/estadisticas.html', {
+        'estudiante':     estudiante,
+        'gasto_total':    gasto_total,
+        'n_entregados':   n_entregados,
+        'n_cancelados':   n_cancelados,
+        'promedio':       promedio,
+        'producto_fav':   producto_fav,
+        'top_productos':  top_productos,
+        'dias_labels':    json.dumps(dias_labels),
+        'dias_data':      json.dumps(dias_data),
+        'meses_labels':   json.dumps(meses_labels),
+        'meses_data':     json.dumps(meses_data),
+        'prods_labels':   json.dumps(prods_labels),
+        'prods_data':     json.dumps(prods_data),
+    })
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CANCELAR PEDIDO
+# ══════════════════════════════════════════════════════════════════════════════
+
+@estudiante_required
+def cancelar_pedido(request, pk):
+    if request.method != 'POST':
+        return redirect('app_estudiante:historial')
+
+    estudiante = _get_estudiante(request)
+    pedido = get_object_or_404(Pedido, pk=pk, estudiante=estudiante)
+
+    if pedido.estado != 'pendiente':
+        messages.error(request, 'Solo puedes cancelar pedidos en estado Pendiente.')
+        return redirect('app_estudiante:historial')
+
+    # Devolver saldo y cancelar pedido en una sola transacción atómica
+    with transaction.atomic():
+        est_locked = Estudiante.objects.select_for_update().get(pk=estudiante.pk)
+        pedido_locked = Pedido.objects.select_for_update().get(pk=pedido.pk)
+
+        # Re-verificar estado (evita doble cancelación por race condition)
+        if pedido_locked.estado != 'pendiente':
+            messages.error(request, 'Este pedido ya no está en estado Pendiente.')
+            return redirect('app_estudiante:historial')
+
+        pedido_locked.estado = 'cancelado'
+        pedido_locked.save(update_fields=['estado'])
+
+        est_locked.saldo += pedido_locked.total
+        est_locked.save(update_fields=['saldo'])
+        estudiante.saldo = est_locked.saldo
+
+    messages.success(
+        request,
+        f'Pedido {pedido.ticket} cancelado. Se devolvieron ${pedido.total:,.0f} a tu saldo.'
+    )
+    return redirect('app_estudiante:historial')
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NOTIFICACIONES DEL ESTUDIANTE (recibe de su padre)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@estudiante_required
+def notificaciones(request):
+    estudiante = _get_estudiante(request)
+    notifs = []
+    if estudiante.padre:
+        notifs = Notificacion.objects.filter(padre=estudiante.padre).order_by('-fecha')[:50]
+    return render(request, 'app_estudiante/notificaciones.html', {
+        'estudiante': estudiante,
+        'notificaciones': notifs,
+    })
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MIS RESTRICCIONES Y ALERGIAS (solo lectura para el estudiante)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@estudiante_required
+def mis_restricciones(request):
+    estudiante = _get_estudiante(request)
+    restricciones_prod_ids, restricciones_cat_ids = _get_restricciones(estudiante)
+
+    prods_rest = Producto.objects.filter(pk__in=restricciones_prod_ids).select_related('categoria')
+    cats_rest  = Categoria.objects.filter(pk__in=restricciones_cat_ids)
+
+    alergias = []
+    if estudiante.padre:
+        alergias = AlergiaEstudiante.objects.filter(
+            estudiante=estudiante, activo=True
+        ).order_by('-gravedad', 'nombre')
+
+    return render(request, 'app_estudiante/mis_restricciones.html', {
+        'estudiante': estudiante,
+        'prods_rest': prods_rest,
+        'cats_rest': cats_rest,
+        'alergias': alergias,
+    })
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SALDO — detalle de movimientos del estudiante
+# ══════════════════════════════════════════════════════════════════════════════
+
+@estudiante_required
+def mi_saldo(request):
+    estudiante = _get_estudiante(request)
+    ahora      = timezone.now()
+
+    # Últimas recargas recibidas
+    from app_padre.models import RecargaSaldo
+    recargas = RecargaSaldo.objects.filter(
+        estudiante=estudiante
+    ).order_by('-fecha')[:20]
+
+    # Últimos pedidos (como movimientos de salida)
+    pedidos_recientes = Pedido.objects.filter(
+        estudiante=estudiante, estado__in=['pendiente', 'preparando', 'listo', 'entregado']
+    ).order_by('-fecha_pedido')[:20]
+
+    # Totales del mes
+    gasto_mes = Pedido.objects.filter(
+        estudiante=estudiante, estado='entregado',
+        fecha_pedido__month=ahora.month, fecha_pedido__year=ahora.year,
+    ).aggregate(t=Sum('total'))['t'] or 0
+
+    recargado_mes = RecargaSaldo.objects.filter(
+        estudiante=estudiante, estado='aprobada',
+        fecha__month=ahora.month, fecha__year=ahora.year,
+    ).aggregate(t=Sum('monto'))['t'] or 0
+
+    limites_data = []
+    for lim in _get_limites(estudiante):
+        limites_data.append({
+            'limite': lim,
+            'gasto': lim.gasto_actual(),
+            'pct': lim.porcentaje_uso,
+            'disponible': lim.disponible,
+        })
+
+    return render(request, 'app_estudiante/mi_saldo.html', {
+        'estudiante':      estudiante,
+        'recargas':        recargas,
+        'pedidos_recientes': pedidos_recientes,
+        'gasto_mes':       gasto_mes,
+        'recargado_mes':   recargado_mes,
+        'limites_data':    limites_data,
+    })

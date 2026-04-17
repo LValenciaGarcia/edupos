@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     :root {
       --ink:         #0f0f0e;
@@ -37,12 +38,13 @@
       --sky-tint:    #e0f2fe;
       --violet:      #7c3aed;
       --violet-pale: #f5f3ff;
+      --violet-tint: #ede9fe;
 
       --serif: 'DM Serif Display', Georgia, serif;
       --sans:  'Inter', system-ui, sans-serif;
       --ease:  cubic-bezier(0.16, 1, 0.3, 1);
 
-      --sb-w-open:   15rem;
+      --sb-w-open:   15.5rem;
       --sb-w-closed: 3.25rem;
       --sidebar-w:   var(--sb-w-open);
       --topbar-h:    3.25rem;
@@ -136,6 +138,17 @@
       width: 2px; background: var(--leaf-bright); border-radius: 0 2px 2px 0;
     }
 
+    /* Badge de notificaciones en sidebar */
+    .sb-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 1.1rem; height: 1.1rem; padding: 0 0.3rem;
+      background: var(--red); color: #fff;
+      border-radius: 99px; font-size: 0.58rem; font-weight: 700;
+      margin-left: auto; flex-shrink: 0;
+      transition: opacity 0.15s;
+    }
+    body.sb-closed .sb-badge { opacity: 0; }
+
     .sb-divider { height: 1px; background: rgba(255,255,255,0.05); margin: 0.35rem 0.5rem; }
 
     .sb-item { position: relative; }
@@ -209,6 +222,23 @@
     .topbar-title { font-family: var(--serif); font-size: 1.15rem; font-weight: 500; color: var(--ink); letter-spacing: 0.01em; }
     .topbar-right { display: flex; align-items: center; gap: 0.5rem; }
 
+    /* Botón de notificaciones en topbar */
+    .notif-btn {
+      position: relative; width: 2rem; height: 2rem;
+      display: flex; align-items: center; justify-content: center;
+      background: none; border: 1px solid var(--mist);
+      border-radius: 7px; color: var(--stone); cursor: pointer;
+      font-size: 0.95rem; text-decoration: none;
+      transition: background 0.14s, border-color 0.14s;
+    }
+    .notif-btn:hover { background: var(--cream); border-color: var(--fog); color: var(--ink); }
+    .notif-dot {
+      position: absolute; top: 0.2rem; right: 0.2rem;
+      width: 0.5rem; height: 0.5rem;
+      background: var(--red); border-radius: 50%;
+      border: 1.5px solid var(--ivory);
+    }
+
     .page-body { padding: 1.75rem; flex: 1; }
 
     /* ══ MENSAJES ════════════════════════════════════════════════════════════ */
@@ -221,9 +251,10 @@
 
     /* ══ CARDS ═══════════════════════════════════════════════════════════════ */
     .card { background: var(--ivory); border: 1px solid var(--mist); border-radius: var(--radius); overflow: hidden; }
-    .card-head { padding: 1rem 1.5rem; border-bottom: 1px solid var(--mist); display: flex; align-items: center; justify-content: space-between; }
+    .card-head { padding: 1rem 1.5rem; border-bottom: 1px solid var(--mist); display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
     .card-title { font-family: var(--serif); font-size: 1.05rem; font-weight: 500; letter-spacing: 0.01em; }
     .card-body  { padding: 1.5rem; }
+    .card-sm    { padding: 0.875rem 1rem; }
 
     /* ══ STAT CARDS ══════════════════════════════════════════════════════════ */
     .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
@@ -244,14 +275,19 @@
 
     /* ══ BADGES ══════════════════════════════════════════════════════════════ */
     .badge { display: inline-block; padding: 0.17rem 0.52rem; border-radius: 99px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.03em; white-space: nowrap; }
-    .badge-ok         { background: var(--leaf-pale);   color: var(--leaf-dark); }
-    .badge-low        { background: var(--amber-pale);  color: var(--amber); }
-    .badge-out        { background: var(--red-pale);    color: var(--red); }
-    .badge-pendiente  { background: var(--amber-pale);  color: var(--amber); }
-    .badge-preparando { background: var(--sky-pale);    color: var(--sky); }
-    .badge-listo      { background: var(--leaf-pale);   color: var(--leaf-dark); }
-    .badge-entregado  { background: var(--mist);        color: var(--stone); }
-    .badge-cancelado  { background: var(--red-pale);    color: var(--red); }
+    .badge-ok         { background: var(--leaf-pale);    color: var(--leaf-dark); }
+    .badge-low        { background: var(--amber-pale);   color: var(--amber); }
+    .badge-pendiente  { background: var(--amber-pale);   color: var(--amber); }
+    .badge-aprobada   { background: var(--leaf-pale);    color: var(--leaf-dark); }
+    .badge-rechazada  { background: var(--red-pale);     color: var(--red); }
+    .badge-preparando { background: var(--sky-pale);     color: var(--sky); }
+    .badge-listo      { background: var(--leaf-pale);    color: var(--leaf-dark); }
+    .badge-entregado  { background: var(--mist);         color: var(--stone); }
+    .badge-cancelado  { background: var(--red-pale);     color: var(--red); }
+    .badge-activo     { background: var(--leaf-pale);    color: var(--leaf-dark); }
+    .badge-inactivo   { background: var(--mist);         color: var(--stone); }
+    .badge-padre      { background: var(--violet-tint);  color: var(--violet); }
+    .badge-info       { background: var(--sky-pale);     color: var(--sky); }
 
     /* ══ BOTONES ═════════════════════════════════════════════════════════════ */
     .btn { display: inline-flex; align-items: center; gap: 0.38rem; padding: 0.47rem 1rem; border-radius: 7px; font-family: var(--sans); font-size: 0.79rem; font-weight: 600; cursor: pointer; text-decoration: none; border: none; transition: all 0.15s var(--ease); white-space: nowrap; letter-spacing: 0.01em; }
@@ -263,6 +299,10 @@
     .btn-danger:hover { background: var(--red); color: #fff; }
     .btn-amber { background: var(--amber-pale); color: var(--amber); border: 1px solid var(--amber-tint); }
     .btn-amber:hover { background: var(--amber); color: #fff; }
+    .btn-sky  { background: var(--sky-pale); color: var(--sky); border: 1px solid var(--sky-tint); }
+    .btn-sky:hover { background: var(--sky); color: #fff; }
+    .btn-violet { background: var(--violet-pale); color: var(--violet); border: 1px solid var(--violet-tint); }
+    .btn-violet:hover { background: var(--violet); color: #fff; }
     .btn-sm { padding: 0.31rem 0.7rem; font-size: 0.74rem; }
     .btn-xs { padding: 0.19rem 0.5rem; font-size: 0.69rem; border-radius: 5px; }
     .btn-full { width: 100%; justify-content: center; }
@@ -283,6 +323,13 @@
     .empty-state { padding: 3rem 1rem; text-align: center; color: var(--ash); }
     .empty-state .es-icon { font-size: 1.9rem; margin-bottom: 0.5rem; opacity: 0.45; display: block; }
     .empty-state p { font-size: 0.84rem; }
+
+    /* ══ PROGRESO ════════════════════════════════════════════════════════════ */
+    .progress-bar { height: 6px; background: var(--mist); border-radius: 99px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 99px; transition: width 0.5s var(--ease); }
+    .progress-fill.green  { background: var(--leaf); }
+    .progress-fill.amber  { background: var(--amber); }
+    .progress-fill.red    { background: var(--red); }
 
     /* ══ ANIMACIÓN ═══════════════════════════════════════════════════════════ */
     @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -307,6 +354,7 @@
   </div>
 
   <nav class="sb-nav">
+    <!-- INICIO -->
     <div class="sb-item">
       <a href="{% url 'app_padre:dashboard' %}" class="sb-link {% block nav_dashboard %}{% endblock %}">
         <i class="bi bi-grid-1x2"></i><span class="sb-label">Inicio</span>
@@ -329,6 +377,40 @@
       <span class="sb-tip">Registrar hijo</span>
     </div>
 
+    <span class="sb-section-label">Control Parental</span>
+
+    <div class="sb-item">
+      <a href="{% url 'app_padre:estadisticas' %}" class="sb-link {% block nav_estadisticas %}{% endblock %}">
+        <i class="bi bi-bar-chart-line"></i><span class="sb-label">Estadísticas</span>
+      </a>
+      <span class="sb-tip">Estadísticas</span>
+    </div>
+    <!-- Límites: enlaza al primer hijo si existe, si no a la lista -->
+    <div class="sb-item">
+      <a href="{% if hijo_sidebar_pk %}{% url 'app_padre:limites' hijo_sidebar_pk %}{% else %}{% url 'app_padre:hijos' %}{% endif %}" class="sb-link {% block nav_limites %}{% endblock %}">
+        <i class="bi bi-speedometer2"></i><span class="sb-label">Límites de gasto</span>
+      </a>
+      <span class="sb-tip">Límites de gasto</span>
+    </div>
+    <div class="sb-item">
+      <a href="{% if hijo_sidebar_pk %}{% url 'app_padre:restricciones' hijo_sidebar_pk %}{% else %}{% url 'app_padre:hijos' %}{% endif %}" class="sb-link {% block nav_restricciones %}{% endblock %}">
+        <i class="bi bi-slash-circle"></i><span class="sb-label">Restricciones</span>
+      </a>
+      <span class="sb-tip">Restricciones alimentarias</span>
+    </div>
+    <div class="sb-item">
+      <a href="{% if hijo_sidebar_pk %}{% url 'app_padre:alergias' hijo_sidebar_pk %}{% else %}{% url 'app_padre:hijos' %}{% endif %}" class="sb-link {% block nav_alergias %}{% endblock %}">
+        <i class="bi bi-heart-pulse"></i><span class="sb-label">Alergias</span>
+      </a>
+      <span class="sb-tip">Alergias e intolerancias</span>
+    </div>
+    <div class="sb-item">
+      <a href="{% if hijo_sidebar_pk %}{% url 'app_padre:horarios' hijo_sidebar_pk %}{% else %}{% url 'app_padre:hijos' %}{% endif %}" class="sb-link {% block nav_horarios %}{% endblock %}">
+        <i class="bi bi-clock"></i><span class="sb-label">Horarios</span>
+      </a>
+      <span class="sb-tip">Horarios de compra</span>
+    </div>
+
     <span class="sb-section-label">Cafetería</span>
 
     <div class="sb-item">
@@ -338,11 +420,24 @@
       <span class="sb-tip">Menú</span>
     </div>
     <div class="sb-item">
+      <a href="{% if hijo_sidebar_pk %}{% url 'app_padre:pedido_padre' hijo_sidebar_pk %}{% else %}{% url 'app_padre:hijos' %}{% endif %}" class="sb-link {% block nav_pedido_padre %}{% endblock %}">
+        <i class="bi bi-cart-plus"></i><span class="sb-label">Pedir por hijo</span>
+      </a>
+      <span class="sb-tip">Hacer pedido</span>
+    </div>
+    <div class="sb-item">
+      <a href="{% if hijo_sidebar_pk %}{% url 'app_padre:pedidos_programados' hijo_sidebar_pk %}{% else %}{% url 'app_padre:hijos' %}{% endif %}" class="sb-link {% block nav_programados %}{% endblock %}">
+        <i class="bi bi-calendar-check"></i><span class="sb-label">Pedidos programados</span>
+      </a>
+      <span class="sb-tip">Pedidos programados</span>
+    </div>
+    <div class="sb-item">
       <a href="{% url 'app_padre:historial' %}" class="sb-link {% block nav_historial %}{% endblock %}">
         <i class="bi bi-clock-history"></i><span class="sb-label">Historial</span>
       </a>
       <span class="sb-tip">Historial</span>
     </div>
+
   </nav>
 
   <div class="sb-bottom">
@@ -362,6 +457,7 @@
           <div class="sb-drop-role">Padre de Familia</div>
         </div>
         <a href="{% url 'app_padre:perfil' %}" class="sb-drop-link"><i class="bi bi-person"></i> Mi perfil</a>
+        <a href="{% url 'app_padre:saldo_padre' %}" class="sb-drop-link"><i class="bi bi-wallet2"></i> Mi saldo</a>
         <a href="{% url 'authentication:logout' %}" class="sb-drop-link danger">
           <i class="bi bi-box-arrow-right"></i> Cerrar sesión
         </a>
@@ -380,6 +476,10 @@
     </div>
     <div class="topbar-right">
       {% block topbar_actions %}{% endblock %}
+      <a href="{% url 'app_padre:notificaciones' %}" class="notif-btn" title="Notificaciones">
+        <i class="bi bi-bell"></i>
+        {% if n_notif %}<span class="notif-dot"></span>{% endif %}
+      </a>
     </div>
   </header>
 
@@ -414,7 +514,7 @@
   document.addEventListener('click', function(e) {
     const btn  = document.getElementById('userBtn');
     const drop = document.getElementById('userDrop');
-    if (drop && !btn.contains(e.target) && !drop.contains(e.target)) {
+    if (drop && btn && !btn.contains(e.target) && !drop.contains(e.target)) {
       drop.classList.remove('open');
     }
   });
@@ -422,6 +522,25 @@
   if (localStorage.getItem(SBKEY) === '1') {
     document.body.classList.add('sb-closed');
   }
+
+  // Polling de notificaciones cada 60s
+  function pollNotificaciones() {
+    fetch('{% url "app_padre:api_notificaciones" %}')
+      .then(r => r.json())
+      .then(data => {
+        const badge = document.getElementById('sb-notif-badge');
+        const dot   = document.querySelector('.notif-dot');
+        if (data.n > 0) {
+          if (badge) badge.textContent = data.n;
+          if (dot) dot.style.display = 'block';
+        } else {
+          if (badge) badge.style.display = 'none';
+          if (dot) dot.style.display = 'none';
+        }
+      })
+      .catch(() => {});
+  }
+  setInterval(pollNotificaciones, 60000);
 </script>
 {% block extra_js %}{% endblock %}
 </body>

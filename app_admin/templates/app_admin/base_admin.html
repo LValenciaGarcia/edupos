@@ -628,6 +628,12 @@
       <span class="sb-tip">Ingredientes</span>
     </div>
     <div class="sb-item">
+      <a href="{% url 'app_admin:insumos' %}" class="sb-link {% block nav_insumos %}{% endblock %}">
+        <i class="bi bi-box2"></i><span class="sb-label">Insumos</span>
+      </a>
+      <span class="sb-tip">Insumos</span>
+    </div>
+    <div class="sb-item">
       <a href="{% url 'app_admin:pedidos' %}" class="sb-link {% block nav_pedidos %}{% endblock %}">
         <i class="bi bi-receipt"></i><span class="sb-label">Pedidos</span>
       </a>
@@ -647,6 +653,12 @@
         <i class="bi bi-people"></i><span class="sb-label">Usuarios</span>
       </a>
       <span class="sb-tip">Usuarios</span>
+    </div>
+    <div class="sb-item">
+      <a href="{% url 'app_admin:recargas' %}" class="sb-link {% block nav_recargas %}{% endblock %}">
+        <i class="bi bi-cash-coin"></i><span class="sb-label">Recargas</span>
+      </a>
+      <span class="sb-tip">Recargas de Saldo</span>
     </div>
     <div class="sb-item">
       <a href="{% url 'app_admin:estadisticas' %}" class="sb-link {% block nav_estadisticas %}{% endblock %}">
@@ -758,6 +770,50 @@
   </div>
 </div>
 
+<script>
+// ── Utilidad global: formateo visual de inputs con separador de miles ────────
+// Aplica a inputs con class="fmt-miles". Muestra 1.000.000 visualmente pero
+// al enviar el form se restaura el valor numérico plano.
+function fmtMiles(n) {
+  if (isNaN(n) || n === '') return '';
+  const parts = String(n).split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return parts.join(',');
+}
+function parseMiles(s) {
+  return s.replace(/\./g, '').replace(',', '.');
+}
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('input.fmt-miles').forEach(function(inp) {
+    // On focus: strip formatting
+    inp.addEventListener('focus', function() {
+      const raw = parseMiles(this.value);
+      if (raw && !isNaN(raw)) this.value = raw;
+    });
+    // On blur: apply formatting
+    inp.addEventListener('blur', function() {
+      const raw = parseFloat(parseMiles(this.value));
+      if (!isNaN(raw)) this.value = fmtMiles(raw);
+    });
+    // On form submit: restore raw value
+    const form = inp.closest('form');
+    if (form && !form._fmtMilesHooked) {
+      form._fmtMilesHooked = true;
+      form.addEventListener('submit', function() {
+        this.querySelectorAll('input.fmt-miles').forEach(function(i) {
+          const raw = parseMiles(i.value);
+          if (raw && !isNaN(raw)) i.value = raw;
+        });
+      });
+    }
+    // Format initial value if present
+    if (inp.value) {
+      const raw = parseFloat(inp.value);
+      if (!isNaN(raw) && raw >= 1000) inp.value = fmtMiles(raw);
+    }
+  });
+});
+</script>
 {% block extra_js %}{% endblock %}
 <script>
 // ── Sidebar toggle ──────────────────────────────────────────────────────────

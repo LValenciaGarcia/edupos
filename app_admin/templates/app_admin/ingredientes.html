@@ -5,6 +5,12 @@
 {% block nav_ingredientes %}active{% endblock %}
 
 {% block topbar_actions %}
+  <a href="{% url 'app_admin:exportar_ingredientes_excel' %}" class="btn btn-ghost btn-sm" title="Exportar a Excel">
+    <i class="bi bi-file-earmark-excel"></i> Excel
+  </a>
+  <a href="{% url 'app_admin:exportar_ingredientes_pdf' %}" class="btn btn-ghost btn-sm" title="Exportar a PDF">
+    <i class="bi bi-file-earmark-pdf"></i> PDF
+  </a>
   <a href="{% url 'app_admin:inventario' %}" class="btn btn-ghost btn-sm">
     <i class="bi bi-box-seam"></i> Inventario
   </a>
@@ -297,10 +303,33 @@
     </div>
 
     {% if ingredientes %}
+
+    {# ── Barra de acciones masivas ── #}
+    <div id="ing-bulk-bar" style="display:none;align-items:center;gap:0.65rem;padding:0.65rem 1rem;background:var(--amber-pale);border-bottom:1px solid var(--amber-tint);flex-wrap:wrap;">
+      <span style="font-size:0.78rem;font-weight:600;color:var(--amber);">
+        <i class="bi bi-check2-square"></i>
+        <span id="ing-bulk-count">0</span> ingrediente(s) seleccionado(s)
+      </span>
+      <form method="post" action="{% url 'app_admin:ingrediente_bulk' %}" id="form-ing-bulk" style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+        {% csrf_token %}
+        <div id="ing-bulk-pks"></div>
+        <input type="hidden" name="accion" id="ing-bulk-accion" value="">
+        <button type="button" class="btn btn-danger btn-sm" onclick="ingBulkAccion('eliminar')" title="Desactivar seleccionados">
+          <i class="bi bi-trash3"></i> Desactivar
+        </button>
+      </form>
+      <button class="btn btn-ghost btn-sm" onclick="limpiarSeleccionIng()" style="margin-left:auto;" title="Cancelar selección">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+
     <div style="overflow-x:auto;">
     <table class="tbl" id="tbl-ingredientes">
       <thead>
         <tr>
+          <th style="width:2.5rem;text-align:center;">
+            <input type="checkbox" id="ing-check-all" title="Seleccionar todos" style="accent-color:var(--amber);cursor:pointer;">
+          </th>
           <th>Ingrediente</th>
           <th>Unidad</th>
           <th>Stock</th>
@@ -313,30 +342,46 @@
       </thead>
       <tbody>
       {% for ing in ingredientes %}
-      <tr>
+      <tr data-pk="{{ ing.pk }}">
+        <td style="width:2.5rem;text-align:center;padding:0.5rem;">
+          <input type="checkbox" class="ing-check" value="{{ ing.pk }}"
+                 style="accent-color:var(--amber);cursor:pointer;width:1rem;height:1rem;">
+        </td>
         <td>
-          <div style="font-weight:600;font-size:0.85rem;">{{ ing.nombre }}</div>
-          {% if ing.proveedor %}
-          <div style="font-size:0.7rem;color:var(--ash);margin-top:0.08rem;">
-            <i class="bi bi-truck" style="font-size:0.62rem;"></i>
-            {{ ing.proveedor }}
+          <div style="display:flex;align-items:center;gap:0.55rem;">
+            {% if ing.imagen %}
+            <img src="{{ ing.imagen.url }}" alt="{{ ing.nombre }}"
+                 style="width:2.2rem;height:2.2rem;object-fit:cover;border-radius:5px;flex-shrink:0;border:1px solid var(--mist);">
+            {% else %}
+            <div style="width:2.2rem;height:2.2rem;border-radius:5px;background:var(--cream);border:1px solid var(--mist);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <i class="bi bi-basket" style="font-size:0.68rem;color:var(--fog);"></i>
+            </div>
+            {% endif %}
+            <div>
+              <div style="font-weight:600;font-size:0.85rem;">{{ ing.nombre }}</div>
+              {% if ing.proveedor %}
+              <div style="font-size:0.7rem;color:var(--ash);margin-top:0.08rem;">
+                <i class="bi bi-truck" style="font-size:0.62rem;"></i>
+                {{ ing.proveedor }}
+              </div>
+              {% endif %}
+            </div>
           </div>
-          {% endif %}
         </td>
         <td>
           <span style="font-size:0.78rem;color:var(--stone);">{{ ing.get_unidad_display }}</span>
         </td>
         <td>
           {% if ing.sin_stock %}
-            <span class="stock-pill out"><i class="bi bi-x-circle-fill"></i> {{ ing.stock }}</span>
+            <span class="stock-pill out"><i class="bi bi-x-circle-fill"></i> {{ ing.stock|floatformat:"-2" }}</span>
           {% elif ing.stock_bajo %}
-            <span class="stock-pill low"><i class="bi bi-exclamation-triangle-fill"></i> {{ ing.stock }}</span>
+            <span class="stock-pill low"><i class="bi bi-exclamation-triangle-fill"></i> {{ ing.stock|floatformat:"-2" }}</span>
           {% else %}
-            <span class="stock-pill ok"><i class="bi bi-check-circle-fill"></i> {{ ing.stock }}</span>
+            <span class="stock-pill ok"><i class="bi bi-check-circle-fill"></i> {{ ing.stock|floatformat:"-2" }}</span>
           {% endif %}
         </td>
-        <td style="color:var(--ash);font-size:0.8rem;">{{ ing.stock_minimo }}</td>
-        <td style="font-size:0.8rem;color:var(--stone);">${{ ing.precio_unitario }}</td>
+        <td style="color:var(--ash);font-size:0.8rem;">{{ ing.stock_minimo|floatformat:"-2" }}</td>
+        <td style="font-size:0.8rem;color:var(--stone);">${{ ing.precio_unitario|miles }}</td>
         <td>
           {% if ing.fecha_vencimiento %}
             {% if ing.vencido %}
@@ -387,14 +432,15 @@
               "unidad":    "{{ ing.get_unidad_display }}",
               "stock":     "{{ ing.stock }}",
               "stock_minimo": "{{ ing.stock_minimo }}",
-              "precio_unitario": "${{ ing.precio_unitario }}",
+              "precio_unitario": "${{ ing.precio_unitario|miles }}",
               "proveedor": "{{ ing.proveedor|default:'—' }}",
               "fecha_vencimiento": "{% if ing.fecha_vencimiento %}{{ ing.fecha_vencimiento|date:'d/m/Y' }}{% endif %}",
               "vencido":    {{ ing.vencido|yesno:"true,false" }},
               "vence_pronto": {{ ing.vence_pronto|yesno:"true,false" }},
               "sin_stock":  {{ ing.sin_stock|yesno:"true,false" }},
               "stock_bajo": {{ ing.stock_bajo|yesno:"true,false" }},
-              "dias_restantes": "{% if ing.dias_restantes %}~{{ ing.dias_restantes }}d{% endif %}"
+              "dias_restantes": "{% if ing.dias_restantes %}~{{ ing.dias_restantes }}d{% endif %}",
+              "imagen_url": "{% if ing.imagen %}{{ ing.imagen.url }}{% endif %}"
             }
             </script>
           </div>
@@ -441,7 +487,7 @@
             · {{ m.fecha|date:"d/m H:i" }}
           </div>
         </div>
-        <span class="mov-cant">{{ m.cantidad }}</span>
+        <span class="mov-cant">{{ m.cantidad|floatformat:"-2" }}</span>
       </div>
       {% endfor %}
     </div>
@@ -457,18 +503,30 @@
 
 <!-- ── Modal info ingrediente ────────────────────────────────────────────── -->
 <div id="modal-info-ing" class="modal-overlay" onclick="if(event.target===this)cerrarInfoIng()">
-  <div class="modal-box" style="max-width:420px;">
-    <div class="modal-icon" id="info-ing-icon" style="background:var(--leaf-pale);color:var(--leaf);">
-      <i class="bi bi-basket"></i>
+  <div class="modal-box" style="max-width:440px;padding:0;overflow:hidden;display:flex;flex-direction:column;">
+    <!-- Cabecera fija -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:0.85rem 1rem 0.85rem 1.4rem;border-bottom:1px solid var(--mist);flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:0.65rem;">
+        <div class="modal-icon" id="info-ing-icon" style="background:var(--leaf-pale);color:var(--leaf);margin:0;width:2.2rem;height:2.2rem;font-size:1rem;">
+          <i class="bi bi-basket"></i>
+        </div>
+        <div>
+          <div class="modal-title" id="info-ing-nombre" style="margin-bottom:0;font-size:1rem;"></div>
+          <span id="info-ing-unidad" style="font-size:0.68rem;color:var(--ash);font-weight:600;letter-spacing:0.05em;"></span>
+        </div>
+      </div>
+      <button onclick="cerrarInfoIng()" style="width:1.8rem;height:1.8rem;border-radius:50%;background:var(--cream);border:1px solid var(--mist);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--stone);font-size:0.85rem;flex-shrink:0;transition:all 0.15s;" onmouseover="this.style.background='var(--red-pale)';this.style.color='var(--red)'" onmouseout="this.style.background='var(--cream)';this.style.color='var(--stone)'">
+        <i class="bi bi-x-lg"></i>
+      </button>
     </div>
-    <div style="display:flex;align-items:baseline;gap:0.5rem;margin-bottom:0.85rem;">
-      <div class="modal-title" id="info-ing-nombre" style="margin-bottom:0;"></div>
-      <span id="info-ing-unidad" style="font-size:0.72rem;color:var(--ash);font-weight:600;"></span>
+    <!-- Imagen (si existe) -->
+    <div id="info-ing-img-wrap" style="display:none;width:100%;aspect-ratio:16/7;overflow:hidden;background:var(--cream);">
+      <img id="info-ing-img" src="" alt="" style="width:100%;height:100%;object-fit:cover;display:block;">
     </div>
-    <div id="info-ing-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:0.55rem 1rem;margin-bottom:1.1rem;"></div>
-    <div id="info-ing-venc-wrap" style="display:none;margin-bottom:1rem;padding:0.55rem 0.8rem;border-radius:8px;font-size:0.8rem;font-weight:600;"></div>
-    <div class="modal-actions">
-      <button type="button" class="btn btn-ghost" style="flex:1;" onclick="cerrarInfoIng()">Cerrar</button>
+    <!-- Cuerpo desplazable -->
+    <div style="padding:1.2rem 1.4rem 1.4rem;overflow-y:auto;">
+      <div id="info-ing-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:0.55rem 1rem;margin-bottom:1.1rem;"></div>
+      <div id="info-ing-venc-wrap" style="display:none;padding:0.55rem 0.8rem;border-radius:8px;font-size:0.8rem;font-weight:600;"></div>
     </div>
   </div>
 </div>
@@ -515,6 +573,17 @@ function abrirInfoIngrediente(pk) {
     iconEl.style.background = 'var(--leaf-pale)'; iconEl.style.color = 'var(--leaf)';
   }
 
+  // Imagen del ingrediente
+  const imgWrap = document.getElementById('info-ing-img-wrap');
+  const imgEl   = document.getElementById('info-ing-img');
+  if (d.imagen_url) {
+    imgEl.src = d.imagen_url;
+    imgEl.alt = d.nombre;
+    imgWrap.style.display = '';
+  } else {
+    imgWrap.style.display = 'none';
+  }
+
   // Grid de datos
   const grid = document.getElementById('info-ing-grid');
   const fields = [
@@ -535,6 +604,7 @@ function abrirInfoIngrediente(pk) {
   const vencWrap = document.getElementById('info-ing-venc-wrap');
   if (d.fecha_vencimiento) {
     vencWrap.style.display = '';
+    vencWrap.style.marginTop = '0.65rem';
     if (d.vencido) {
       vencWrap.style.background = 'var(--red-pale)'; vencWrap.style.color = 'var(--red)';
       vencWrap.innerHTML = `<i class="bi bi-x-circle-fill"></i> Vencido el ${d.fecha_vencimiento}`;
@@ -576,5 +646,63 @@ document.getElementById('ing-buscar').addEventListener('input', function () {
     row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
   });
 });
+
+// ── Selección múltiple de ingredientes ──────────────────────────────────────
+const ingCheckAll = document.getElementById('ing-check-all');
+if (ingCheckAll) {
+  function actualizarBulkIng() {
+    const checks = document.querySelectorAll('.ing-check:checked');
+    const bar = document.getElementById('ing-bulk-bar');
+    document.getElementById('ing-bulk-count').textContent = checks.length;
+    if (checks.length > 0) {
+      bar.style.display = 'flex';
+      document.querySelectorAll('#tbl-ingredientes tbody tr').forEach(tr => {
+        const chk = tr.querySelector('.ing-check');
+        if (chk) tr.style.background = chk.checked ? 'var(--amber-pale)' : '';
+      });
+    } else {
+      bar.style.display = 'none';
+      document.querySelectorAll('#tbl-ingredientes tbody tr').forEach(tr => tr.style.background = '');
+    }
+    const total = document.querySelectorAll('.ing-check').length;
+    ingCheckAll.indeterminate = checks.length > 0 && checks.length < total;
+    ingCheckAll.checked = checks.length > 0 && checks.length === total;
+  }
+
+  ingCheckAll.addEventListener('change', function () {
+    document.querySelectorAll('.ing-check').forEach(c => {
+      const row = c.closest('tr');
+      if (!row || row.style.display === 'none') return;
+      c.checked = this.checked;
+    });
+    actualizarBulkIng();
+  });
+
+  document.querySelectorAll('.ing-check').forEach(c =>
+    c.addEventListener('change', actualizarBulkIng)
+  );
+}
+
+function limpiarSeleccionIng() {
+  document.querySelectorAll('.ing-check').forEach(c => c.checked = false);
+  if (ingCheckAll) ingCheckAll.checked = false;
+  document.getElementById('ing-bulk-bar').style.display = 'none';
+  document.querySelectorAll('#tbl-ingredientes tbody tr').forEach(tr => tr.style.background = '');
+}
+
+function ingBulkAccion(accion) {
+  const checks = document.querySelectorAll('.ing-check:checked');
+  if (!checks.length) return;
+  if (accion === 'eliminar' && !confirm('¿Desactivar ' + checks.length + ' ingrediente(s)?')) return;
+  document.getElementById('ing-bulk-accion').value = accion;
+  const container = document.getElementById('ing-bulk-pks');
+  container.innerHTML = '';
+  checks.forEach(c => {
+    const inp = document.createElement('input');
+    inp.type = 'hidden'; inp.name = 'pks'; inp.value = c.value;
+    container.appendChild(inp);
+  });
+  document.getElementById('form-ing-bulk').submit();
+}
 </script>
 {% endblock %}

@@ -89,12 +89,54 @@
       border-bottom: 1.5px solid transparent;
       transition: color 0.2s, border-color 0.2s !important;
       padding-bottom: 2px;
+      cursor: pointer;
     }
 
     .nav-register:hover {
       color: var(--green-mid) !important;
       border-color: var(--green-mid) !important;
     }
+
+    /* Dropdown registro */
+    .nav-has-dropdown { position: relative; list-style: none; }
+    .nav-dropdown-menu {
+      display: none;
+      position: absolute;
+      top: calc(100% + 10px);
+      right: 0;
+      background: #fff;
+      border: 1px solid var(--gray-200);
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+      min-width: 200px;
+      z-index: 300;
+      overflow: hidden;
+      list-style: none;
+      padding: 0.4rem 0;
+    }
+    .nav-has-dropdown:hover .nav-dropdown-menu,
+    .nav-has-dropdown:focus-within .nav-dropdown-menu {
+      display: block;
+    }
+    .nav-dropdown-menu li a {
+      display: flex; align-items: center; gap: 8px;
+      padding: 0.65rem 1rem;
+      font-size: 0.85rem; font-weight: 500;
+      color: var(--black) !important;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    .nav-dropdown-menu li a:hover {
+      background: var(--green-pale);
+      color: var(--green-dark) !important;
+    }
+    .nav-dropdown-menu li a svg {
+      width: 14px; height: 14px;
+      stroke: currentColor; fill: none;
+      stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+      flex-shrink: 0;
+    }
+    .nav-dropdown-divider { height: 1px; background: var(--gray-200); margin: 0.3rem 0; }
 
     .nav-btn {
       background: var(--black) !important;
@@ -784,8 +826,25 @@
     <li><a href="#nosotros">Nosotros</a></li>
     <li><a href="#caracteristicas">Características</a></li>
     <li><a href="#punto-asis">Punto Asis</a></li>
-    <li><a href="../registro/padre" class="nav-register">Regístrate</a></li>
-    <li><a href="/login/" class="nav-btn">Acceder →</a></li>
+    <li class="nav-has-dropdown">
+      <a href="#" class="nav-register">Regístrate ▾</a>
+      <ul class="nav-dropdown-menu">
+        <li>
+          <a href="{% url 'authentication:registro_padre' %}">
+            <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Padre de familia
+          </a>
+        </li>
+        <li class="nav-dropdown-divider"></li>
+        <li>
+          <a href="{% url 'authentication:registro_docente' %}">
+            <svg viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+            Docente
+          </a>
+        </li>
+      </ul>
+    </li>
+    <li><a href="{% url 'authentication:login' %}" class="nav-btn">Acceder →</a></li>
   </ul>
 </nav>
 
@@ -963,7 +1022,10 @@
           Ingresar al sistema
         </a>
         <p class="asis-register-text">
-          ¿No tienes cuenta? <a href="../registro/padre" class="asis-register-link">Regístrate</a>
+          ¿No tienes cuenta?
+          <a href="{% url 'authentication:registro_padre' %}" class="asis-register-link">Padre</a>
+          o
+          <a href="{% url 'authentication:registro_docente' %}" class="asis-register-link">Docente</a>
         </p>
       </div>
     </div>

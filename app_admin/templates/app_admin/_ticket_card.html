@@ -19,6 +19,16 @@
     <span class="ticket-time">{{ pedido.fecha_pedido|time:"H:i" }}</span>
   </div>
 
+  {% if pedido.estado == 'entregado' %}
+  <div onclick="event.stopPropagation();" style="margin-top:.6rem;">
+    <a href="{% url 'app_admin:factura_vista' pedido.pk %}"
+       class="btn btn-ghost btn-sm btn-full"
+       style="font-size:.72rem;">
+      <i class="bi bi-receipt"></i> Ver factura
+    </a>
+  </div>
+  {% endif %}
+
   {% if next_estado %}
   <div onclick="event.stopPropagation();" style="margin-top:.6rem;">
     {% if confirmar and next_estado == 'entregado' %}

@@ -1,0 +1,271 @@
+{% extends 'app_padre/base_padre.html' %}
+{% load filtros %}
+{% block title %}Restricciones Alimenticias{% endblock %}
+{% block page_title %}Restricciones Alimenticias{% endblock %}
+{% block nav_hijos %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+  .page-layout { display: grid; grid-template-columns: 1fr 380px; gap: 1.4rem; align-items: start; }
+  @media (max-width: 980px) { .page-layout { grid-template-columns: 1fr; } }
+
+  .hijo-chip {
+    display: flex; align-items: center; gap: 0.85rem;
+    background: var(--ink); border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.4rem; color: #fff;
+  }
+  .hijo-chip-ava {
+    width: 2.5rem; height: 2.5rem; border-radius: 50%;
+    background: rgba(220,38,38,0.2); border: 1px solid rgba(220,38,38,0.3);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--serif); font-size: 1rem; color: #f87171; flex-shrink: 0;
+  }
+  .hijo-chip-name { font-family: var(--serif); font-size: 1.1rem; }
+  .hijo-chip-meta { font-size: 0.71rem; color: rgba(255,255,255,0.45); margin-top: 0.07rem; }
+
+  .restriccion-card {
+    background: var(--ivory); border: 1px solid var(--mist); border-radius: 10px;
+    padding: 1rem 1.25rem; margin-bottom: 0.75rem;
+    display: flex; align-items: flex-start; gap: 0.85rem;
+  }
+  .restriccion-card.inactiva { opacity: 0.5; }
+  .restriccion-icon {
+    width: 2.2rem; height: 2.2rem; border-radius: 8px; flex-shrink: 0;
+    background: var(--red-tint); color: var(--red);
+    display: flex; align-items: center; justify-content: center; font-size: 0.95rem;
+  }
+  .restriccion-info { flex: 1; min-width: 0; }
+  .restriccion-nombre { font-size: 0.87rem; font-weight: 600; }
+  .restriccion-tipo { font-size: 0.7rem; color: var(--ash); margin-top: 0.07rem; }
+  .restriccion-motivo { font-size: 0.74rem; color: var(--stone); margin-top: 0.2rem; font-style: italic; }
+  .restriccion-aplica { font-size: 0.68rem; margin-top: 0.15rem; }
+  .restriccion-actions { display: flex; gap: 0.35rem; align-items: flex-start; flex-shrink: 0; }
+
+  .seg-control {
+    display: flex; background: var(--mist); border-radius: 8px; padding: 2px; gap: 2px; margin-bottom: 0.85rem;
+  }
+  .seg-btn {
+    flex: 1; padding: 0.5rem; border: none; border-radius: 6px; font-family: var(--sans);
+    font-size: 0.77rem; font-weight: 600; cursor: pointer; background: none; color: var(--stone);
+    transition: background 0.14s, color 0.14s;
+  }
+  .seg-btn.active { background: var(--ivory); color: var(--leaf-dark); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+
+  .product-search { position: relative; margin-bottom: 0.65rem; }
+  .product-search input { width: 100%; padding-left: 2rem; }
+  .product-search i { position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%); color: var(--ash); font-size: 0.85rem; }
+  .product-list { max-height: 200px; overflow-y: auto; border: 1px solid var(--fog); border-radius: 7px; }
+  .product-opt {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.55rem 0.85rem; font-size: 0.8rem; cursor: pointer;
+    border-bottom: 1px solid var(--mist); transition: background 0.1s;
+  }
+  .product-opt:last-child { border-bottom: none; }
+  .product-opt:hover { background: var(--cream); }
+  .product-opt input { accent-color: var(--leaf); flex-shrink: 0; }
+  .product-opt-cat { font-size: 0.65rem; color: var(--ash); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Chip del hijo -->
+<div class="hijo-chip">
+  <div class="hijo-chip-ava"><i class="bi bi-shield-x"></i></div>
+  <div>
+    <div class="hijo-chip-name">Restricciones de {{ estudiante.perfil.user.get_full_name }}</div>
+    <div class="hijo-chip-meta">Grado {{ estudiante.grado }} · Los productos restringidos quedarán bloqueados</div>
+  </div>
+</div>
+
+<div class="page-layout">
+
+  <!-- Lista de restricciones -->
+  <div>
+    <h2 style="font-family:var(--serif);font-size:1.25rem;font-weight:500;margin-bottom:1rem;">
+      Restricciones activas ({{ restricciones.count }})
+    </h2>
+
+    {% if restricciones %}
+      {% for r in restricciones %}
+      <div class="restriccion-card {% if not r.activo %}inactiva{% endif %}">
+        <div class="restriccion-icon">
+          <i class="bi bi-{% if r.producto %}box-seam{% else %}tag{% endif %}"></i>
+        </div>
+        <div class="restriccion-info">
+          <div class="restriccion-nombre">
+            {% if r.producto %}{{ r.producto.nombre }}{% elif r.categoria %}{{ r.categoria.get_nombre_display }} (categoría completa){% endif %}
+          </div>
+          <div class="restriccion-tipo">
+            {% if r.producto %}Producto específico · {{ r.producto.categoria.get_nombre_display }}
+            {% else %}Categoría completa{% endif %}
+          </div>
+          {% if r.motivo %}<div class="restriccion-motivo">{{ r.motivo }}</div>{% endif %}
+          <div class="restriccion-aplica">
+            <span class="badge {% if r.estudiante %}badge-pendiente{% else %}badge-rechazada{% endif %}">
+              {% if r.estudiante %}Solo {{ r.estudiante.perfil.user.first_name }}{% else %}Todos mis hijos{% endif %}
+            </span>
+            <span class="badge {% if r.activo %}badge-activo{% else %}badge-inactivo{% endif %}" style="margin-left:4px;">
+              {% if r.activo %}Activa{% else %}Inactiva{% endif %}
+            </span>
+          </div>
+        </div>
+        <div class="restriccion-actions">
+          <form method="post" style="display:inline;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="toggle">
+            <input type="hidden" name="restriccion_id" value="{{ r.pk }}">
+            <button type="submit" class="btn btn-ghost btn-xs" title="{% if r.activo %}Desactivar{% else %}Activar{% endif %}">
+              <i class="bi bi-{% if r.activo %}pause-circle{% else %}play-circle{% endif %}"></i>
+            </button>
+          </form>
+          <form method="post" style="display:inline;" onsubmit="return confirm('¿Eliminar esta restricción?')">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="restriccion_id" value="{{ r.pk }}">
+            <button type="submit" class="btn btn-danger btn-xs"><i class="bi bi-trash"></i></button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="card">
+        <div class="empty-state">
+          <i class="bi bi-shield-check es-icon"></i>
+          <p>No hay restricciones configuradas.</p>
+          <p style="margin-top:0.4rem;font-size:0.78rem;color:var(--stone);">Todos los productos están disponibles para este estudiante.</p>
+        </div>
+      </div>
+    {% endif %}
+
+    <a href="{% url 'app_padre:hijos' %}" class="btn btn-ghost btn-sm" style="margin-top:0.75rem;">
+      <i class="bi bi-arrow-left"></i> Volver
+    </a>
+  </div>
+
+  <!-- Formulario nueva restricción -->
+  <div class="card">
+    <div class="card-head"><span class="card-title">Nueva restricción</span></div>
+    <div class="card-body">
+      <form method="post" id="formRestr" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save">
+        <input type="hidden" name="tipo_obj" id="tipo_obj_input" value="producto">
+        <input type="hidden" name="obj_id"   id="obj_id_input"   value="">
+
+        <!-- Segmentado: Producto / Categoría -->
+        <div class="seg-control" style="margin-bottom:0.9rem;">
+          <button type="button" class="seg-btn active" id="btnProd" onclick="switchTab('producto')">
+            <i class="bi bi-box-seam"></i> Producto
+          </button>
+          <button type="button" class="seg-btn" id="btnCat" onclick="switchTab('categoria')">
+            <i class="bi bi-tag"></i> Categoría
+          </button>
+        </div>
+
+        <!-- Panel productos -->
+        <div id="panelProducto">
+          <div class="product-search">
+            <i class="bi bi-search"></i>
+            <input type="text" id="searchProd" placeholder="Buscar producto…" oninput="filterProducts(this.value)">
+          </div>
+          <div class="product-list" id="productList">
+            {% for p in productos %}
+            <label class="product-opt" data-name="{{ p.nombre|lower }}" data-id="{{ p.pk }}">
+              <input type="radio" name="_prod_radio" value="{{ p.pk }}" onchange="selectItem('producto', {{ p.pk }})">
+              <div>
+                <div>{{ p.nombre }}</div>
+                <div class="product-opt-cat">{{ p.categoria.get_nombre_display }}</div>
+              </div>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Panel categorías -->
+        <div id="panelCategoria" style="display:none;">
+          <div style="display:flex;flex-direction:column;gap:0.5rem;">
+            {% for cat in categorias %}
+            <label class="tipo-opt" style="display:flex;align-items:center;gap:0.65rem;padding:0.7rem 0.9rem;border:1px solid var(--fog);border-radius:8px;cursor:pointer;">
+              <input type="radio" name="_cat_radio" value="{{ cat.pk }}" onchange="selectItem('categoria', {{ cat.pk }})">
+              <div>
+                <div style="font-size:0.83rem;font-weight:600;">{{ cat.get_nombre_display }}</div>
+              </div>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="field" style="margin-top:1rem;margin-bottom:0.85rem;">
+          <label>Aplica a</label>
+          <select name="aplica_a">
+            <option value="hijo">Solo {{ estudiante.perfil.user.first_name }}</option>
+            <option value="todos">Todos mis hijos</option>
+          </select>
+        </div>
+
+        <div class="field" style="margin-bottom:1.1rem;">
+          <label for="motivo">Motivo (opcional)</label>
+          <input type="text" id="motivo" name="motivo" placeholder="Ej: Alergia, dieta, preferencia…" maxlength="200">
+        </div>
+
+        <div id="seleccionado" style="display:none;background:var(--red-pale);border:1px solid var(--red-tint);border-radius:7px;padding:0.6rem 0.85rem;font-size:0.79rem;color:var(--red);margin-bottom:0.9rem;">
+          <i class="bi bi-shield-x"></i> <span id="seleccionado-texto">–</span>
+        </div>
+
+        <button type="submit" class="btn btn-danger btn-full" id="btnSubmit" disabled>
+          <i class="bi bi-shield-x"></i> Crear restricción
+        </button>
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function switchTab(tab) {
+    document.getElementById('tipo_obj_input').value = tab;
+    document.getElementById('obj_id_input').value = '';
+    document.getElementById('seleccionado').style.display = 'none';
+    document.getElementById('btnSubmit').disabled = true;
+
+    if (tab === 'producto') {
+      document.getElementById('panelProducto').style.display = 'block';
+      document.getElementById('panelCategoria').style.display = 'none';
+      document.getElementById('btnProd').classList.add('active');
+      document.getElementById('btnCat').classList.remove('active');
+    } else {
+      document.getElementById('panelProducto').style.display = 'none';
+      document.getElementById('panelCategoria').style.display = 'block';
+      document.getElementById('btnProd').classList.remove('active');
+      document.getElementById('btnCat').classList.add('active');
+    }
+  }
+
+  function selectItem(tipo, id) {
+    document.getElementById('tipo_obj_input').value = tipo;
+    document.getElementById('obj_id_input').value = id;
+    const label = tipo === 'producto'
+      ? document.querySelector(`.product-opt[data-id="${id}"]`)?.querySelector('div div:first-child')?.textContent
+      : document.querySelector(`input[name="_cat_radio"][value="${id}"]`)?.closest('label')?.querySelector('div div')?.textContent;
+    document.getElementById('seleccionado-texto').textContent = label || id;
+    document.getElementById('seleccionado').style.display = 'block';
+    document.getElementById('btnSubmit').disabled = false;
+  }
+
+  function filterProducts(q) {
+    const opts = document.querySelectorAll('.product-opt');
+    opts.forEach(opt => {
+      opt.style.display = opt.dataset.name.includes(q.toLowerCase()) ? '' : 'none';
+    });
+  }
+
+  document.getElementById('formRestr').addEventListener('submit', function(e) {
+    if (!document.getElementById('obj_id_input').value) {
+      e.preventDefault();
+      alert('Selecciona un producto o categoría.');
+    }
+  });
+</script>
+{% endblock %}

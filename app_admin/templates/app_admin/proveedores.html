@@ -5,138 +5,781 @@
 {% block nav_proveedores %}active{% endblock %}
 
 {% block topbar_actions %}
-  <a href="{% url 'app_admin:entrada_stock' %}" class="btn btn-ghost btn-sm">
-    <i class="bi bi-plus-circle"></i> Registrar entrada
-  </a>
-  <a href="{% url 'app_admin:proveedor_nuevo' %}" class="btn btn-primary">
+  <a href="{% url 'app_admin:proveedor_nuevo' %}" class="btn btn-primary btn-sm">
     <i class="bi bi-plus-lg"></i> Nuevo proveedor
   </a>
 {% endblock %}
 
 {% block content %}
-<form method="get" class="filter-bar">
-  <input type="text" name="q" value="{{ q }}" placeholder="Buscar por nombre, NIT o contacto…" style="min-width:18rem;">
-  <button type="submit" class="btn btn-ghost btn-sm"><i class="bi bi-search"></i></button>
-  {% if q %}<a href="{% url 'app_admin:proveedores' %}" class="btn btn-ghost btn-sm"><i class="bi bi-x-lg"></i></a>{% endif %}
-</form>
+<style>
+  /* ── KPI strip ────────────────────────────────────────────────────────── */
+  .prov-kpi {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 0.85rem;
+    margin-bottom: 1.4rem;
+  }
+  .prov-kpi-card {
+    background: var(--ivory);
+    border: 1px solid var(--mist);
+    border-radius: 10px;
+    padding: 1.05rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+    position: relative;
+    overflow: hidden;
+    transition: box-shadow 0.18s, border-color 0.18s;
+  }
+  .prov-kpi-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.06); border-color: var(--fog); }
+  .prov-kpi-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    border-radius: 99px 0 0 99px;
+  }
+  .prov-kpi-card.green::before  { background: var(--leaf); }
+  .prov-kpi-card.amber::before  { background: var(--amber); }
+  .prov-kpi-card.red::before    { background: var(--red); }
+  .prov-kpi-card.blue::before   { background: var(--sky); }
+  .prov-kpi-label { font-size: 0.59rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ash); }
+  .prov-kpi-val   { font-family: var(--serif); font-size: 1.85rem; line-height: 1; }
+  .prov-kpi-card.green .prov-kpi-val { color: var(--leaf); }
+  .prov-kpi-card.amber .prov-kpi-val { color: var(--amber); }
+  .prov-kpi-card.red   .prov-kpi-val { color: var(--red); }
+  .prov-kpi-card.blue  .prov-kpi-val { color: var(--sky); }
+  .prov-kpi-sub { font-size: 0.68rem; color: var(--ash); }
 
-{% if proveedores %}
-<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1.2rem;">
-  {% for prov in proveedores %}
-  <div class="card">
-    <div class="card-body" style="padding:0;">
+  /* ── Search bar ────────────────────────────────────────────────────────── */
+  .prov-search {
+    position: relative;
+    flex: 1;
+    min-width: 200px;
+    max-width: 360px;
+  }
+  .prov-search i {
+    position: absolute;
+    left: 0.65rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--ash);
+    font-size: 0.8rem;
+    pointer-events: none;
+  }
+  .prov-search input {
+    width: 100%;
+    padding: 0.42rem 0.8rem 0.42rem 2rem;
+    border: 1px solid var(--fog);
+    border-radius: 7px;
+    background: var(--ivory);
+    font-family: var(--sans);
+    font-size: 0.81rem;
+    color: var(--ink);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    outline: none;
+  }
+  .prov-search input:focus { border-color: var(--leaf); box-shadow: 0 0 0 3px var(--leaf-tint); }
 
-      <!-- Cabecera con logo grande -->
-      <div style="background:var(--off-black);border-radius:12px 12px 0 0;padding:1.4rem 1.4rem 1rem;
-                  display:flex;align-items:center;gap:1rem;position:relative;">
-        {% if prov.logo %}
-          <img src="{{ prov.logo.url }}"
-               style="width:4rem;height:4rem;object-fit:contain;border-radius:10px;
-                      background:var(--white);padding:4px;flex-shrink:0;
-                      border:2px solid rgba(64,192,116,0.3);">
-        {% else %}
-          <div style="width:4rem;height:4rem;background:var(--green-dark);border-radius:10px;
-                      display:flex;align-items:center;justify-content:center;flex-shrink:0;
-                      border:2px solid rgba(64,192,116,0.2);">
-            <i class="bi bi-truck" style="color:var(--green-vivid);font-size:1.6rem;"></i>
-          </div>
-        {% endif %}
-        <div style="min-width:0;flex:1;">
-          <div style="font-family:var(--serif);font-size:1.1rem;color:var(--white);
-                      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ prov.nombre }}</div>
-          {% if prov.nit %}
-          <div style="font-size:.72rem;color:rgba(64,192,116,.8);font-weight:600;margin-top:.15rem;">
-            NIT {{ prov.nit }}
-          </div>
-          {% endif %}
-          {% if prov.contacto %}
-          <div style="font-size:.78rem;color:rgba(255,255,255,.5);margin-top:.1rem;">{{ prov.contacto }}</div>
-          {% endif %}
-        </div>
-        <span class="badge {% if prov.activo %}badge-ok{% else %}badge-out{% endif %}"
-              style="flex-shrink:0;position:absolute;top:.8rem;right:.8rem;">
-          {% if prov.activo %}Activo{% else %}Inactivo{% endif %}
-        </span>
-      </div>
+  /* ── Action buttons ────────────────────────────────────────────────────── */
+  .action-group {
+    display: flex;
+    gap: 0.3rem;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+  }
+  .action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.26rem;
+    padding: 0.26rem 0.54rem;
+    border-radius: 6px;
+    font-size: 0.69rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    border: 1px solid transparent;
+    transition: all 0.14s;
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+    background: none;
+    font-family: var(--sans);
+  }
+  .action-btn.editar   { background: var(--sky-pale);    color: var(--sky);       border-color: var(--sky-tint); }
+  .action-btn.editar:hover   { background: var(--sky);   color: #fff; border-color: var(--sky); }
+  .action-btn.historial { background: var(--cream);      color: var(--stone);     border-color: var(--mist); }
+  .action-btn.historial:hover { background: var(--fog);  color: var(--ink);       border-color: var(--fog); }
+  .action-btn.eliminar { background: var(--red-pale);    color: var(--red);       border-color: var(--red-tint); }
+  .action-btn.eliminar:hover { background: var(--red);   color: #fff;             border-color: var(--red); }
+  .action-btn.info     { background: var(--violet-pale); color: var(--violet);    border-color: #e9d5ff; }
+  .action-btn.info:hover     { background: var(--violet);color: #fff;             border-color: var(--violet); }
+  .action-btn.productos { background: var(--leaf-pale);  color: var(--leaf-dark); border-color: var(--leaf-tint); }
+  .action-btn.productos:hover { background: var(--leaf); color: #fff;             border-color: var(--leaf); }
 
-      <!-- Datos de contacto -->
-      <div style="padding:1rem 1.2rem .8rem;display:flex;flex-direction:column;gap:.35rem;">
-        {% if prov.telefono %}
-        <div style="font-size:.82rem;display:flex;gap:.5rem;align-items:center;color:var(--gray-500);">
-          <i class="bi bi-telephone" style="color:var(--gray-400);width:1rem;flex-shrink:0;"></i>
-          <span>{{ prov.telefono }}</span>
-        </div>
-        {% endif %}
-        {% if prov.email %}
-        <div style="font-size:.82rem;display:flex;gap:.5rem;align-items:center;color:var(--gray-500);">
-          <i class="bi bi-envelope" style="color:var(--gray-400);width:1rem;flex-shrink:0;"></i>
-          <span>{{ prov.email }}</span>
-        </div>
-        {% endif %}
-        {% if prov.direccion %}
-        <div style="font-size:.82rem;display:flex;gap:.5rem;align-items:center;color:var(--gray-500);">
-          <i class="bi bi-geo-alt" style="color:var(--gray-400);width:1rem;flex-shrink:0;"></i>
-          <span>{{ prov.direccion }}</span>
-        </div>
-        {% endif %}
-      </div>
+  /* ── Row animation ─────────────────────────────────────────────────────── */
+  @keyframes fadeInRow {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .tbl tbody tr { animation: fadeInRow 0.18s var(--ease) both; }
 
-      <!-- Stats -->
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;
-                  background:var(--gray-50);border-top:1px solid var(--gray-200);
-                  border-bottom:1px solid var(--gray-200);">
-        <div style="text-align:center;padding:.7rem .5rem;">
-          <div style="font-family:var(--serif);font-size:1.3rem;color:var(--green-mid);">
-            ${{ prov.total_compras|miles }}
-          </div>
-          <div style="font-size:.65rem;color:var(--gray-400);text-transform:uppercase;letter-spacing:.06em;margin-top:.1rem;">
-            Total comprado
-          </div>
-        </div>
-        <div style="text-align:center;padding:.7rem .5rem;border-left:1px solid var(--gray-200);">
-          <div style="font-family:var(--serif);font-size:1.3rem;">{{ prov.num_productos }}</div>
-          <div style="font-size:.65rem;color:var(--gray-400);text-transform:uppercase;letter-spacing:.06em;margin-top:.1rem;">
-            Productos
-          </div>
-        </div>
-        <div style="text-align:center;padding:.7rem .5rem;border-left:1px solid var(--gray-200);">
-          <div style="font-family:var(--serif);font-size:1.3rem;">{{ prov.num_compras }}</div>
-          <div style="font-size:.65rem;color:var(--gray-400);text-transform:uppercase;letter-spacing:.06em;margin-top:.1rem;">
-            Compras
-          </div>
-        </div>
-      </div>
+  /* ── Proveedor logo ────────────────────────────────────────────────────── */
+  .prov-logo {
+    width: 2.2rem; height: 2.2rem;
+    border-radius: 8px;
+    object-fit: contain;
+    background: var(--cream);
+    border: 1px solid var(--mist);
+    flex-shrink: 0;
+  }
+  .prov-logo-placeholder {
+    width: 2.2rem; height: 2.2rem;
+    border-radius: 8px;
+    background: var(--ink);
+    border: 1px solid rgba(64,192,116,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .prov-logo-placeholder i {
+    color: var(--leaf-bright);
+    font-size: 1rem;
+  }
 
-      <!-- Acciones -->
-      <div style="padding:.85rem 1.2rem;display:flex;gap:.5rem;">
-        <!-- Botón compra directa — el más prominente -->
-        <a href="{% url 'app_admin:entrada_stock' %}?prov={{ prov.pk }}"
-           class="btn btn-primary btn-sm" style="flex:1;justify-content:center;">
-          <i class="bi bi-plus-circle"></i> Registrar entrada
-        </a>
-        <a href="{% url 'app_admin:proveedor_compras' prov.pk %}"
-           class="btn btn-ghost btn-sm" title="Historial de compras">
-          <i class="bi bi-clock-history"></i>
-        </a>
-        <a href="{% url 'app_admin:proveedor_editar' prov.pk %}"
-           class="btn btn-ghost btn-sm" title="Editar"
-           style="background:var(--amber-pale);color:var(--amber);border-color:var(--amber-pale);">
-          <i class="bi bi-pencil"></i>
-        </a>
-      </div>
+  /* ── Contact chips ─────────────────────────────────────────────────────── */
+  .prov-contact {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.72rem;
+    color: var(--ash);
+  }
+  .prov-contact i { font-size: 0.62rem; color: var(--fog); }
+
+  /* ── Stat inline ───────────────────────────────────────────────────────── */
+  .prov-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    font-size: 0.73rem;
+    font-weight: 600;
+  }
+  .prov-stat.money { color: var(--leaf-dark); }
+  .prov-stat i { font-size: 0.6rem; }
+
+  /* ── Row inactive ──────────────────────────────────────────────────────── */
+  .row-inactivo { opacity: 0.45; }
+
+  /* ── Empty state ───────────────────────────────────────────────────────── */
+  .prov-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3.5rem 2rem;
+    gap: 0.75rem;
+    color: var(--ash);
+  }
+  .prov-empty i { font-size: 2.8rem; opacity: 0.35; }
+  .prov-empty p { font-size: 0.84rem; }
+
+  /* ── Modal styles ──────────────────────────────────────────────────────── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15,15,14,0.55);
+    z-index: 300;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-box {
+    background: var(--ivory);
+    border-radius: 14px;
+    padding: 1.8rem;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.22);
+    border: 1px solid var(--mist);
+  }
+  .modal-icon {
+    width: 2.8rem; height: 2.8rem;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+  }
+  .modal-icon.red    { background: var(--red-pale);    color: var(--red); }
+  .modal-icon.green  { background: var(--leaf-pale);   color: var(--leaf); }
+  .modal-icon.violet { background: var(--violet-pale); color: var(--violet); }
+  .modal-title { font-family: var(--serif); font-size: 1.1rem; margin-bottom: 0.3rem; }
+  .modal-desc  { font-size: 0.82rem; color: var(--stone); margin-bottom: 1.4rem; line-height: 1.55; }
+  .modal-actions { display: flex; gap: 0.65rem; }
+
+  /* ── Info modal (wide) ─────────────────────────────────────────────────── */
+  .info-modal-box {
+    background: var(--ivory);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 520px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.22);
+    border: 1px solid var(--mist);
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .info-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.85rem 1rem 0.85rem 1.4rem;
+    border-bottom: 1px solid var(--mist);
+    flex-shrink: 0;
+  }
+  .info-close {
+    width: 1.8rem; height: 1.8rem;
+    border-radius: 50%;
+    background: var(--cream);
+    border: 1px solid var(--mist);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--stone);
+    font-size: 0.85rem;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .info-close:hover { background: var(--red-pale); color: var(--red); border-color: var(--red-tint); }
+  .info-modal-scroll { overflow-y: auto; flex: 1; padding: 1.2rem 1.4rem 1.4rem; }
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem 1rem;
+    margin-bottom: 1rem;
+  }
+  .info-field { display: flex; flex-direction: column; gap: 0.12rem; }
+  .info-label { font-size: 0.58rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ash); }
+  .info-value { font-size: 0.88rem; font-weight: 600; color: var(--ink); }
+
+  /* ── Items modal ───────────────────────────────────────────────────────── */
+  .items-modal-box {
+    background: var(--ivory);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 560px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.22);
+    border: 1px solid var(--mist);
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .items-modal-scroll { overflow-y: auto; flex: 1; }
+  .item-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 1.4rem;
+    border-bottom: 1px solid var(--cream);
+    transition: background 0.1s;
+  }
+  .item-row:last-child { border-bottom: none; }
+  .item-row:hover { background: var(--cream); }
+  .item-tipo-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.12rem 0.45rem;
+    border-radius: 99px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+  }
+  .item-tipo-badge.producto    { background: var(--leaf-pale);   color: var(--leaf-dark); }
+  .item-tipo-badge.ingrediente { background: var(--amber-pale);  color: var(--amber); }
+  .item-tipo-badge.insumo      { background: var(--sky-pale);    color: var(--sky); }
+  .item-nombre { font-size: 0.82rem; font-weight: 600; color: var(--ink); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item-stock { font-size: 0.76rem; font-weight: 700; color: var(--stone); flex-shrink: 0; }
+  .items-empty { padding: 2rem; text-align: center; color: var(--ash); font-size: 0.82rem; }
+
+  /* ── Items counter badges ──────────────────────────────────────────────── */
+  .prov-items-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+  .count-dot {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0.08rem 0.38rem;
+    border-radius: 99px;
+    font-size: 0.62rem;
+    font-weight: 700;
+  }
+  .count-dot.prod { background: var(--leaf-pale); color: var(--leaf-dark); }
+  .count-dot.ing  { background: var(--amber-pale); color: var(--amber); }
+  .count-dot.ins  { background: var(--sky-pale); color: var(--sky); }
+</style>
+
+<!-- ── KPI strip ──────────────────────────────────────────────────────────── -->
+{% with total=proveedores.count %}
+<div class="prov-kpi">
+  <div class="prov-kpi-card green">
+    <div class="prov-kpi-label">Total</div>
+    <div class="prov-kpi-val">{{ total }}</div>
+    <div class="prov-kpi-sub">proveedores registrados</div>
+  </div>
+  <div class="prov-kpi-card blue">
+    <div class="prov-kpi-label">Activos</div>
+    <div class="prov-kpi-val" id="kpi-activos">0</div>
+    <div class="prov-kpi-sub">operando actualmente</div>
+  </div>
+  <div class="prov-kpi-card amber">
+    <div class="prov-kpi-label">Total compras</div>
+    <div class="prov-kpi-val" id="kpi-compras">0</div>
+    <div class="prov-kpi-sub">compras registradas</div>
+  </div>
+  <div class="prov-kpi-card red">
+    <div class="prov-kpi-label">Inactivos</div>
+    <div class="prov-kpi-val" id="kpi-inactivos">0</div>
+    <div class="prov-kpi-sub">proveedores inactivos</div>
+  </div>
+</div>
+{% endwith %}
+
+<!-- ── Main card ──────────────────────────────────────────────────────────── -->
+<div class="card">
+  <div class="card-head" style="flex-wrap:wrap;gap:0.5rem;">
+    <span class="card-title" style="display:flex;align-items:center;gap:0.5rem;">
+      <i class="bi bi-truck" style="color:var(--leaf);font-size:1rem;"></i>
+      Proveedores
+      <span style="font-family:var(--sans);font-size:0.72rem;font-weight:600;color:var(--ash);background:var(--cream);padding:0.1rem 0.5rem;border-radius:99px;">{{ proveedores.count }}</span>
+    </span>
+
+    <div style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;">
+      <form method="get" style="display:contents;">
+        <div class="prov-search">
+          <i class="bi bi-search"></i>
+          <input type="text" name="q" id="prov-buscar" value="{{ q }}" placeholder="Buscar por nombre, NIT o contacto..." autocomplete="off">
+        </div>
+        <button type="submit" class="btn btn-ghost btn-sm"><i class="bi bi-search"></i></button>
+        {% if q %}<a href="{% url 'app_admin:proveedores' %}" class="btn btn-ghost btn-sm"><i class="bi bi-x-lg"></i></a>{% endif %}
+      </form>
     </div>
   </div>
-  {% endfor %}
-</div>
-{% else %}
-<div class="card">
-  <div class="empty-state">
-    <i class="bi bi-truck" style="font-size:2.5rem;color:var(--gray-200);display:block;margin-bottom:.5rem;"></i>
+
+  {% if proveedores %}
+  <div style="overflow-x:auto;">
+  <table class="tbl" id="tbl-proveedores">
+    <thead>
+      <tr>
+        <th>Proveedor</th>
+        <th>Contacto</th>
+        <th>Items asociados</th>
+        <th>Compras</th>
+        <th>Total comprado</th>
+        <th>Estado</th>
+        <th style="text-align:right;padding-right:1rem;">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for pd in proveedores_data %}
+    {% with prov=pd.prov %}
+    <tr class="{% if not prov.activo %}row-inactivo{% endif %}" data-activo="{{ prov.activo|yesno:'1,0' }}" data-compras="{{ prov.num_compras }}">
+      <td style="min-width:200px;">
+        <div style="display:flex;align-items:center;gap:0.65rem;">
+          {% if prov.logo %}
+            <img src="{{ prov.logo.url }}" class="prov-logo" alt="{{ prov.nombre }}">
+          {% else %}
+            <div class="prov-logo-placeholder">
+              <i class="bi bi-truck"></i>
+            </div>
+          {% endif %}
+          <div style="min-width:0;">
+            <div style="font-weight:700;font-size:0.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ prov.nombre }}</div>
+            {% if prov.nit %}
+            <div style="font-size:0.67rem;color:var(--leaf);font-weight:600;letter-spacing:0.03em;margin-top:0.08rem;">NIT {{ prov.nit }}</div>
+            {% endif %}
+          </div>
+        </div>
+      </td>
+      <td>
+        <div style="display:flex;flex-direction:column;gap:0.2rem;">
+          {% if prov.contacto %}
+          <span class="prov-contact"><i class="bi bi-person"></i> {{ prov.contacto }}</span>
+          {% endif %}
+          {% if prov.telefono %}
+          <span class="prov-contact"><i class="bi bi-telephone"></i> {{ prov.telefono }}</span>
+          {% endif %}
+          {% if prov.email %}
+          <span class="prov-contact"><i class="bi bi-envelope"></i> {{ prov.email }}</span>
+          {% endif %}
+          {% if not prov.contacto and not prov.telefono and not prov.email %}
+          <span style="color:var(--fog);font-size:0.76rem;">—</span>
+          {% endif %}
+        </div>
+      </td>
+      <td>
+        <div class="prov-items-count">
+          {% if prov.num_productos %}<span class="count-dot prod"><i class="bi bi-bag" style="font-size:0.5rem;"></i> {{ prov.num_productos }}</span>{% endif %}
+          {% if prov.num_ingredientes %}<span class="count-dot ing"><i class="bi bi-basket" style="font-size:0.5rem;"></i> {{ prov.num_ingredientes }}</span>{% endif %}
+          {% if prov.num_insumos %}<span class="count-dot ins"><i class="bi bi-box" style="font-size:0.5rem;"></i> {{ prov.num_insumos }}</span>{% endif %}
+          {% if not prov.num_productos and not prov.num_ingredientes and not prov.num_insumos %}
+          <span style="color:var(--fog);font-size:0.76rem;">—</span>
+          {% endif %}
+        </div>
+      </td>
+      <td>
+        <span style="font-size:0.82rem;font-weight:700;">{{ prov.num_compras }}</span>
+      </td>
+      <td>
+        <span class="prov-stat money">
+          <i class="bi bi-graph-up-arrow"></i>
+          ${{ prov.total_compras|miles }}
+        </span>
+      </td>
+      <td>
+        <span class="badge {% if prov.activo %}badge-ok{% else %}badge-out{% endif %}">
+          {% if prov.activo %}Activo{% else %}Inactivo{% endif %}
+        </span>
+      </td>
+      <td>
+        <div class="action-group">
+          <button class="action-btn productos" title="Ver items asociados"
+                  onclick='abrirItemsProveedor("{{ prov.nombre|escapejs }}", {{ pd.items_json }})'>
+            <i class="bi bi-box-seam"></i> Items
+          </button>
+          <button class="action-btn info" title="Ver detalles"
+                  onclick="abrirInfoProveedor({{ prov.pk }})">
+            <i class="bi bi-info-circle"></i>
+          </button>
+          <a href="{% url 'app_admin:proveedor_compras' prov.pk %}" class="action-btn historial" title="Historial de compras">
+            <i class="bi bi-clock-history"></i>
+          </a>
+          <a href="{% url 'app_admin:proveedor_editar' prov.pk %}" class="action-btn editar" title="Editar">
+            <i class="bi bi-pencil"></i>
+          </a>
+          <button class="action-btn eliminar" title="Eliminar proveedor"
+                  onclick="confirmarEliminarProv('{{ prov.nombre|escapejs }}', '{% url 'app_admin:proveedor_eliminar' prov.pk %}')">
+            <i class="bi bi-trash3"></i>
+          </button>
+
+          <!-- Data JSON oculta para modal de info -->
+          <script type="application/json" id="prov-data-{{ prov.pk }}">
+          {
+            "nombre":    "{{ prov.nombre|escapejs }}",
+            "nit":       "{{ prov.nit|escapejs }}",
+            "contacto":  "{{ prov.contacto|escapejs }}",
+            "telefono":  "{{ prov.telefono|escapejs }}",
+            "email":     "{{ prov.email|escapejs }}",
+            "direccion": "{{ prov.direccion|escapejs }}",
+            "activo":    {{ prov.activo|yesno:"true,false" }},
+            "total_compras": "${{ prov.total_compras|miles }}",
+            "num_productos": {{ prov.num_productos }},
+            "num_ingredientes": {{ prov.num_ingredientes }},
+            "num_insumos": {{ prov.num_insumos }},
+            "num_compras": {{ prov.num_compras }},
+            "logo_url":  "{% if prov.logo %}{{ prov.logo.url }}{% endif %}"
+          }
+          </script>
+        </div>
+      </td>
+    </tr>
+    {% endwith %}
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <div class="prov-empty">
+    <i class="bi bi-truck"></i>
     <p>{% if q %}Sin proveedores con "{{ q }}"{% else %}Sin proveedores registrados{% endif %}</p>
-    <a href="{% url 'app_admin:proveedor_nuevo' %}" class="btn btn-primary" style="margin-top:1rem;">
+    <a href="{% url 'app_admin:proveedor_nuevo' %}" class="btn btn-primary" style="margin-top:0.5rem;">
       <i class="bi bi-plus-lg"></i> Agregar proveedor
     </a>
   </div>
+  {% endif %}
 </div>
-{% endif %}
+
+<!-- ── Modal confirmar eliminacion ──────────────────────────────────────── -->
+<div id="modal-eliminar-prov" class="modal-overlay" onclick="if(event.target===this)cerrarElimProv()">
+  <div class="modal-box">
+    <div class="modal-icon red"><i class="bi bi-trash3-fill"></i></div>
+    <div class="modal-title">¿Desactivar proveedor?</div>
+    <p class="modal-desc" id="modal-elim-prov-desc">
+      El proveedor sera desactivado del sistema. Su historial de compras se conservara.
+    </p>
+    <form id="form-eliminar-prov" method="post">
+      {% csrf_token %}
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" style="flex:1;" onclick="cerrarElimProv()">Cancelar</button>
+        <button type="submit" class="btn btn-danger" style="flex:1;">
+          <i class="bi bi-trash3"></i> Desactivar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Modal info proveedor ─────────────────────────────────────────────── -->
+<div id="modal-info-prov" class="modal-overlay" onclick="if(event.target===this)cerrarInfoProv()">
+  <div class="info-modal-box">
+    <div class="info-modal-header">
+      <div style="display:flex;align-items:center;gap:0.65rem;">
+        <div id="info-prov-logo" style="width:2.4rem;height:2.4rem;border-radius:10px;background:var(--ink);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;">
+          <i class="bi bi-truck" style="color:var(--leaf-bright);font-size:1.1rem;"></i>
+        </div>
+        <div>
+          <div class="modal-title" id="info-prov-nombre" style="margin-bottom:0;font-size:1.05rem;"></div>
+          <span id="info-prov-nit" style="font-size:0.65rem;color:var(--leaf);font-weight:600;letter-spacing:0.03em;"></span>
+        </div>
+      </div>
+      <button class="info-close" onclick="cerrarInfoProv()"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="info-modal-scroll">
+      <!-- Status badge -->
+      <div id="info-prov-status" style="margin-bottom:1rem;"></div>
+
+      <!-- Contact info -->
+      <div id="info-prov-grid" class="info-grid"></div>
+
+      <!-- Address -->
+      <div id="info-prov-address" style="display:none;margin-bottom:1rem;padding:0.65rem 0.85rem;border-radius:8px;background:var(--cream);border:1px solid var(--mist);">
+        <div style="font-size:0.58rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--ash);margin-bottom:0.25rem;">
+          <i class="bi bi-geo-alt"></i> Direccion
+        </div>
+        <div id="info-prov-address-text" style="font-size:0.82rem;color:var(--ink);"></div>
+      </div>
+
+      <!-- Stats -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.55rem;margin-bottom:0.5rem;">
+        <div style="text-align:center;padding:0.7rem;background:var(--leaf-pale);border-radius:8px;">
+          <div id="info-prov-total" style="font-family:var(--serif);font-size:1.1rem;color:var(--leaf-dark);"></div>
+          <div style="font-size:0.58rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--leaf);margin-top:0.15rem;">Total comprado</div>
+        </div>
+        <div style="text-align:center;padding:0.7rem;background:var(--sky-pale);border-radius:8px;">
+          <div id="info-prov-items" style="font-family:var(--serif);font-size:1.1rem;color:var(--sky);"></div>
+          <div style="font-size:0.58rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--sky);margin-top:0.15rem;">Items</div>
+        </div>
+        <div style="text-align:center;padding:0.7rem;background:var(--amber-pale);border-radius:8px;">
+          <div id="info-prov-compras" style="font-family:var(--serif);font-size:1.1rem;color:var(--amber);"></div>
+          <div style="font-size:0.58rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--amber);margin-top:0.15rem;">Compras</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal items asociados ────────────────────────────────────────────── -->
+<div id="modal-items-prov" class="modal-overlay" onclick="if(event.target===this)cerrarItemsProv()">
+  <div class="items-modal-box">
+    <div class="info-modal-header">
+      <div style="display:flex;align-items:center;gap:0.55rem;">
+        <div style="width:2rem;height:2rem;border-radius:8px;background:var(--leaf-pale);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i class="bi bi-box-seam" style="color:var(--leaf);font-size:0.9rem;"></i>
+        </div>
+        <div>
+          <div class="modal-title" id="items-prov-nombre" style="margin-bottom:0;font-size:0.95rem;"></div>
+          <span style="font-size:0.65rem;color:var(--ash);font-weight:600;">Items asociados</span>
+        </div>
+      </div>
+      <button class="info-close" onclick="cerrarItemsProv()"><i class="bi bi-x-lg"></i></button>
+    </div>
+
+    <!-- Filter tabs -->
+    <div style="padding:0.55rem 1.2rem;border-bottom:1px solid var(--mist);display:flex;gap:0.3rem;flex-wrap:wrap;" id="items-filter-tabs">
+      <button class="btn btn-xs" style="background:var(--ink);color:var(--ivory);" onclick="filtrarItems('', this)">Todos <span id="items-count-all" style="margin-left:0.2rem;opacity:0.7;"></span></button>
+      <button class="btn btn-xs btn-ghost" onclick="filtrarItems('Producto', this)">Productos <span id="items-count-prod" style="margin-left:0.2rem;opacity:0.7;"></span></button>
+      <button class="btn btn-xs btn-ghost" onclick="filtrarItems('Ingrediente', this)">Ingredientes <span id="items-count-ing" style="margin-left:0.2rem;opacity:0.7;"></span></button>
+      <button class="btn btn-xs btn-ghost" onclick="filtrarItems('Insumo', this)">Insumos <span id="items-count-ins" style="margin-left:0.2rem;opacity:0.7;"></span></button>
+    </div>
+
+    <div class="items-modal-scroll" id="items-list-container">
+      <!-- Populated by JS -->
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── KPI calculation ──────────────────────────────────────────────────────
+(function calcKPIs() {
+  let activos = 0, inactivos = 0, comprasTotal = 0;
+  document.querySelectorAll('#tbl-proveedores tbody tr').forEach(tr => {
+    if (tr.dataset.activo === '1') activos++; else inactivos++;
+    comprasTotal += parseInt(tr.dataset.compras) || 0;
+  });
+  const el = id => document.getElementById(id);
+  if (el('kpi-activos'))   el('kpi-activos').textContent = activos;
+  if (el('kpi-inactivos')) el('kpi-inactivos').textContent = inactivos;
+  if (el('kpi-compras'))   el('kpi-compras').textContent = comprasTotal;
+})();
+
+// ── Modal eliminar proveedor ─────────────────────────────────────────────
+function confirmarEliminarProv(nombre, url) {
+  document.getElementById('modal-elim-prov-desc').innerHTML =
+    'Vas a desactivar el proveedor <strong>' + nombre + '</strong>. Su historial de compras se conservara.';
+  document.getElementById('form-eliminar-prov').action = url;
+  document.getElementById('modal-eliminar-prov').classList.add('open');
+}
+function cerrarElimProv() {
+  document.getElementById('modal-eliminar-prov').classList.remove('open');
+}
+
+// ── Modal info proveedor ─────────────────────────────────────────────────
+function abrirInfoProveedor(pk) {
+  const raw = document.getElementById('prov-data-' + pk);
+  if (!raw) return;
+  const d = JSON.parse(raw.textContent);
+
+  document.getElementById('info-prov-nombre').textContent = d.nombre;
+  document.getElementById('info-prov-nit').textContent = d.nit ? 'NIT ' + d.nit : '';
+
+  // Logo
+  const logoEl = document.getElementById('info-prov-logo');
+  if (d.logo_url) {
+    logoEl.innerHTML = '<img src="' + d.logo_url + '" style="width:100%;height:100%;object-fit:contain;border-radius:10px;">';
+  } else {
+    logoEl.innerHTML = '<i class="bi bi-truck" style="color:var(--leaf-bright);font-size:1.1rem;"></i>';
+  }
+
+  // Status
+  const statusEl = document.getElementById('info-prov-status');
+  if (d.activo) {
+    statusEl.innerHTML = '<span class="badge badge-ok"><i class="bi bi-check-circle-fill"></i> Activo</span>';
+  } else {
+    statusEl.innerHTML = '<span class="badge badge-out"><i class="bi bi-x-circle-fill"></i> Inactivo</span>';
+  }
+
+  // Contact grid
+  const grid = document.getElementById('info-prov-grid');
+  const fields = [];
+  if (d.contacto) fields.push({ label: 'Contacto', value: d.contacto });
+  if (d.telefono) fields.push({ label: 'Telefono', value: d.telefono });
+  if (d.email)    fields.push({ label: 'Email', value: d.email });
+  if (d.nit)      fields.push({ label: 'NIT', value: d.nit });
+  grid.innerHTML = fields.map(f => `
+    <div class="info-field">
+      <span class="info-label">${f.label}</span>
+      <span class="info-value">${f.value}</span>
+    </div>
+  `).join('');
+
+  // Address
+  const addrEl = document.getElementById('info-prov-address');
+  const addrText = document.getElementById('info-prov-address-text');
+  if (d.direccion) {
+    addrEl.style.display = '';
+    addrText.textContent = d.direccion;
+  } else {
+    addrEl.style.display = 'none';
+  }
+
+  // Stats
+  document.getElementById('info-prov-total').textContent = d.total_compras;
+  document.getElementById('info-prov-items').textContent = d.num_productos + d.num_ingredientes + d.num_insumos;
+  document.getElementById('info-prov-compras').textContent = d.num_compras;
+
+  document.getElementById('modal-info-prov').classList.add('open');
+}
+function cerrarInfoProv() {
+  document.getElementById('modal-info-prov').classList.remove('open');
+}
+
+// ── Modal items asociados ────────────────────────────────────────────────
+let currentItems = [];
+
+function abrirItemsProveedor(nombre, items) {
+  currentItems = items;
+  document.getElementById('items-prov-nombre').textContent = nombre;
+
+  // Counts
+  const countAll  = items.length;
+  const countProd = items.filter(i => i.tipo === 'Producto').length;
+  const countIng  = items.filter(i => i.tipo === 'Ingrediente').length;
+  const countIns  = items.filter(i => i.tipo === 'Insumo').length;
+  document.getElementById('items-count-all').textContent = '(' + countAll + ')';
+  document.getElementById('items-count-prod').textContent = '(' + countProd + ')';
+  document.getElementById('items-count-ing').textContent = '(' + countIng + ')';
+  document.getElementById('items-count-ins').textContent = '(' + countIns + ')';
+
+  // Reset filter
+  document.querySelectorAll('#items-filter-tabs button').forEach((btn, i) => {
+    if (i === 0) {
+      btn.style.background = 'var(--ink)'; btn.style.color = 'var(--ivory)'; btn.style.borderColor = 'var(--ink)';
+    } else {
+      btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = '';
+    }
+  });
+
+  renderItems(items);
+  document.getElementById('modal-items-prov').classList.add('open');
+}
+
+function renderItems(items) {
+  const container = document.getElementById('items-list-container');
+  if (!items.length) {
+    container.innerHTML = '<div class="items-empty"><i class="bi bi-inbox" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;opacity:0.4;"></i>Sin items asociados a este proveedor</div>';
+    return;
+  }
+  container.innerHTML = items.map(item => {
+    const tipoClass = item.tipo.toLowerCase();
+    return `
+      <div class="item-row">
+        <span class="item-tipo-badge ${tipoClass}">${item.tipo}</span>
+        <span class="item-nombre">${item.nombre}</span>
+        <span class="item-stock">${item.stock} ${item.unidad}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function filtrarItems(tipo, btn) {
+  // Style buttons
+  document.querySelectorAll('#items-filter-tabs button').forEach(b => {
+    b.style.background = ''; b.style.color = ''; b.style.borderColor = '';
+    b.className = 'btn btn-xs btn-ghost';
+  });
+  btn.className = 'btn btn-xs';
+  btn.style.background = 'var(--ink)'; btn.style.color = 'var(--ivory)'; btn.style.borderColor = 'var(--ink)';
+
+  const filtered = tipo ? currentItems.filter(i => i.tipo === tipo) : currentItems;
+  renderItems(filtered);
+}
+
+function cerrarItemsProv() {
+  document.getElementById('modal-items-prov').classList.remove('open');
+}
+
+// ── ESC key ──────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    cerrarElimProv();
+    cerrarInfoProv();
+    cerrarItemsProv();
+  }
+});
+
+// ── Client-side search ───────────────────────────────────────────────────
+const searchInput = document.getElementById('prov-buscar');
+if (searchInput) {
+  searchInput.addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    document.querySelectorAll('#tbl-proveedores tbody tr').forEach(row => {
+      row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+}
+</script>
 {% endblock %}

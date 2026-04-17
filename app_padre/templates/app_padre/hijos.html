@@ -5,149 +5,181 @@
 {% block nav_hijos %}active{% endblock %}
 
 {% block topbar_actions %}
-  <a href="{% url 'app_padre:crear_estudiante' %}" class="btn btn-primary btn-sm">
-    <i class="bi bi-person-plus"></i> Registrar hijo
-  </a>
+<a href="{% url 'app_padre:crear_estudiante' %}" class="btn btn-primary btn-sm">
+  <i class="bi bi-person-plus"></i> Registrar hijo
+</a>
 {% endblock %}
 
 {% block extra_css %}
 <style>
-  .hijos-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr));
-    gap: 1.2rem;
-  }
-
-  /* ── Hijo card ──────────────────────────────────────────────────────────── */
   .hijo-card {
     background: var(--ivory); border: 1px solid var(--mist);
-    border-radius: 12px; overflow: hidden;
-    transition: box-shadow 0.2s, border-color 0.2s;
+    border-radius: 12px; overflow: hidden; margin-bottom: 1.2rem;
   }
-  .hijo-card:hover { box-shadow: 0 6px 28px rgba(0,0,0,0.07); border-color: var(--fog); }
-
-  .hijo-card-head {
-    padding: 1.4rem 1.5rem 1.1rem;
-    display: flex; align-items: center; gap: 1rem;
-    border-bottom: 1px solid var(--mist);
+  .hijo-header {
+    display: flex; align-items: center; gap: 1.1rem;
+    padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--mist);
+    background: var(--cream);
   }
-  .hijo-big-avatar {
-    width: 3.2rem; height: 3.2rem; border-radius: 50%;
-    background: var(--leaf-tint); border: 2px solid var(--leaf-pale);
+  .hijo-ava {
+    width: 3rem; height: 3rem; border-radius: 50%; flex-shrink: 0;
+    background: var(--leaf-tint); border: 2px solid rgba(34,197,94,0.25);
     display: flex; align-items: center; justify-content: center;
-    font-family: var(--serif); font-size: 1.35rem;
-    color: var(--leaf-dark); flex-shrink: 0;
+    font-family: var(--serif); font-size: 1.25rem; color: var(--leaf-dark);
   }
-  .hijo-head-info { flex: 1; min-width: 0; }
-  .hijo-full-name { font-family: var(--serif); font-size: 1.1rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .hijo-username  { font-size: 0.73rem; color: var(--ash); margin-top: 0.1rem; }
-  .hijo-badges    { display: flex; gap: 0.4rem; margin-top: 0.38rem; flex-wrap: wrap; }
-
-  .hijo-card-saldo {
-    padding: 1rem 1.5rem;
+  .hijo-h-info { flex: 1; min-width: 0; }
+  .hijo-h-name { font-family: var(--serif); font-size: 1.2rem; font-weight: 500; }
+  .hijo-h-meta { font-size: 0.74rem; color: var(--stone); margin-top: 0.1rem; }
+  .hijo-h-saldo { text-align: right; flex-shrink: 0; }
+  .hijo-h-saldo-val { font-family: var(--serif); font-size: 1.6rem; line-height: 1; font-weight: 500; }
+  .hijo-h-saldo-val.ok  { color: var(--leaf); }
+  .hijo-h-saldo-val.low { color: var(--red); }
+  .hijo-h-saldo-lbl { font-size: 0.63rem; color: var(--ash); letter-spacing: 0.06em; text-transform: uppercase; }
+  .hijo-body { padding: 1.2rem 1.5rem; }
+  .hijo-actions-row {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+    padding: 0.9rem 1.5rem; border-top: 1px solid var(--mist);
+    background: rgba(248,248,246,0.5);
+  }
+  .hijo-section-title {
+    font-size: 0.63rem; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--ash); margin-bottom: 0.65rem;
+  }
+  .hijo-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+  @media (max-width: 800px) { .hijo-cols { grid-template-columns: 1fr; } }
+  .mini-list-row {
     display: flex; align-items: center; justify-content: space-between;
-    gap: 1rem; background: var(--cream); border-bottom: 1px solid var(--mist);
+    padding: 0.55rem 0; border-bottom: 1px solid var(--mist); font-size: 0.8rem;
   }
-  .saldo-label { font-size: 0.63rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ash); margin-bottom: 0.2rem; }
-  .saldo-value { font-family: var(--serif); font-size: 1.8rem; color: var(--leaf); line-height: 1; }
-  .saldo-sub { font-size: 0.69rem; color: var(--ash); margin-top: 0.15rem; }
-
-  .hijo-card-body { padding: 1rem 1.5rem; }
-  .mini-section-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ash); margin-bottom: 0.5rem; }
-
-  .mini-row { display: flex; align-items: center; justify-content: space-between; padding: 0.38rem 0; border-bottom: 1px solid var(--mist); font-size: 0.79rem; }
-  .mini-row:last-child { border-bottom: none; }
-  .mini-label { color: var(--stone); }
-  .mini-val { font-weight: 600; }
-  .mini-val.green { color: var(--leaf); }
-  .mini-val.amber { color: var(--amber); }
-
-  .hijo-card-footer {
-    padding: 1rem 1.5rem; border-top: 1px solid var(--mist);
-    display: flex; gap: 0.5rem;
+  .mini-list-row:last-child { border-bottom: none; }
+  .ml-left { display: flex; flex-direction: column; gap: 0.07rem; }
+  .ml-main { font-weight: 500; }
+  .ml-sub { font-size: 0.69rem; color: var(--ash); }
+  .ml-right { font-weight: 700; text-align: right; flex-shrink: 0; }
+  .limite-row { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 0.65rem; }
+  .limite-label { font-size: 0.77rem; font-weight: 600; min-width: 4.5rem; }
+  .limite-bar-wrap { flex: 1; }
+  .limite-info { font-size: 0.7rem; color: var(--ash); white-space: nowrap; }
+  .gasto-hoy-chip {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    background: var(--amber-pale); color: var(--amber); border: 1px solid var(--amber-tint);
+    border-radius: 6px; padding: 0.22rem 0.6rem; font-size: 0.71rem; font-weight: 700; margin-top: 0.25rem;
   }
 </style>
 {% endblock %}
 
 {% block content %}
 
-{% if hijos_data %}
-<div class="hijos-grid">
-  {% for item in hijos_data %}
-  {% with hijo=item.hijo %}
-  <div class="hijo-card">
-
-    <!-- Cabecera -->
-    <div class="hijo-card-head">
-      <div class="hijo-big-avatar">{{ hijo.perfil.user.first_name|slice:":1"|upper }}</div>
-      <div class="hijo-head-info">
-        <div class="hijo-full-name">{{ hijo.perfil.user.get_full_name|default:hijo.perfil.user.username }}</div>
-        <div class="hijo-username">@{{ hijo.perfil.user.username }}</div>
-        <div class="hijo-badges">
-          <span class="badge badge-ok">Grado {{ hijo.grado }}</span>
-          <span style="background:var(--sky-pale);color:var(--sky);" class="badge">{{ hijo.codigo }}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Saldo -->
-    <div class="hijo-card-saldo">
-      <div>
-        <div class="saldo-label">Saldo disponible</div>
-        <div class="saldo-value">${{ hijo.saldo|miles }}</div>
-        <div class="saldo-sub">Listo para usar en la cafetería</div>
-      </div>
-      <a href="{% url 'app_padre:recargar_saldo' hijo.pk %}" class="btn btn-primary">
-        <i class="bi bi-plus-circle"></i> Recargar
-      </a>
-    </div>
-
-    <!-- Info + mini historial -->
-    <div class="hijo-card-body">
-      {% if item.pedidos %}
-      <div class="mini-section-label">Últimos pedidos</div>
-      {% for pedido in item.pedidos %}
-      <div class="mini-row">
-        <span class="mini-label">{{ pedido.fecha_pedido|date:"d M" }} · {{ pedido.ticket }}</span>
-        <div style="display:flex;align-items:center;gap:0.5rem;">
-          <span class="badge badge-{{ pedido.estado }}">{{ pedido.get_estado_display }}</span>
-          <span class="mini-val">${{ pedido.total|miles }}</span>
-        </div>
-      </div>
-      {% endfor %}
-      {% else %}
-      <div style="text-align:center;padding:0.75rem 0;font-size:0.79rem;color:var(--ash);">
-        Sin pedidos registrados
-      </div>
-      {% endif %}
-    </div>
-
-    <!-- Acciones -->
-    <div class="hijo-card-footer">
-      <a href="{% url 'app_padre:recargar_saldo' hijo.pk %}" class="btn btn-ghost btn-sm">
-        <i class="bi bi-clock-history"></i> Ver recargas
-      </a>
-      <a href="{% url 'app_padre:historial' %}?hijo={{ hijo.pk }}" class="btn btn-ghost btn-sm">
-        <i class="bi bi-receipt"></i> Historial
-      </a>
-    </div>
-
-  </div>
-  {% endwith %}
-  {% endfor %}
-</div>
-
-{% else %}
+{% if not hijos_data %}
 <div class="card">
   <div class="empty-state" style="padding:4rem 1rem;">
     <i class="bi bi-people es-icon" style="font-size:2.5rem;"></i>
-    <p style="font-size:1rem;margin-bottom:0.5rem;color:var(--stone);">Aún no has registrado ningún hijo</p>
-    <p style="margin-bottom:1.5rem;">Crea la cuenta de tu estudiante para que pueda usar la cafetería.</p>
-    <a href="{% url 'app_padre:crear_estudiante' %}" class="btn btn-primary">
+    <p>Aún no tienes hijos registrados.</p>
+    <a href="{% url 'app_padre:crear_estudiante' %}" class="btn btn-primary btn-sm" style="margin-top:1.2rem;">
       <i class="bi bi-person-plus"></i> Registrar primer hijo
     </a>
   </div>
 </div>
 {% endif %}
+
+{% for item in hijos_data %}
+{% with hijo=item.hijo %}
+<div class="hijo-card">
+  <!-- Header -->
+  <div class="hijo-header">
+    <div class="hijo-ava">{{ hijo.perfil.user.first_name|slice:":1"|upper }}</div>
+    <div class="hijo-h-info">
+      <div class="hijo-h-name">{{ hijo.perfil.user.get_full_name|default:hijo.perfil.user.username }}</div>
+      <div class="hijo-h-meta">Grado {{ hijo.grado }} &nbsp;·&nbsp; Código: {{ hijo.codigo }} &nbsp;·&nbsp; @{{ hijo.perfil.user.username }}</div>
+      {% if item.gasto_hoy > 0 %}
+      <div class="gasto-hoy-chip"><i class="bi bi-sun"></i> Gasto hoy: ${{ item.gasto_hoy|floatformat:0|miles }}</div>
+      {% endif %}
+    </div>
+    <div class="hijo-h-saldo">
+      <div class="hijo-h-saldo-val {% if hijo.saldo < 5000 %}low{% else %}ok{% endif %}">${{ hijo.saldo|miles }}</div>
+      <div class="hijo-h-saldo-lbl">saldo disponible</div>
+      {% if item.n_restricciones > 0 %}
+      <div style="margin-top:0.35rem;">
+        <span class="badge badge-rechazada">{{ item.n_restricciones }} restricción{{ item.n_restricciones|pluralize:"es" }}</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div class="hijo-body">
+    <div class="hijo-cols">
+      <!-- Últimas recargas -->
+      <div>
+        <div class="hijo-section-title">Últimas recargas</div>
+        {% if item.recargas %}
+          {% for r in item.recargas %}
+          <div class="mini-list-row">
+            <div class="ml-left">
+              <div class="ml-main">+${{ r.monto|miles }}</div>
+              <div class="ml-sub">{{ r.fecha|date:"d M Y" }}</div>
+            </div>
+            <span class="badge badge-{{ r.estado }}">{{ r.get_estado_display }}</span>
+          </div>
+          {% endfor %}
+        {% else %}
+          <p style="font-size:0.78rem;color:var(--ash);">Sin recargas registradas</p>
+        {% endif %}
+      </div>
+      <!-- Últimos pedidos -->
+      <div>
+        <div class="hijo-section-title">Últimos pedidos</div>
+        {% if item.pedidos %}
+          {% for p in item.pedidos %}
+          <div class="mini-list-row">
+            <div class="ml-left">
+              <div class="ml-main" style="font-family:monospace;font-size:0.77rem;color:var(--leaf);">{{ p.ticket }}</div>
+              <div class="ml-sub">{{ p.fecha_pedido|date:"d M, H:i" }}</div>
+            </div>
+            <div style="text-align:right;">
+              <div class="ml-right">${{ p.total|miles }}</div>
+              <span class="badge badge-{{ p.estado }}" style="margin-top:0.1rem;">{{ p.get_estado_display }}</span>
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <p style="font-size:0.78rem;color:var(--ash);">Sin pedidos registrados</p>
+        {% endif %}
+      </div>
+    </div>
+    <!-- Límites activos -->
+    {% if item.limites %}
+    <div style="margin-top:1.1rem;">
+      <div class="hijo-section-title">Límites de gasto activos</div>
+      {% for l in item.limites %}
+      <div class="limite-row">
+        <div class="limite-label">{{ l.get_tipo_display }}</div>
+        <div class="limite-bar-wrap">
+          <div class="progress-bar">
+            <div class="progress-fill {% if l.porcentaje_uso >= 100 %}red{% elif l.porcentaje_uso >= 80 %}amber{% else %}green{% endif %}"
+                 style="width:{{ l.porcentaje_uso }}%;"></div>
+          </div>
+        </div>
+        <div class="limite-info">{{ l.porcentaje_uso }}% · disp. ${{ l.disponible|floatformat:0|miles }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Acciones -->
+  <div class="hijo-actions-row">
+    <a href="{% url 'app_padre:recargar_saldo' hijo.pk %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle"></i> Recargar</a>
+    <a href="{% url 'app_padre:pedido_padre' hijo.pk %}" class="btn btn-sky btn-sm"><i class="bi bi-cart-plus"></i> Hacer pedido</a>
+    <a href="{% url 'app_padre:limites' hijo.pk %}" class="btn btn-amber btn-sm"><i class="bi bi-speedometer2"></i> Límites</a>
+    <a href="{% url 'app_padre:restricciones' hijo.pk %}" class="btn btn-danger btn-sm"><i class="bi bi-shield-x"></i> Restricciones</a>
+    <a href="{% url 'app_padre:horarios' hijo.pk %}" class="btn btn-ghost btn-sm"><i class="bi bi-clock"></i> Horarios</a>
+    <a href="{% url 'app_padre:pedidos_programados' hijo.pk %}" class="btn btn-violet btn-sm"><i class="bi bi-calendar-plus"></i> Programar pedido</a>
+    <a href="{% url 'app_padre:estadisticas' %}?hijo={{ hijo.pk }}" class="btn btn-ghost btn-sm"><i class="bi bi-bar-chart-line"></i> Estadísticas</a>
+    <a href="{% url 'app_padre:historial' %}?hijo={{ hijo.pk }}" class="btn btn-ghost btn-sm"><i class="bi bi-clock-history"></i> Historial</a>
+  </div>
+</div>
+{% endwith %}
+{% endfor %}
 
 {% endblock %}

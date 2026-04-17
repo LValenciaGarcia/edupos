@@ -1,0 +1,134 @@
+{% extends 'app_padre/base_padre.html' %}
+{% load filtros %}
+{% block title %}Mi Saldo{% endblock %}
+{% block page_title %}Mi Saldo{% endblock %}
+{% block nav_saldo %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+  .saldo-hero {
+    background: var(--ink); border-radius: 12px; padding: 2rem;
+    display: flex; align-items: center; justify-content: space-between; gap: 1.2rem;
+    margin-bottom: 1.4rem; position: relative; overflow: hidden;
+  }
+  .saldo-hero::before {
+    content: ''; position: absolute; right: -2rem; top: -2rem;
+    width: 12rem; height: 12rem; border-radius: 50%;
+    background: radial-gradient(circle, rgba(96,165,250,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .saldo-hero-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(96,165,250,0.7); margin-bottom: 0.35rem; }
+  .saldo-hero-val { font-family: var(--serif); font-size: 3rem; color: #60a5fa; line-height: 1; }
+  .saldo-hero-sub { font-size: 0.8rem; color: rgba(255,255,255,0.4); margin-top: 0.4rem; }
+
+  .layout-2col { display: grid; grid-template-columns: 1fr 360px; gap: 1.4rem; align-items: start; }
+  @media (max-width: 960px) { .layout-2col { grid-template-columns: 1fr; } }
+
+  .pedido-row-padre {
+    display: flex; align-items: flex-start; gap: 0.85rem;
+    padding: 0.9rem 1.4rem; border-bottom: 1px solid var(--mist); font-size: 0.8rem;
+  }
+  .pedido-row-padre:last-child { border-bottom: none; }
+  .pedido-row-padre:hover { background: var(--cream); }
+
+  .upload-zone {
+    border: 2px dashed var(--fog); border-radius: 9px; padding: 1.25rem;
+    text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s; position: relative;
+  }
+  .upload-zone:hover { border-color: var(--sky); background: var(--sky-pale); }
+  .upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Hero saldo -->
+<div class="saldo-hero">
+  <div>
+    <div class="saldo-hero-label">Tu saldo disponible</div>
+    <div class="saldo-hero-val">${{ padre.saldo|miles }}</div>
+    <div class="saldo-hero-sub">Puedes usarlo para hacer pedidos a nombre de tus hijos</div>
+  </div>
+  <div style="text-align:right;flex-shrink:0;">
+    <div style="font-size:0.7rem;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.3rem;">Gastado con mi saldo</div>
+    <div style="font-family:var(--serif);font-size:1.4rem;color:rgba(255,255,255,0.7);">${{ gasto_saldo_propio|floatformat:0|miles }}</div>
+    <div style="font-size:0.68rem;color:rgba(255,255,255,0.3);margin-top:0.15rem;">en {{ pedidos_propios.count }} pedido{{ pedidos_propios.count|pluralize:"s" }}</div>
+  </div>
+</div>
+
+<div class="layout-2col">
+
+  <!-- Historial de usos de mi saldo -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Pedidos con mi saldo</span>
+    </div>
+    {% if pedidos_propios %}
+      {% for pp in pedidos_propios %}
+      <div class="pedido-row-padre">
+        <div style="flex-shrink:0;">
+          <div style="font-family:monospace;font-size:0.72rem;color:var(--sky);font-weight:700;">{{ pp.pedido.ticket }}</div>
+          <span class="badge badge-{{ pp.pedido.estado }}" style="margin-top:0.2rem;">{{ pp.pedido.get_estado_display }}</span>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;font-size:0.83rem;">Para {{ pp.pedido.estudiante.perfil.user.get_full_name }}</div>
+          <div style="font-size:0.7rem;color:var(--ash);margin-top:0.1rem;">{{ pp.created_at|date:"d M Y, H:i" }}</div>
+        </div>
+        <div style="font-family:var(--serif);font-size:1rem;font-weight:500;color:var(--red);flex-shrink:0;">−${{ pp.pedido.total|miles }}</div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">
+        <i class="bi bi-cart es-icon"></i>
+        <p>No has hecho pedidos usando tu propio saldo.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Formulario de recarga de saldo propio -->
+  <div class="card">
+    <div class="card-head"><span class="card-title">Recargar mi saldo</span></div>
+    <div class="card-body">
+      <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+
+        <div class="field" style="margin-bottom:0.85rem;">
+          <label for="monto_propio">Monto a recargar ($) *</label>
+          <input type="number" id="monto_propio" name="monto" min="5000" max="2000000" step="1000" placeholder="Ej: 50000" required>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;margin-bottom:0.9rem;">
+          <button type="button" class="btn btn-ghost btn-xs" onclick="document.getElementById('monto_propio').value=20000">$20.000</button>
+          <button type="button" class="btn btn-ghost btn-xs" onclick="document.getElementById('monto_propio').value=50000">$50.000</button>
+          <button type="button" class="btn btn-ghost btn-xs" onclick="document.getElementById('monto_propio').value=100000">$100.000</button>
+          <button type="button" class="btn btn-ghost btn-xs" onclick="document.getElementById('monto_propio').value=200000">$200.000</button>
+        </div>
+
+        <div class="field" style="margin-bottom:0.9rem;">
+          <label>Comprobante de pago</label>
+          <div class="upload-zone">
+            <input type="file" name="comprobante" accept="image/*,.pdf">
+            <i class="bi bi-cloud-upload" style="font-size:1.5rem;color:var(--ash);display:block;margin-bottom:0.4rem;"></i>
+            <div style="font-size:0.79rem;color:var(--stone);">Adjunta tu comprobante</div>
+          </div>
+        </div>
+
+        <div class="field" style="margin-bottom:1rem;">
+          <label for="nota_propio">Nota</label>
+          <input type="text" id="nota_propio" name="nota" placeholder="Opcional" maxlength="200">
+        </div>
+
+        <div style="background:var(--amber-pale);border:1px solid var(--amber-tint);border-radius:8px;padding:0.7rem 0.85rem;font-size:0.77rem;color:var(--amber);margin-bottom:1rem;display:flex;gap:0.4rem;">
+          <i class="bi bi-info-circle-fill" style="flex-shrink:0;"></i>
+          <span>La recarga será revisada por un administrador antes de acreditarse.</span>
+        </div>
+
+        <button type="submit" class="btn btn-sky btn-full">
+          <i class="bi bi-send"></i> Solicitar recarga
+        </button>
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

@@ -322,10 +322,39 @@
     </div>
 
     {% if productos %}
+
+    {# ── Barra de acciones masivas productos ── #}
+    <div id="inv-prod-bulk-bar" style="display:none;align-items:center;gap:0.65rem;padding:0.65rem 1rem;background:var(--violet-pale);border-bottom:1px solid #ddd6fe;flex-wrap:wrap;">
+      <span style="font-size:0.78rem;font-weight:600;color:var(--violet);">
+        <i class="bi bi-check2-square"></i>
+        <span id="inv-prod-bulk-count">0</span> producto(s) seleccionado(s)
+      </span>
+      <form method="post" action="{% url 'app_admin:producto_bulk' %}" id="form-inv-prod-bulk" style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+        {% csrf_token %}
+        <div id="inv-prod-bulk-pks"></div>
+        <input type="hidden" name="accion" id="inv-prod-bulk-accion" value="">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="invProdBulkAccion('mostrar')">
+          <i class="bi bi-eye"></i> Mostrar
+        </button>
+        <button type="button" class="btn btn-amber btn-sm" onclick="invProdBulkAccion('ocultar')">
+          <i class="bi bi-eye-slash"></i> Ocultar
+        </button>
+        <button type="button" class="btn btn-danger btn-sm" onclick="invProdBulkAccion('eliminar')">
+          <i class="bi bi-trash3"></i> Eliminar
+        </button>
+      </form>
+      <button class="btn btn-ghost btn-sm" onclick="limpiarInvProd()" style="margin-left:auto;">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+
     <div style="overflow-x:auto;">
     <table class="tbl" id="tbl-productos">
       <thead>
         <tr>
+          <th style="width:2.5rem;text-align:center;">
+            <input type="checkbox" id="inv-prod-check-all" title="Seleccionar todos" style="accent-color:var(--violet);cursor:pointer;">
+          </th>
           <th>Producto</th>
           <th>Categoría</th>
           <th>Tipo</th>
@@ -337,14 +366,30 @@
       </thead>
       <tbody>
       {% for p in productos %}
-      <tr>
+      <tr data-pk="{{ p.pk }}">
+        <td style="width:2.5rem;text-align:center;padding:0.5rem;">
+          <input type="checkbox" class="inv-prod-check" value="{{ p.pk }}"
+                 style="accent-color:var(--violet);cursor:pointer;width:1rem;height:1rem;">
+        </td>
         <td>
-          <div style="font-weight:600;font-size:0.85rem;">{{ p.nombre }}</div>
-          {% if p.proveedor %}
-          <div style="font-size:0.71rem;color:var(--ash);margin-top:0.1rem;">
-            <i class="bi bi-truck" style="font-size:0.65rem;"></i> {{ p.proveedor.nombre }}
+          <div style="display:flex;align-items:center;gap:0.55rem;">
+            {% if p.imagen %}
+            <img src="{{ p.imagen.url }}" alt="{{ p.nombre }}"
+                 style="width:2.2rem;height:2.2rem;object-fit:cover;border-radius:5px;flex-shrink:0;border:1px solid var(--mist);">
+            {% else %}
+            <div style="width:2.2rem;height:2.2rem;border-radius:5px;background:var(--cream);border:1px solid var(--mist);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <i class="bi bi-box-seam" style="font-size:0.68rem;color:var(--fog);"></i>
+            </div>
+            {% endif %}
+            <div>
+              <div style="font-weight:600;font-size:0.85rem;">{{ p.nombre }}</div>
+              {% if p.proveedor %}
+              <div style="font-size:0.71rem;color:var(--ash);margin-top:0.1rem;">
+                <i class="bi bi-truck" style="font-size:0.65rem;"></i> {{ p.proveedor.nombre }}
+              </div>
+              {% endif %}
+            </div>
           </div>
-          {% endif %}
         </td>
         <td>
           <span style="font-size:0.78rem;color:var(--stone);">{{ p.categoria }}</span>
@@ -424,10 +469,33 @@
     </div>
 
     {% if ingredientes %}
+
+    {# ── Barra de acciones masivas ingredientes ── #}
+    <div id="inv-ing-bulk-bar" style="display:none;align-items:center;gap:0.65rem;padding:0.65rem 1rem;background:var(--amber-pale);border-bottom:1px solid var(--amber-tint);flex-wrap:wrap;">
+      <span style="font-size:0.78rem;font-weight:600;color:var(--amber);">
+        <i class="bi bi-check2-square"></i>
+        <span id="inv-ing-bulk-count">0</span> ingrediente(s) seleccionado(s)
+      </span>
+      <form method="post" action="{% url 'app_admin:ingrediente_bulk' %}" id="form-inv-ing-bulk" style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+        {% csrf_token %}
+        <div id="inv-ing-bulk-pks"></div>
+        <input type="hidden" name="accion" id="inv-ing-bulk-accion" value="">
+        <button type="button" class="btn btn-danger btn-sm" onclick="invIngBulkAccion('eliminar')">
+          <i class="bi bi-trash3"></i> Desactivar
+        </button>
+      </form>
+      <button class="btn btn-ghost btn-sm" onclick="limpiarInvIng()" style="margin-left:auto;">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+
     <div style="overflow-x:auto;">
     <table class="tbl" id="tbl-ingredientes">
       <thead>
         <tr>
+          <th style="width:2.5rem;text-align:center;">
+            <input type="checkbox" id="inv-ing-check-all" title="Seleccionar todos" style="accent-color:var(--amber);cursor:pointer;">
+          </th>
           <th>Ingrediente</th>
           <th>Unidad</th>
           <th>Stock</th>
@@ -439,14 +507,30 @@
       </thead>
       <tbody>
       {% for ing in ingredientes %}
-      <tr>
+      <tr data-pk="{{ ing.pk }}">
+        <td style="width:2.5rem;text-align:center;padding:0.5rem;">
+          <input type="checkbox" class="inv-ing-check" value="{{ ing.pk }}"
+                 style="accent-color:var(--amber);cursor:pointer;width:1rem;height:1rem;">
+        </td>
         <td>
-          <div style="font-weight:600;font-size:0.85rem;">{{ ing.nombre }}</div>
-          {% if ing.proveedor %}
-          <div style="font-size:0.71rem;color:var(--ash);margin-top:0.1rem;">
-            <i class="bi bi-truck" style="font-size:0.65rem;"></i> {{ ing.proveedor.nombre }}
+          <div style="display:flex;align-items:center;gap:0.55rem;">
+            {% if ing.imagen %}
+            <img src="{{ ing.imagen.url }}" alt="{{ ing.nombre }}"
+                 style="width:2.2rem;height:2.2rem;object-fit:cover;border-radius:5px;flex-shrink:0;border:1px solid var(--mist);">
+            {% else %}
+            <div style="width:2.2rem;height:2.2rem;border-radius:5px;background:var(--cream);border:1px solid var(--mist);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <i class="bi bi-basket" style="font-size:0.68rem;color:var(--fog);"></i>
+            </div>
+            {% endif %}
+            <div>
+              <div style="font-weight:600;font-size:0.85rem;">{{ ing.nombre }}</div>
+              {% if ing.proveedor %}
+              <div style="font-size:0.71rem;color:var(--ash);margin-top:0.1rem;">
+                <i class="bi bi-truck" style="font-size:0.65rem;"></i> {{ ing.proveedor.nombre }}
+              </div>
+              {% endif %}
+            </div>
           </div>
-          {% endif %}
         </td>
         <td>
           <span style="font-size:0.78rem;color:var(--stone);">{{ ing.get_unidad_display }}</span>
@@ -667,6 +751,101 @@ function confirmarEliminarIng(nombre, url) {
 
 function cerrarModal() {
   document.getElementById('modal-eliminar').classList.remove('open');
+}
+
+// ── Selección múltiple productos (inventario) ──────────────────────────────
+const invProdCheckAll = document.getElementById('inv-prod-check-all');
+if (invProdCheckAll) {
+  function actualizarInvProdBulk() {
+    const checks = document.querySelectorAll('.inv-prod-check:checked');
+    const bar = document.getElementById('inv-prod-bulk-bar');
+    document.getElementById('inv-prod-bulk-count').textContent = checks.length;
+    bar.style.display = checks.length > 0 ? 'flex' : 'none';
+    document.querySelectorAll('#tbl-productos tbody tr').forEach(tr => {
+      const chk = tr.querySelector('.inv-prod-check');
+      if (chk) tr.style.background = chk.checked ? 'var(--violet-pale)' : '';
+    });
+    const total = document.querySelectorAll('.inv-prod-check').length;
+    invProdCheckAll.indeterminate = checks.length > 0 && checks.length < total;
+    invProdCheckAll.checked = checks.length === total && total > 0;
+  }
+  invProdCheckAll.addEventListener('change', function () {
+    document.querySelectorAll('.inv-prod-check').forEach(c => {
+      const row = c.closest('tr');
+      if (!row || row.style.display === 'none') return;
+      c.checked = this.checked;
+    });
+    actualizarInvProdBulk();
+  });
+  document.querySelectorAll('.inv-prod-check').forEach(c => c.addEventListener('change', actualizarInvProdBulk));
+}
+function limpiarInvProd() {
+  document.querySelectorAll('.inv-prod-check').forEach(c => c.checked = false);
+  if (invProdCheckAll) invProdCheckAll.checked = false;
+  document.getElementById('inv-prod-bulk-bar').style.display = 'none';
+  document.querySelectorAll('#tbl-productos tbody tr').forEach(tr => tr.style.background = '');
+}
+function invProdBulkAccion(accion) {
+  const checks = document.querySelectorAll('.inv-prod-check:checked');
+  if (!checks.length) return;
+  let msg = accion === 'eliminar' ? '¿Eliminar ' + checks.length + ' producto(s)?' : '¿' + accion.charAt(0).toUpperCase() + accion.slice(1) + ' ' + checks.length + ' producto(s)?';
+  if (!confirm(msg)) return;
+  document.getElementById('inv-prod-bulk-accion').value = accion;
+  const container = document.getElementById('inv-prod-bulk-pks');
+  container.innerHTML = '';
+  checks.forEach(c => {
+    const inp = document.createElement('input');
+    inp.type = 'hidden'; inp.name = 'pks'; inp.value = c.value;
+    container.appendChild(inp);
+  });
+  document.getElementById('form-inv-prod-bulk').submit();
+}
+
+// ── Selección múltiple ingredientes (inventario) ──────────────────────────
+const invIngCheckAll = document.getElementById('inv-ing-check-all');
+if (invIngCheckAll) {
+  function actualizarInvIngBulk() {
+    const checks = document.querySelectorAll('.inv-ing-check:checked');
+    const bar = document.getElementById('inv-ing-bulk-bar');
+    document.getElementById('inv-ing-bulk-count').textContent = checks.length;
+    bar.style.display = checks.length > 0 ? 'flex' : 'none';
+    document.querySelectorAll('#tbl-ingredientes tbody tr').forEach(tr => {
+      const chk = tr.querySelector('.inv-ing-check');
+      if (chk) tr.style.background = chk.checked ? 'var(--amber-pale)' : '';
+    });
+    const total = document.querySelectorAll('.inv-ing-check').length;
+    invIngCheckAll.indeterminate = checks.length > 0 && checks.length < total;
+    invIngCheckAll.checked = checks.length === total && total > 0;
+  }
+  invIngCheckAll.addEventListener('change', function () {
+    document.querySelectorAll('.inv-ing-check').forEach(c => {
+      const row = c.closest('tr');
+      if (!row || row.style.display === 'none') return;
+      c.checked = this.checked;
+    });
+    actualizarInvIngBulk();
+  });
+  document.querySelectorAll('.inv-ing-check').forEach(c => c.addEventListener('change', actualizarInvIngBulk));
+}
+function limpiarInvIng() {
+  document.querySelectorAll('.inv-ing-check').forEach(c => c.checked = false);
+  if (invIngCheckAll) invIngCheckAll.checked = false;
+  document.getElementById('inv-ing-bulk-bar').style.display = 'none';
+  document.querySelectorAll('#tbl-ingredientes tbody tr').forEach(tr => tr.style.background = '');
+}
+function invIngBulkAccion(accion) {
+  const checks = document.querySelectorAll('.inv-ing-check:checked');
+  if (!checks.length) return;
+  if (!confirm('¿Desactivar ' + checks.length + ' ingrediente(s)?')) return;
+  document.getElementById('inv-ing-bulk-accion').value = accion;
+  const container = document.getElementById('inv-ing-bulk-pks');
+  container.innerHTML = '';
+  checks.forEach(c => {
+    const inp = document.createElement('input');
+    inp.type = 'hidden'; inp.name = 'pks'; inp.value = c.value;
+    container.appendChild(inp);
+  });
+  document.getElementById('form-inv-ing-bulk').submit();
 }
 
 // ── Búsqueda en tabla (client-side) ──────────────────────────────────────

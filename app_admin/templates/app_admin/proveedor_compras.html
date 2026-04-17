@@ -57,7 +57,7 @@
         <td style="font-weight:600;">{% if det.producto %}{{ det.producto.nombre }}{% elif det.ingrediente %}{{ det.ingrediente.nombre }}{% endif %}</td>
         <td>{% if det.producto %}<span class="badge badge-simple">Producto</span>{% else %}<span class="badge badge-elaborado">Ingrediente</span>{% endif %}</td>
         <td>{{ det.cantidad }}</td>
-        <td>${{ det.precio_unitario }}</td>
+        <td>${{ det.precio_unitario|miles }}</td>
         <td style="font-weight:700;">${{ det.subtotal|miles }}</td>
       </tr>
       {% endfor %}

@@ -1,0 +1,173 @@
+{% extends 'app_docente/base_docente.html' %}
+{% block title %}Mis Favoritos{% endblock %}
+{% block topbar_title %}Mis Favoritos{% endblock %}
+
+{% block content %}
+
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.25rem; flex-wrap:wrap; gap:.75rem;">
+  <h1 class="page-title" style="margin-bottom:0;">Mis Favoritos</h1>
+  <a href="{% url 'app_docente:menu' %}" class="btn btn-outline btn-sm">
+    <i class="bi bi-shop"></i> Ir al menú
+  </a>
+</div>
+
+{% if favoritos %}
+<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:1rem; margin-bottom:5rem;">
+  {% for fav in favoritos %}
+  <div class="prod-card">
+
+    <!-- Quitar favorito -->
+    <button class="fav-remove" data-pk="{{ fav.producto.pk }}"
+      style="position:absolute; top:.6rem; right:.6rem; z-index:2; width:1.8rem; height:1.8rem; border-radius:50%;
+             background:rgba(255,255,255,.9); backdrop-filter:blur(4px); border:none; cursor:pointer;
+             display:flex; align-items:center; justify-content:center; font-size:.9rem; color:var(--leaf);
+             box-shadow:0 1px 4px rgba(0,0,0,.12); transition:all .15s;"
+      title="Quitar de favoritos">
+      <i class="bi bi-heart-fill"></i>
+    </button>
+
+    <!-- Imagen -->
+    <div class="prod-img-wrap">
+      {% if fav.producto.imagen %}
+      <img src="{{ fav.producto.imagen.url }}" alt="{{ fav.producto.nombre }}">
+      {% else %}
+      <div class="prod-img-placeholder"><i class="bi bi-egg-fried"></i></div>
+      {% endif %}
+    </div>
+
+    <div class="prod-body">
+      <div class="prod-name">{{ fav.producto.nombre }}</div>
+      <div class="prod-tipo">{{ fav.producto.get_tipo_display }}</div>
+    </div>
+
+    <div class="prod-footer">
+      <span class="prod-price">${{ fav.producto.precio_venta|floatformat:0 }}</span>
+      <button class="btn btn-primary btn-sm fav-add"
+              data-pk="{{ fav.producto.pk }}"
+              data-name="{{ fav.producto.nombre }}"
+              data-price="{{ fav.producto.precio_venta }}">
+        <i class="bi bi-bag-plus"></i> Pedir
+      </button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- FAB -->
+<button class="cart-fab" id="cart-fab" onclick="openCart()" title="Ver carrito">
+  <i class="bi bi-bag"></i>
+  <span class="cart-count" id="cart-count" style="display:none;">0</span>
+</button>
+
+<!-- Modal carrito -->
+<div id="cart-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:800; align-items:flex-end; justify-content:center; backdrop-filter:blur(4px);">
+  <div style="background:var(--ivory); border-radius:20px 20px 0 0; width:100%; max-width:520px; padding:1.25rem 1.4rem 1.5rem; max-height:70vh; overflow-y:auto; box-shadow:0 -12px 48px rgba(0,0,0,.15);">
+    <div style="text-align:center; margin-bottom:.75rem;">
+      <div style="width:2.5rem; height:.25rem; background:var(--fog); border-radius:99px; margin:0 auto;"></div>
+    </div>
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
+      <h3 style="font-family:var(--serif); font-size:1.2rem; font-weight:400;">Carrito</h3>
+      <button onclick="closeCart()" class="btn btn-ghost btn-sm"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div id="cart-items"></div>
+    <div style="font-weight:700; font-size:.9rem; border-top:2px solid var(--mist); padding-top:.75rem; margin-bottom:.75rem; display:flex; justify-content:space-between; align-items:center;">
+      <span>Total</span>
+      <span style="font-family:var(--serif); font-size:1.2rem; color:var(--leaf);" id="cart-total">$0</span>
+    </div>
+    <form id="cart-form" action="{% url 'app_docente:pedir' %}" method="post">
+      {% csrf_token %}
+      <input type="hidden" name="carrito" id="cart-json">
+      <input type="hidden" name="nota" value="">
+      <button type="submit" class="btn btn-primary btn-full" style="font-size:.86rem;">
+        <i class="bi bi-send"></i> Confirmar pedido
+      </button>
+    </form>
+  </div>
+</div>
+
+{% else %}
+<div class="empty-state" style="padding:4rem 2rem;">
+  <i class="bi bi-heart es-icon" style="font-size:3rem;"></i>
+  <h3>Sin favoritos aún</h3>
+  <p style="margin-bottom:1.25rem;">Marca productos con <i class="bi bi-heart-fill" style="color:var(--leaf);"></i> desde el menú para acceder rápidamente.</p>
+  <a href="{% url 'app_docente:menu' %}" class="btn btn-primary"><i class="bi bi-shop"></i> Explorar menú</a>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let cart = {};
+
+function updateUI() {
+  const count = Object.values(cart).reduce((a,i) => a + i.qty, 0);
+  const total = Object.values(cart).reduce((a,i) => a + i.qty*i.price, 0);
+  const countEl = document.getElementById('cart-count');
+  countEl.textContent = count;
+  countEl.style.display = count > 0 ? 'flex' : 'none';
+  document.getElementById('cart-total').textContent = '$' + total.toLocaleString('es-CO');
+  const el = document.getElementById('cart-items');
+  if (count === 0) {
+    el.innerHTML = `<div style="text-align:center; padding:1.25rem; color:var(--ash);">
+      <i class="bi bi-bag" style="font-size:2rem; opacity:.3; display:block; margin-bottom:.5rem; color:var(--leaf);"></i>
+      <p style="font-size:.82rem;">Carrito vacío.</p>
+    </div>`;
+    return;
+  }
+  el.innerHTML = Object.values(cart).map(i =>
+    `<div style="display:flex; justify-content:space-between; align-items:center; padding:.55rem 0; border-bottom:1px solid var(--mist);">
+      <span style="font-weight:600; font-size:.82rem; flex:1;">${i.name}</span>
+      <div style="display:flex; align-items:center; gap:.4rem;">
+        <button onclick="changeQty(${i.pk}, -1)" class="btn btn-ghost btn-xs" style="padding:.1rem .35rem;"><i class="bi bi-dash"></i></button>
+        <span style="font-size:.85rem; font-weight:700; min-width:1.2rem; text-align:center;">${i.qty}</span>
+        <button onclick="changeQty(${i.pk}, 1)" class="btn btn-ghost btn-xs" style="padding:.1rem .35rem;"><i class="bi bi-plus"></i></button>
+        <span style="font-size:.8rem; color:var(--leaf); font-weight:700; min-width:4.5rem; text-align:right;">$${(i.qty*i.price).toLocaleString('es-CO')}</span>
+      </div>
+    </div>`).join('');
+}
+
+function changeQty(pk, delta) {
+  if (!cart[pk]) return;
+  cart[pk].qty += delta;
+  if (cart[pk].qty <= 0) delete cart[pk];
+  updateUI();
+}
+
+document.querySelectorAll('.fav-add').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const pk = btn.dataset.pk;
+    if (cart[pk]) cart[pk].qty++;
+    else cart[pk] = { pk, name: btn.dataset.name, price: parseFloat(btn.dataset.price), qty: 1 };
+    updateUI();
+    btn.innerHTML = '<i class="bi bi-check-lg"></i> Listo';
+    btn.style.background = 'var(--leaf-dark)';
+    setTimeout(() => { btn.innerHTML = '<i class="bi bi-bag-plus"></i> Pedir'; btn.style.background = ''; }, 900);
+  });
+});
+
+document.querySelectorAll('.fav-remove').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    if (!confirm('¿Quitar de favoritos?')) return;
+    await fetch(`/docente/favoritos/toggle/${btn.dataset.pk}/`, {
+      method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+    });
+    const card = btn.closest('.prod-card');
+    card.style.transition = 'all .25s';
+    card.style.opacity = '0';
+    card.style.transform = 'scale(0.9)';
+    setTimeout(() => card.remove(), 250);
+  });
+});
+
+function openCart()  { updateUI(); document.getElementById('cart-modal').style.display = 'flex'; }
+function closeCart() { document.getElementById('cart-modal').style.display = 'none'; }
+
+document.getElementById('cart-form')?.addEventListener('submit', e => {
+  if (Object.keys(cart).length === 0) { e.preventDefault(); alert('El carrito está vacío.'); return; }
+  document.getElementById('cart-json').value = JSON.stringify(
+    Object.values(cart).map(i => ({ id: i.pk, cantidad: i.qty }))
+  );
+});
+</script>
+{% endblock %}

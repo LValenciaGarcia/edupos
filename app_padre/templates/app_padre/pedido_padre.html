@@ -1,0 +1,333 @@
+{% extends 'app_padre/base_padre.html' %}
+{% load filtros %}
+{% block title %}Hacer Pedido{% endblock %}
+{% block page_title %}Hacer Pedido para {{ estudiante.perfil.user.first_name }}{% endblock %}
+{% block nav_menu %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+  .pedido-layout { display: grid; grid-template-columns: 1fr 320px; gap: 1.4rem; align-items: start; }
+  @media (max-width: 1000px) { .pedido-layout { grid-template-columns: 1fr; } }
+
+  /* Hijo chip */
+  .hijo-banner {
+    display: flex; align-items: center; gap: 0.85rem;
+    background: var(--ink); border-radius: 10px; padding: 0.9rem 1.2rem; margin-bottom: 1.2rem;
+  }
+  .hijo-banner-ava {
+    width: 2.4rem; height: 2.4rem; border-radius: 50%;
+    background: rgba(34,197,94,0.2); border: 1px solid rgba(34,197,94,0.3);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--serif); font-size: 1rem; color: var(--leaf-bright); flex-shrink: 0;
+  }
+  .hijo-banner-name { font-family: var(--serif); font-size: 1rem; color: #fff; }
+  .hijo-banner-saldos { margin-left: auto; display: flex; gap: 1.2rem; }
+  .saldo-info { text-align: right; }
+  .saldo-info-val { font-family: var(--serif); font-size: 1.1rem; line-height: 1; }
+  .saldo-info-val.hijo-col { color: var(--leaf-bright); }
+  .saldo-info-val.padre-col { color: #60a5fa; }
+  .saldo-info-lbl { font-size: 0.6rem; color: rgba(255,255,255,0.4); letter-spacing: 0.05em; }
+
+  /* Filtros categoría */
+  .cat-tabs { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .cat-tab {
+    padding: 0.35rem 0.85rem; border: 1px solid var(--fog); border-radius: 99px;
+    font-size: 0.76rem; font-weight: 600; color: var(--stone); cursor: pointer;
+    background: var(--ivory); transition: all 0.14s; text-decoration: none;
+  }
+  .cat-tab:hover, .cat-tab.active { border-color: var(--leaf); color: var(--leaf-dark); background: var(--leaf-pale); }
+
+  /* Grid de productos */
+  .productos-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 0.85rem;
+  }
+  .prod-card {
+    background: var(--ivory); border: 1px solid var(--mist); border-radius: 10px;
+    overflow: hidden; transition: box-shadow 0.18s, border-color 0.18s;
+    position: relative;
+  }
+  .prod-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.07); border-color: var(--fog); }
+  .prod-card.restringido { opacity: 0.45; pointer-events: none; }
+  .prod-card.restringido::after {
+    content: 'RESTRINGIDO'; position: absolute; inset: 0;
+    background: rgba(220,38,38,0.08); display: flex; align-items: center; justify-content: center;
+    font-size: 0.6rem; font-weight: 800; color: var(--red); letter-spacing: 0.12em;
+    border: 1.5px dashed var(--red); border-radius: 10px; pointer-events: none;
+  }
+  .prod-img { height: 80px; background: var(--cream); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .prod-img img { width: 100%; height: 100%; object-fit: cover; }
+  .prod-img .prod-icon { font-size: 1.6rem; color: var(--fog); }
+  .prod-body { padding: 0.65rem 0.75rem; }
+  .prod-nombre { font-size: 0.8rem; font-weight: 600; line-height: 1.3; }
+  .prod-precio { font-family: var(--serif); font-size: 1rem; color: var(--leaf); margin-top: 0.3rem; }
+  .prod-cat { font-size: 0.64rem; color: var(--ash); margin-top: 0.1rem; }
+  .qty-control {
+    display: flex; align-items: center; gap: 0.4rem; margin-top: 0.5rem;
+  }
+  .qty-btn {
+    width: 1.5rem; height: 1.5rem; border-radius: 5px; border: 1px solid var(--fog);
+    background: var(--ivory); cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem; font-weight: 700; color: var(--stone);
+    transition: background 0.1s, border-color 0.1s;
+  }
+  .qty-btn:hover { background: var(--leaf-pale); border-color: var(--leaf); color: var(--leaf-dark); }
+  .qty-input {
+    width: 2rem; text-align: center; border: 1px solid var(--fog); border-radius: 5px;
+    padding: 0.15rem; font-size: 0.82rem; font-weight: 700;
+  }
+
+  /* Carrito lateral */
+  .carrito-card { position: sticky; top: calc(var(--topbar-h) + 1rem); }
+  .carrito-item { display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 1.4rem; border-bottom: 1px solid var(--mist); font-size: 0.8rem; }
+  .carrito-item:last-child { border-bottom: none; }
+  .carrito-nombre { font-weight: 600; }
+  .carrito-qty  { color: var(--ash); font-size: 0.72rem; }
+  .carrito-sub  { font-weight: 700; flex-shrink: 0; }
+
+  .fuente-radio { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+  .fuente-opt {
+    display: flex; align-items: center; gap: 0.65rem;
+    padding: 0.7rem 0.9rem; border: 1px solid var(--fog); border-radius: 8px; cursor: pointer;
+    transition: border-color 0.14s, background 0.14s;
+  }
+  .fuente-opt:has(input:checked) { border-color: var(--leaf); background: var(--leaf-pale); }
+  .fuente-opt input { accent-color: var(--leaf); }
+  .fuente-opt-name { font-size: 0.82rem; font-weight: 600; }
+  .fuente-opt-saldo { font-size: 0.7rem; color: var(--ash); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Banner del hijo -->
+<div class="hijo-banner">
+  <div class="hijo-banner-ava">{{ estudiante.perfil.user.first_name|slice:":1"|upper }}</div>
+  <div>
+    <div class="hijo-banner-name">{{ estudiante.perfil.user.get_full_name }}</div>
+    <div style="font-size:0.7rem;color:rgba(255,255,255,0.45);">Grado {{ estudiante.grado }}</div>
+  </div>
+  <div class="hijo-banner-saldos">
+    <div class="saldo-info">
+      <div class="saldo-info-val hijo-col">${{ estudiante.saldo|miles }}</div>
+      <div class="saldo-info-lbl">saldo hijo</div>
+    </div>
+    <div class="saldo-info">
+      <div class="saldo-info-val padre-col">${{ padre.saldo|miles }}</div>
+      <div class="saldo-info-lbl">mi saldo</div>
+    </div>
+  </div>
+</div>
+
+<form method="post" id="formPedido" novalidate>
+{% csrf_token %}
+
+<div class="pedido-layout">
+
+  <!-- Productos -->
+  <div>
+    <!-- Tabs categorías -->
+    <div class="cat-tabs">
+      <a href="?hijo={{ estudiante.pk }}" class="cat-tab {% if not request.GET.cat %}active{% endif %}">Todos</a>
+      {% for cat in categorias %}
+      <a href="?hijo={{ estudiante.pk }}&cat={{ cat.nombre }}"
+         class="cat-tab {% if request.GET.cat == cat.nombre %}active{% endif %}">
+        {{ cat.get_nombre_display }}
+      </a>
+      {% endfor %}
+    </div>
+
+    <!-- Búsqueda -->
+    <div style="position:relative;margin-bottom:1rem;">
+      <i class="bi bi-search" style="position:absolute;left:0.75rem;top:50%;transform:translateY(-50%);color:var(--ash);font-size:0.85rem;"></i>
+      <input type="text" id="searchProd" placeholder="Buscar producto…"
+             style="width:100%;padding-left:2.2rem;"
+             oninput="filterProds(this.value)">
+    </div>
+
+    <div class="productos-grid" id="prodGrid">
+      {% for prod, restringido in prods_lista %}
+      {% if not request.GET.cat or request.GET.cat == prod.categoria.nombre %}
+      <div class="prod-card {% if restringido %}restringido{% endif %}"
+           data-nombre="{{ prod.nombre|lower }}" data-id="{{ prod.pk }}">
+        <div class="prod-img">
+          {% if prod.imagen %}
+          <img src="{{ prod.imagen.url }}" alt="{{ prod.nombre }}">
+          {% else %}
+          <i class="bi bi-box-seam prod-icon"></i>
+          {% endif %}
+        </div>
+        <div class="prod-body">
+          <div class="prod-nombre">{{ prod.nombre }}</div>
+          <div class="prod-cat">{{ prod.categoria.get_nombre_display }}</div>
+          <div class="prod-precio">${{ prod.precio_venta|miles }}</div>
+          {% if not restringido %}
+          <div class="qty-control">
+            <button type="button" class="qty-btn" onclick="changeQty({{ prod.pk }}, -1)">−</button>
+            <input type="number" class="qty-input" name="qty_{{ prod.pk }}" id="qty_{{ prod.pk }}"
+                   value="0" min="0" max="20" readonly
+                   data-precio="{{ prod.precio_venta|stringformat:'f'|cut:',' }}" data-nombre="{{ prod.nombre }}">
+            <button type="button" class="qty-btn" onclick="changeQty({{ prod.pk }}, +1)">+</button>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Carrito / Resumen -->
+  <div class="carrito-card">
+    <div class="card">
+      <div class="card-head"><span class="card-title">Resumen del pedido</span></div>
+
+      <!-- Items carrito -->
+      <div id="carritoItems">
+        <div id="carritoVacio" class="empty-state" style="padding:2rem 1rem;">
+          <i class="bi bi-cart es-icon"></i>
+          <p>Carrito vacío</p>
+        </div>
+      </div>
+
+      <!-- Total -->
+      <div style="padding:1rem 1.4rem;border-top:1px solid var(--mist);background:var(--cream);">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:0.75rem;font-weight:700;color:var(--stone);text-transform:uppercase;letter-spacing:0.07em;">Total</span>
+          <span style="font-family:var(--serif);font-size:1.5rem;color:var(--leaf);" id="totalDisplay">$0</span>
+        </div>
+      </div>
+
+      <!-- Fuente de pago -->
+      <div style="padding:1rem 1.4rem;border-top:1px solid var(--mist);">
+        <div style="font-size:0.67rem;font-weight:700;color:var(--stone);letter-spacing:0.07em;text-transform:uppercase;margin-bottom:0.6rem;">Pagar con</div>
+        <div class="fuente-radio">
+          <label class="fuente-opt">
+            <input type="radio" name="fuente" value="saldo_hijo" checked>
+            <div>
+              <div class="fuente-opt-name">Saldo del estudiante</div>
+              <div class="fuente-opt-saldo">Disponible: ${{ estudiante.saldo|miles }}</div>
+            </div>
+          </label>
+          <label class="fuente-opt">
+            <input type="radio" name="fuente" value="saldo_padre">
+            <div>
+              <div class="fuente-opt-name">Mi saldo</div>
+              <div class="fuente-opt-saldo">Disponible: ${{ padre.saldo|miles }}</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Nota -->
+      <div style="padding:0 1.4rem 1rem;">
+        <div class="field">
+          <label for="notaPedido">Nota (opcional)</label>
+          <input type="text" id="notaPedido" name="nota" placeholder="Instrucciones especiales…" maxlength="200">
+        </div>
+      </div>
+
+      <!-- Botón confirmar -->
+      <div style="padding:0 1.4rem 1.2rem;">
+        <button type="submit" class="btn btn-primary btn-full" id="btnConfirmar" disabled>
+          <i class="bi bi-cart-check"></i> Confirmar pedido
+        </button>
+        <a href="{% url 'app_padre:hijos' %}" class="btn btn-ghost btn-full" style="margin-top:0.4rem;">Cancelar</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+</form>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const carrito = {};
+  const HIJO_SALDO  = {{ estudiante.saldo|floatformat:"0"|default:"0" }};
+  const PADRE_SALDO = {{ padre.saldo|floatformat:"0"|default:"0" }};
+
+   window.changeQty = function(id, delta) {
+    const input = document.getElementById('qty_' + id);
+    if (!input) return;
+    let val = parseInt(input.value) + delta;
+    if (val < 0) val = 0;
+    if (val > 20) val = 20;
+    input.value = val;
+    carrito[id] = {
+      qty: val,
+      precio: parseFloat(input.dataset.precio),
+      nombre: input.dataset.nombre,
+    };
+    renderCarrito();
+  };
+
+  function renderCarrito() {
+    const cont = document.getElementById('carritoItems');
+    const vacio = document.getElementById('carritoVacio');
+    let total = 0;
+    let html = '';
+    let tieneItems = false;
+
+    for (const [id, item] of Object.entries(carrito)) {
+      if (item.qty > 0) {
+        tieneItems = true;
+        const sub = item.qty * item.precio;
+        total += sub;
+        html += `<div class="carrito-item">
+          <div>
+            <div class="carrito-nombre">${item.nombre}</div>
+            <div class="carrito-qty">${item.qty} × $${fmtPesos(item.precio)}</div>
+          </div>
+          <div class="carrito-sub">$${fmtPesos(sub)}</div>
+        </div>`;
+      }
+    }
+
+    if (tieneItems) {
+      vacio.style.display = 'none';
+      cont.innerHTML = html;
+    } else {
+      vacio.style.display = '';
+      cont.innerHTML = '';
+      cont.appendChild(vacio);
+    }
+
+    document.getElementById('totalDisplay').textContent = '$' + fmtPesos(total);
+    document.getElementById('btnConfirmar').disabled = !tieneItems;
+    validarSaldo(total);
+  }
+
+  function validarSaldo(total) {
+    const fuente = document.querySelector('input[name="fuente"]:checked')?.value;
+    const saldo  = fuente === 'saldo_padre' ? PADRE_SALDO : HIJO_SALDO;
+    const btn    = document.getElementById('btnConfirmar');
+    if (total > saldo && total > 0) {
+      btn.textContent = '⚠ Saldo insuficiente';
+      btn.disabled = true;
+      btn.style.background = 'var(--red)';
+    } else if (total > 0) {
+      btn.innerHTML = '<i class="bi bi-cart-check"></i> Confirmar pedido';
+      btn.disabled = false;
+      btn.style.background = '';
+    }
+  }
+
+  document.querySelectorAll('input[name="fuente"]').forEach(r => {
+    r.addEventListener('change', () => {
+      const total = Object.values(carrito).reduce((s, i) => s + (i.qty * i.precio), 0);
+      validarSaldo(total);
+    });
+  });
+
+  function fmtPesos(n) {
+    return Math.floor(n).toLocaleString('es-CO').replace(/,/g, '.');
+  }
+
+  function filterProds(q) {
+    document.querySelectorAll('.prod-card').forEach(c => {
+      c.style.display = c.dataset.nombre?.includes(q.toLowerCase()) ? '' : 'none';
+    });
+  }
+</script>
+{% endblock %}

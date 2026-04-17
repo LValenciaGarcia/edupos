@@ -1,8 +1,30 @@
+import unicodedata
+import re
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
 from django.contrib import messages
-from .models import Perfil, Padre
+from .models import Perfil, Padre, Docente
+
+
+# ─── HELPERS ──────────────────────────────────────────────────────────────────
+
+def _normalizar(s):
+    """Quita tildes y caracteres especiales, deja solo a-z0-9."""
+    s = unicodedata.normalize('NFD', s)
+    s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+    return re.sub(r'[^a-z0-9]', '', s.lower())
+
+
+def generar_username(first_name, last_name):
+    """Genera un username único a partir de nombre y apellido."""
+    base = f"{_normalizar(first_name)}.{_normalizar(last_name)}"
+    username = base
+    counter = 1
+    while User.objects.filter(username=username).exists():
+        username = f"{base}{counter}"
+        counter += 1
+    return username
 
 
 # ─── LOGIN ────────────────────────────────────────────────────────────────────
@@ -17,7 +39,6 @@ def login_view(request):
         user = authenticate(request, username=username, password=password)
 
         if user is not None:
-            # Verificar que la cuenta esté activa
             try:
                 if not user.perfil.activo:
                     messages.error(request, 'Tu cuenta está desactivada. Contacta al administrador.')
@@ -46,8 +67,8 @@ def _redirigir_por_rol(user):
             return redirect('app_padre:dashboard')
         elif rol == 'estudiante':
             return redirect('app_estudiante:dashboard')
-        # elif rol == 'profesor':
-        #     return redirect('app_profesor:dashboard')
+        elif rol == 'docente':
+            return redirect('app_docente:dashboard')
     except Perfil.DoesNotExist:
         pass
     return redirect('core:home')
@@ -63,30 +84,26 @@ def logout_view(request):
 # ─── REGISTRO PADRE ───────────────────────────────────────────────────────────
 
 def registro_padre(request):
-    """Solo los padres pueden registrarse por su cuenta."""
+    """Los padres pueden registrarse por su cuenta."""
     if request.user.is_authenticated:
         return _redirigir_por_rol(request.user)
 
     if request.method == 'POST':
         first_name = request.POST.get('first_name', '').strip()
         last_name  = request.POST.get('last_name', '').strip()
-        username   = request.POST.get('username', '').strip()
         email      = request.POST.get('email', '').strip()
         telefono   = request.POST.get('telefono', '').strip()
         documento  = request.POST.get('documento', '').strip()
         password1  = request.POST.get('password1', '')
         password2  = request.POST.get('password2', '')
 
-        # Validaciones
         errores = []
-        if not all([first_name, last_name, username, password1]):
-            errores.append('Nombre, apellido, usuario y contraseña son obligatorios.')
+        if not all([first_name, last_name, password1]):
+            errores.append('Nombre, apellido y contraseña son obligatorios.')
         if password1 != password2:
             errores.append('Las contraseñas no coinciden.')
         if len(password1) < 8:
             errores.append('La contraseña debe tener al menos 8 caracteres.')
-        if User.objects.filter(username=username).exists():
-            errores.append('Ese nombre de usuario ya está en uso.')
         if email and User.objects.filter(email=email).exists():
             errores.append('Ya existe una cuenta con ese correo.')
 
@@ -94,6 +111,7 @@ def registro_padre(request):
             for e in errores:
                 messages.error(request, e)
         else:
+            username = generar_username(first_name, last_name)
             user = User.objects.create_user(
                 username=username,
                 password=password1,
@@ -103,7 +121,59 @@ def registro_padre(request):
             )
             perfil = Perfil.objects.create(user=user, rol='padre', telefono=telefono)
             Padre.objects.create(perfil=perfil, documento=documento)
-            messages.success(request, '¡Cuenta creada! Ya puedes iniciar sesión.')
+            messages.success(
+                request,
+                f'¡Cuenta creada! Tu usuario es <strong>{username}</strong>. Ya puedes iniciar sesión.'
+            )
             return redirect('authentication:login')
 
     return render(request, 'authentication/registro_padre.html')
+
+
+# ─── REGISTRO DOCENTE ─────────────────────────────────────────────────────────
+
+def registro_docente(request):
+    """Los docentes pueden registrarse por su cuenta."""
+    if request.user.is_authenticated:
+        return _redirigir_por_rol(request.user)
+
+    if request.method == 'POST':
+        first_name = request.POST.get('first_name', '').strip()
+        last_name  = request.POST.get('last_name', '').strip()
+        email      = request.POST.get('email', '').strip()
+        telefono   = request.POST.get('telefono', '').strip()
+        documento  = request.POST.get('documento', '').strip()
+        password1  = request.POST.get('password1', '')
+        password2  = request.POST.get('password2', '')
+
+        errores = []
+        if not all([first_name, last_name, password1]):
+            errores.append('Nombre, apellido y contraseña son obligatorios.')
+        if password1 != password2:
+            errores.append('Las contraseñas no coinciden.')
+        if len(password1) < 8:
+            errores.append('La contraseña debe tener al menos 8 caracteres.')
+        if email and User.objects.filter(email=email).exists():
+            errores.append('Ya existe una cuenta con ese correo.')
+
+        if errores:
+            for e in errores:
+                messages.error(request, e)
+        else:
+            username = generar_username(first_name, last_name)
+            user = User.objects.create_user(
+                username=username,
+                password=password1,
+                first_name=first_name,
+                last_name=last_name,
+                email=email,
+            )
+            perfil = Perfil.objects.create(user=user, rol='docente', telefono=telefono)
+            Docente.objects.create(perfil=perfil, documento=documento)
+            messages.success(
+                request,
+                f'¡Cuenta creada! Tu usuario es <strong>{username}</strong>. Ya puedes iniciar sesión.'
+            )
+            return redirect('authentication:login')
+
+    return render(request, 'authentication/registro_docente.html')

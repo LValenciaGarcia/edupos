@@ -1,0 +1,320 @@
+{% extends 'app_estudiante/base_estudiante.html' %}
+{% load filtros %}
+{% block title %}Mis Estadisticas{% endblock %}
+{% block page_title %}Mis Estadisticas{% endblock %}
+{% block nav_estadisticas %}active{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'app_estudiante:menu' %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-cart-plus"></i> Hacer pedido
+  </a>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── Layout ──────────────────────────────────────────────────────────────── */
+  .est-grid-top {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+    gap: 1rem; margin-bottom: 1.5rem;
+  }
+  .est-grid-charts {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 1.2rem; margin-bottom: 1.2rem;
+  }
+  @media (max-width: 860px) { .est-grid-charts { grid-template-columns: 1fr; } }
+
+  /* ── Stat card acento ────────────────────────────────────────────────────── */
+  .kpi-card {
+    background: var(--ivory); border: 1px solid var(--mist); border-radius: var(--radius);
+    padding: 1.25rem 1.4rem; position: relative; overflow: hidden;
+  }
+  .kpi-card::before {
+    content: ''; position: absolute; left: 0; top: 12%; bottom: 12%;
+    width: 3px; border-radius: 0 3px 3px 0;
+  }
+  .kpi-card.green::before { background: var(--leaf); }
+  .kpi-card.amber::before { background: var(--amber); }
+  .kpi-card.blue::before  { background: var(--sky); }
+  .kpi-card.violet::before{ background: var(--violet); }
+  .kpi-label { font-size: 0.61rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ash); margin-bottom: 0.5rem; }
+  .kpi-val   { font-family: var(--serif); font-size: 2rem; line-height: 1; letter-spacing: -0.01em; }
+  .kpi-card.green .kpi-val  { color: var(--leaf); }
+  .kpi-card.amber .kpi-val  { color: var(--amber); }
+  .kpi-card.blue  .kpi-val  { color: var(--sky); }
+  .kpi-card.violet .kpi-val { color: var(--violet); }
+  .kpi-sub   { font-size: 0.7rem; color: var(--ash); margin-top: 0.3rem; }
+
+  /* ── Chart wrapper ───────────────────────────────────────────────────────── */
+  .chart-wrap {
+    background: var(--ivory); border: 1px solid var(--mist); border-radius: var(--radius);
+    padding: 1.3rem 1.5rem;
+  }
+  .chart-title {
+    font-family: var(--serif); font-size: 0.97rem; font-weight: 500;
+    letter-spacing: 0.01em; margin-bottom: 1.1rem;
+    display: flex; align-items: center; gap: 0.45rem;
+  }
+  .chart-title i { font-size: 0.9rem; color: var(--leaf); }
+  .chart-canvas-wrap { position: relative; height: 220px; }
+
+  /* ── Top productos ───────────────────────────────────────────────────────── */
+  .top-item {
+    display: flex; align-items: center; gap: 0.85rem;
+    padding: 0.7rem 1.4rem; border-bottom: 1px solid var(--mist);
+  }
+  .top-item:last-child { border-bottom: none; }
+  .top-rank {
+    width: 1.6rem; height: 1.6rem; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.7rem; font-weight: 800;
+  }
+  .top-rank.gold   { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+  .top-rank.silver { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+  .top-rank.bronze { background: #fff7ed; color: #92400e; border: 1px solid #fed7aa; }
+  .top-rank.other  { background: var(--cream); color: var(--stone); border: 1px solid var(--mist); }
+  .top-nombre { flex: 1; min-width: 0; font-size: 0.81rem; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .top-bar-wrap { width: 6rem; flex-shrink: 0; }
+  .top-bar { height: 5px; background: var(--leaf-tint); border-radius: 99px; overflow: hidden; }
+  .top-bar-fill { height: 100%; background: var(--leaf); border-radius: 99px; }
+  .top-veces { font-size: 0.7rem; color: var(--ash); text-align: right; margin-top: 0.18rem; }
+
+  /* ── Empty hint ──────────────────────────────────────────────────────────── */
+  .est-empty {
+    text-align: center; padding: 3.5rem 1rem; color: var(--ash);
+  }
+  .est-empty i { font-size: 2rem; display: block; margin-bottom: 0.6rem; opacity: 0.35; }
+  .est-empty p { font-size: 0.83rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- KPIs -->
+<div class="est-grid-top">
+  <div class="kpi-card green">
+    <div class="kpi-label">Total gastado</div>
+    <div class="kpi-val">${{ gasto_total|miles }}</div>
+    <div class="kpi-sub">pedidos entregados</div>
+  </div>
+  <div class="kpi-card amber">
+    <div class="kpi-label">Pedidos realizados</div>
+    <div class="kpi-val">{{ n_entregados }}</div>
+    <div class="kpi-sub">entregados con exito</div>
+  </div>
+  <div class="kpi-card blue">
+    <div class="kpi-label">Promedio por pedido</div>
+    <div class="kpi-val">${{ promedio|floatformat:0 }}</div>
+    <div class="kpi-sub">gasto promedio</div>
+  </div>
+  <div class="kpi-card violet">
+    <div class="kpi-label">Favorito</div>
+    <div class="kpi-val" style="font-size:1rem;line-height:1.3;margin-top:0.2rem;">{{ producto_fav }}</div>
+    <div class="kpi-sub">producto mas pedido</div>
+  </div>
+</div>
+
+{% if n_entregados == 0 %}
+<!-- Sin datos -->
+<div class="card">
+  <div class="est-empty">
+    <i class="bi bi-bar-chart-line"></i>
+    <p>Aun no tienes pedidos entregados. Tus estadisticas apareceran aqui cuando hagas tu primer pedido.</p>
+    <a href="{% url 'app_estudiante:menu' %}" class="btn btn-primary btn-sm" style="margin-top:1rem;">
+      <i class="bi bi-shop"></i> Ir al menu
+    </a>
+  </div>
+</div>
+
+{% else %}
+
+<!-- Gráficos -->
+<div class="est-grid-charts">
+
+  <!-- Gasto por día -->
+  <div class="chart-wrap">
+    <div class="chart-title">
+      <i class="bi bi-calendar3"></i> Gasto diario — ultimos 30 dias
+    </div>
+    {% if dias_data != '[]' %}
+    <div class="chart-canvas-wrap">
+      <canvas id="chartDias"></canvas>
+    </div>
+    {% else %}
+    <div class="est-empty" style="padding:2rem 0;">
+      <i class="bi bi-calendar-x"></i>
+      <p>Sin compras en los ultimos 30 dias.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Gasto por mes -->
+  <div class="chart-wrap">
+    <div class="chart-title">
+      <i class="bi bi-calendar-month"></i> Gasto mensual — ultimos 6 meses
+    </div>
+    {% if meses_data != '[]' %}
+    <div class="chart-canvas-wrap">
+      <canvas id="chartMeses"></canvas>
+    </div>
+    {% else %}
+    <div class="est-empty" style="padding:2rem 0;">
+      <i class="bi bi-calendar-x"></i>
+      <p>Sin datos de meses anteriores.</p>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Top productos + doughnut -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;align-items:start;">
+
+  <!-- Top productos lista -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title" style="font-size:0.95rem;">
+        <i class="bi bi-trophy" style="color:var(--amber);margin-right:0.3rem;font-size:0.9rem;"></i>
+        Mis productos favoritos
+      </span>
+    </div>
+    {% for p in top_productos %}
+    {% with forloop.counter as rk %}
+    <div class="top-item">
+      <div class="top-rank {% if rk == 1 %}gold{% elif rk == 2 %}silver{% elif rk == 3 %}bronze{% else %}other{% endif %}">
+        {{ rk }}
+      </div>
+      <div class="top-nombre" title="{{ p.producto__nombre }}">{{ p.producto__nombre }}</div>
+      <div class="top-bar-wrap">
+        <div class="top-bar">
+          <div class="top-bar-fill" style="width:{{ p.veces|floatformat:0 }}0%;max-width:100%;"></div>
+        </div>
+        <div class="top-veces">{{ p.veces }} ped.</div>
+      </div>
+    </div>
+    {% endwith %}
+    {% empty %}
+    <div class="est-empty"><i class="bi bi-bag-x"></i><p>Sin datos aun.</p></div>
+    {% endfor %}
+  </div>
+
+  <!-- Doughnut -->
+  <div class="chart-wrap">
+    <div class="chart-title">
+      <i class="bi bi-pie-chart"></i> Distribucion de productos
+    </div>
+    {% if prods_data != '[]' %}
+    <div class="chart-canvas-wrap" style="height:260px;">
+      <canvas id="chartProds"></canvas>
+    </div>
+    {% else %}
+    <div class="est-empty" style="padding:2rem 0;"><i class="bi bi-pie-chart"></i><p>Sin datos.</p></div>
+    {% endif %}
+  </div>
+
+</div>
+
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script>
+  // Paleta
+  const LEAF   = '#16a34a';
+  const LEAF_T = 'rgba(22,163,74,0.12)';
+  const AMBER  = '#d97706';
+  const SKY    = '#0284c7';
+  const VIOLET = '#7c3aed';
+  const RED    = '#dc2626';
+  const COLORS = [LEAF, AMBER, SKY, VIOLET, RED, '#0891b2'];
+
+  Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+  Chart.defaults.color = '#a4a39b';
+
+  const fmtPeso = v => '$' + Math.floor(v).toLocaleString('es-CO').replace(/,/g, '.');
+
+  // ── Gasto diario ──────────────────────────────────────────────────────────
+  {% if dias_data != '[]' %}
+  new Chart(document.getElementById('chartDias'), {
+    type: 'line',
+    data: {
+      labels: {{ dias_labels|safe }},
+      datasets: [{
+        label: 'Gasto',
+        data: {{ dias_data|safe }},
+        borderColor: LEAF,
+        backgroundColor: LEAF_T,
+        borderWidth: 2,
+        pointRadius: 3,
+        pointBackgroundColor: LEAF,
+        fill: true,
+        tension: 0.35,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmtPeso(ctx.raw) } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } },
+        y: { grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 10 }, callback: v => fmtPeso(v) } }
+      }
+    }
+  });
+  {% endif %}
+
+  // ── Gasto mensual ─────────────────────────────────────────────────────────
+  {% if meses_data != '[]' %}
+  new Chart(document.getElementById('chartMeses'), {
+    type: 'bar',
+    data: {
+      labels: {{ meses_labels|safe }},
+      datasets: [{
+        label: 'Gasto',
+        data: {{ meses_data|safe }},
+        backgroundColor: LEAF_T,
+        borderColor: LEAF,
+        borderWidth: 1.5,
+        borderRadius: 6,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmtPeso(ctx.raw) } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 10 }, callback: v => fmtPeso(v) } }
+      }
+    }
+  });
+  {% endif %}
+
+  // ── Doughnut productos ────────────────────────────────────────────────────
+  {% if prods_data != '[]' %}
+  new Chart(document.getElementById('chartProds'), {
+    type: 'doughnut',
+    data: {
+      labels: {{ prods_labels|safe }},
+      datasets: [{
+        data: {{ prods_data|safe }},
+        backgroundColor: COLORS,
+        borderWidth: 0,
+        hoverOffset: 6,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '62%',
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { font: { size: 11 }, boxWidth: 10, padding: 12 }
+        },
+        tooltip: { callbacks: { label: ctx => ctx.label + ': ' + ctx.raw + ' ped.' } }
+      }
+    }
+  });
+  {% endif %}
+</script>
+{% endblock %}

@@ -1,0 +1,287 @@
+{% extends 'app_docente/base_docente.html' %}
+{% block title %}Recargar Saldo{% endblock %}
+{% block topbar_title %}Recargar Saldo{% endblock %}
+
+{% block extra_css %}
+<style>
+  .recarga-layout {
+    display: grid; grid-template-columns: 1fr 320px; gap: 1.4rem; align-items: start;
+  }
+  @media (max-width: 960px) { .recarga-layout { grid-template-columns: 1fr; } }
+
+  /* Stepper */
+  .stepper {
+    display: flex; align-items: center;
+    background: var(--ivory); border: 1px solid var(--mist);
+    border-radius: var(--radius); padding: .9rem 1.25rem;
+    margin-bottom: 1.25rem; gap: 0; overflow: hidden;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04);
+  }
+  .step-item { display: flex; align-items: center; gap: .5rem; flex: 1; }
+  .step-circle {
+    width: 1.75rem; height: 1.75rem; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .7rem; font-weight: 800; transition: all .3s;
+  }
+  .step-circle.done   { background: linear-gradient(135deg, var(--leaf), var(--leaf-dark)); color: #fff; box-shadow: 0 2px 8px rgba(22,163,74,.3); }
+  .step-circle.active { background: linear-gradient(135deg, var(--leaf), var(--leaf-dark)); color: #fff; box-shadow: 0 2px 8px rgba(22,163,74,.3); }
+  .step-circle.wait   { background: var(--cream); color: var(--ash); border: 1.5px solid var(--fog); }
+  .step-text { font-size: .74rem; font-weight: 600; }
+  .step-text.active { color: var(--leaf-dark); }
+  .step-text.wait   { color: var(--ash); }
+  .step-sep { flex: 0 0 2rem; height: 1.5px; background: var(--fog); margin: 0 .2rem; }
+  .step-sep.done { background: var(--leaf); }
+
+  /* Montos rápidos */
+  .montos-rapidos { display: grid; grid-template-columns: repeat(4, 1fr); gap: .6rem; margin: .75rem 0 1.1rem; }
+  .monto-btn {
+    padding: .65rem .4rem; border: 1.5px solid var(--fog);
+    border-radius: 9px; background: var(--ivory); cursor: pointer;
+    font-family: var(--sans); font-size: .79rem; font-weight: 700; color: var(--ink);
+    transition: all .15s; text-align: center;
+  }
+  .monto-btn:hover  { border-color: var(--leaf); color: var(--leaf); background: var(--leaf-pale); }
+  .monto-btn.selected { border-color: var(--leaf); color: #fff; background: linear-gradient(135deg, var(--leaf), var(--leaf-dark)); box-shadow: 0 2px 8px rgba(22,163,74,.25); }
+
+  /* Upload */
+  .upload-zone {
+    border: 2px dashed var(--fog); border-radius: 10px; padding: 1.5rem;
+    text-align: center; cursor: pointer; transition: all .18s;
+    position: relative; background: var(--cream);
+  }
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--leaf); background: var(--leaf-pale);
+    box-shadow: 0 0 0 3px rgba(34,197,94,.1);
+  }
+  .upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .upload-icon { font-size: 1.75rem; color: var(--leaf); display: block; margin-bottom: .5rem; opacity: .7; }
+  .upload-text { font-size: .82rem; color: var(--stone); font-weight: 500; }
+  .upload-hint { font-size: .69rem; color: var(--ash); margin-top: .25rem; }
+  #preview-img { max-height: 120px; max-width: 100%; border-radius: 8px; margin-top: .75rem; display: none; border: 1px solid var(--mist); }
+
+  /* Historial rows */
+  .hist-row {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    padding: .85rem 1.25rem; border-bottom: 1px solid var(--mist);
+    font-size: .8rem; transition: background .12s;
+  }
+  .hist-row:last-child { border-bottom: none; }
+  .hist-row:hover { background: rgba(22,163,74,.03); }
+  .hist-monto { font-family: var(--serif); font-size: 1rem; color: var(--leaf); }
+  .hist-fecha { font-size: .67rem; color: var(--ash); margin-top: .07rem; }
+  .hist-nota  { font-size: .7rem;  color: var(--stone); margin-top: .07rem; font-style: italic; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="recarga-layout">
+
+  <!-- Formulario -->
+  <div>
+
+    <!-- Header de usuario -->
+    <div style="display:flex; align-items:center; gap:1rem; background:linear-gradient(130deg, var(--leaf-dark), var(--leaf) 65%, #22c55e); border-radius:var(--radius-lg); padding:1.25rem 1.5rem; margin-bottom:1.25rem; position:relative; overflow:hidden;">
+      <div style="position:absolute; inset:0; opacity:.5; background:url('data:image/svg+xml,%3Csvg width=\'40\' height=\'40\' viewBox=\'0 0 40 40\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.05\'%3E%3Cpath d=\'M0 0h20v20H0zm20 20h20v20H20z\'/%3E%3C/g%3E%3C/svg%3E');"></div>
+      <div style="width:3rem; height:3rem; border-radius:50%; background:rgba(255,255,255,.18); border:2px solid rgba(255,255,255,.35); display:flex; align-items:center; justify-content:center; font-family:var(--serif); font-size:1.2rem; color:#fff; flex-shrink:0; position:relative; z-index:1;">
+        {{ request.user.first_name|slice:":1"|upper }}
+      </div>
+      <div style="position:relative; z-index:1; flex:1;">
+        <div style="font-family:var(--serif); font-size:1.1rem; font-style:italic; color:#fff;">{{ request.user.get_full_name|default:request.user.username }}</div>
+        <div style="font-size:.7rem; color:rgba(255,255,255,.72);">Docente{% if docente.materia %} &middot; {{ docente.materia }}{% endif %}</div>
+      </div>
+      <div style="text-align:right; position:relative; z-index:1;">
+        <div style="font-family:var(--serif); font-size:1.6rem; color:#fff; line-height:1;">${{ docente.saldo|floatformat:0 }}</div>
+        <div style="font-size:.6rem; color:rgba(255,255,255,.65); text-transform:uppercase; letter-spacing:.07em; margin-top:.1rem;">saldo actual</div>
+      </div>
+    </div>
+
+    <!-- Stepper -->
+    <div class="stepper">
+      <div class="step-item">
+        <div class="step-circle done"><i class="bi bi-check-lg" style="font-size:.75rem;"></i></div>
+        <div class="step-text active">Solicitar</div>
+      </div>
+      <div class="step-sep done"></div>
+      <div class="step-item">
+        <div class="step-circle wait">2</div>
+        <div class="step-text wait">Revisión</div>
+      </div>
+      <div class="step-sep"></div>
+      <div class="step-item">
+        <div class="step-circle wait">3</div>
+        <div class="step-text wait">Acreditado</div>
+      </div>
+    </div>
+
+    <!-- Formulario recarga -->
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Nueva solicitud de recarga</span>
+      </div>
+      <div class="card-body">
+        <form method="post" enctype="multipart/form-data" novalidate>
+          {% csrf_token %}
+
+          <div class="field" style="margin-bottom:.6rem;">
+            <label for="monto">Monto a recargar *</label>
+            <input type="number" id="monto" name="monto"
+                   min="1000" max="2000000" step="500"
+                   placeholder="Ingresa el monto en pesos" required
+                   oninput="syncMontos(this.value)">
+            <span class="hint">Mínimo: $1.000 &middot; Máximo: $2.000.000</span>
+          </div>
+
+          <!-- Montos rápidos -->
+          <div class="montos-rapidos">
+            <button type="button" class="monto-btn" onclick="setMonto(5000,this)">$5.000</button>
+            <button type="button" class="monto-btn" onclick="setMonto(10000,this)">$10.000</button>
+            <button type="button" class="monto-btn" onclick="setMonto(20000,this)">$20.000</button>
+            <button type="button" class="monto-btn" onclick="setMonto(50000,this)">$50.000</button>
+          </div>
+
+          <!-- Upload comprobante -->
+          <div class="field" style="margin-bottom:1rem;">
+            <label>Comprobante de pago <span style="color:var(--red); font-weight:700;">*</span></label>
+            <div class="upload-zone" id="uploadZone">
+              <input type="file" name="comprobante" id="comprobante" accept="image/*,.pdf"
+                     onchange="previewFile(this)" required>
+              <i class="bi bi-cloud-arrow-up upload-icon"></i>
+              <div class="upload-text">Arrastra aquí o haz clic para seleccionar</div>
+              <div class="upload-hint">JPG, PNG o PDF &middot; Máx. 5 MB &middot; Requerido para procesar</div>
+              <img id="preview-img" src="" alt="Preview">
+            </div>
+          </div>
+
+          <div class="field" style="margin-bottom:1rem;">
+            <label for="nota">Nota (opcional)</label>
+            <input type="text" id="nota" name="nota"
+                   placeholder="Ej: Semana del 7 al 11 de abril" maxlength="300">
+          </div>
+
+          <!-- Preview saldo nuevo -->
+          <div id="saldo-preview" style="display:none; background:var(--leaf-pale); border:1px solid var(--leaf-tint); border-radius:9px; padding:.9rem 1rem; margin-bottom:1rem;">
+            <div style="font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--leaf-dark); margin-bottom:.5rem;">Vista previa del saldo</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:.8rem; padding:.3rem 0; border-bottom:1px solid var(--leaf-tint);">
+              <span style="color:var(--stone);">Saldo actual</span>
+              <span style="font-weight:700;">${{ docente.saldo|floatformat:0 }}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:.8rem; padding:.3rem 0; border-bottom:1px solid var(--leaf-tint);">
+              <span style="color:var(--stone);">+ Recarga solicitada</span>
+              <span style="font-weight:700; color:var(--leaf);" id="monto-preview">$0</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:.4rem 0 .1rem; font-size:.85rem;">
+              <span style="font-weight:700; color:var(--leaf-dark);">Saldo estimado</span>
+              <span style="font-family:var(--serif); font-size:1.15rem; color:var(--leaf);" id="saldo-nuevo">$0</span>
+            </div>
+          </div>
+
+          <!-- Aviso -->
+          <div style="background:var(--amber-pale); border:1px solid var(--amber-tint); border-radius:9px; padding:.8rem 1rem; margin-bottom:1.1rem; font-size:.79rem; color:var(--amber); display:flex; gap:.6rem; align-items:flex-start;">
+            <i class="bi bi-info-circle-fill" style="flex-shrink:0; margin-top:.1rem; font-size:.95rem;"></i>
+            <span>El saldo <strong>no se acredita de inmediato</strong>. Un administrador revisará tu comprobante. <strong>El comprobante es obligatorio</strong>.</span>
+          </div>
+
+          <div class="form-footer" style="margin-top:0; padding-top:.75rem;">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-send"></i> Enviar solicitud
+            </button>
+            <a href="{% url 'app_docente:dashboard' %}" class="btn btn-ghost">Cancelar</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Historial -->
+  <div class="card card-flat" style="overflow:hidden;">
+    <div class="card-head">
+      <span class="card-title" style="font-size:.9rem;">Historial de recargas</span>
+    </div>
+    {% if historial %}
+      {% for recarga in historial %}
+      <div class="hist-row">
+        <div>
+          <div class="hist-monto">+${{ recarga.monto|floatformat:0 }}</div>
+          <div class="hist-fecha">{{ recarga.fecha|date:"d M Y, H:i" }}</div>
+          {% if recarga.nota %}<div class="hist-nota">"{{ recarga.nota }}"</div>{% endif %}
+          {% if recarga.nota_admin %}
+          <div class="hist-nota" style="color:var(--red);">Admin: {{ recarga.nota_admin }}</div>
+          {% endif %}
+        </div>
+        <span class="badge badge-{{ recarga.estado }}">{{ recarga.get_estado_display }}</span>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">
+        <i class="bi bi-clock-history es-icon"></i>
+        <p>Sin recargas previas</p>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const saldoActual = {{ docente.saldo }};
+
+  function formatPesos(n) {
+    return '$' + Math.floor(n).toLocaleString('es-CO').replace(/,/g, '.');
+  }
+
+  function setMonto(val, btn) {
+    document.getElementById('monto').value = val;
+    syncMontos(val);
+    document.querySelectorAll('.monto-btn').forEach(b => b.classList.remove('selected'));
+    if (btn) btn.classList.add('selected');
+  }
+
+  function syncMontos(val) {
+    const n = parseFloat(val) || 0;
+    if (n > 0) {
+      document.getElementById('saldo-preview').style.display = 'block';
+      document.getElementById('monto-preview').textContent = formatPesos(n);
+      document.getElementById('saldo-nuevo').textContent   = formatPesos(saldoActual + n);
+    } else {
+      document.getElementById('saldo-preview').style.display = 'none';
+    }
+    // Deseleccionar montos rápidos si no coinciden
+    document.querySelectorAll('.monto-btn').forEach(b => {
+      if (parseFloat(b.textContent.replace(/\D/g,'')) !== n) b.classList.remove('selected');
+    });
+  }
+
+  function previewFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    document.querySelector('.upload-text').textContent = file.name;
+    document.querySelector('.upload-icon').style.color = 'var(--leaf)';
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const img = document.getElementById('preview-img');
+        img.src = e.target.result;
+        img.style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  const zone = document.getElementById('uploadZone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      const input = document.getElementById('comprobante');
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+      previewFile(input);
+    }
+  });
+</script>
+{% endblock %}

@@ -69,13 +69,13 @@
             <label for="first_name">Nombre *</label>
             <input type="text" id="first_name" name="first_name"
                    value="{{ form_data.first_name|default:'' }}"
-                   placeholder="Ej: Santiago" required>
+                   placeholder="Ej: Santiago" required oninput="previewUsername()">
           </div>
           <div class="field">
             <label for="last_name">Apellido *</label>
             <input type="text" id="last_name" name="last_name"
                    value="{{ form_data.last_name|default:'' }}"
-                   placeholder="Ej: Gómez" required>
+                   placeholder="Ej: Gómez" required oninput="previewUsername()">
           </div>
         </div>
 
@@ -100,11 +100,10 @@
         <div class="section-title">Credenciales de acceso</div>
         <div class="form-grid" style="margin-bottom:1.2rem;">
           <div class="field full">
-            <label for="username">Nombre de usuario *</label>
-            <input type="text" id="username" name="username"
-                   value="{{ form_data.username|default:'' }}"
-                   placeholder="Ej: santiago.gomez" required autocomplete="off">
-            <span class="hint">Con este usuario el estudiante iniciará sesión</span>
+            <label>Usuario generado automáticamente</label>
+            <div id="username-preview" style="font-size:0.82rem;color:var(--stone);padding:0.4rem 0;min-height:1.4em;">
+              Se generará a partir del nombre y apellido
+            </div>
           </div>
           <div class="field">
             <label for="password1">Contraseña *</label>
@@ -153,4 +152,27 @@
   </div>
 
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function normalizar(s) {
+    return s.normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
+  }
+
+  function previewUsername() {
+    const fn = normalizar(document.getElementById('first_name').value.trim());
+    const ln = normalizar(document.getElementById('last_name').value.trim());
+    const preview = document.getElementById('username-preview');
+    if (fn || ln) {
+      const base = [fn, ln].filter(Boolean).join('.');
+      preview.innerHTML = `<strong style="color:var(--leaf-dark);">${base}</strong> <span style="color:var(--ash);">(puede añadirse un número si ya existe)</span>`;
+    } else {
+      preview.textContent = 'Se generará a partir del nombre y apellido';
+    }
+  }
+</script>
 {% endblock %}

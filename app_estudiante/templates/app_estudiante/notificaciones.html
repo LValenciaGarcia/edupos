@@ -1,0 +1,42 @@
+{% extends 'app_estudiante/base_estudiante.html' %}
+{% block title %}Notificaciones{% endblock %}
+{% block page_title %}Notificaciones{% endblock %}
+{% block nav_notificaciones %}active{% endblock %}
+
+{% block content %}
+<div style="max-width:42rem;margin:0 auto">
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Notificaciones de tu acudiente</span>
+      <span style="font-size:0.75rem;color:var(--ash)">{{ notificaciones|length }} mensaje{{ notificaciones|length|pluralize }}</span>
+    </div>
+    <div class="card-body" style="padding:0">
+      {% if notificaciones %}
+      <div style="display:flex;flex-direction:column">
+        {% for n in notificaciones %}
+        <div style="padding:1rem 1.5rem;border-bottom:1px solid var(--mist);display:flex;gap:1rem;align-items:flex-start">
+          <div style="width:2rem;height:2rem;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:0.9rem;
+            {% if 'aprobada' in n.tipo %}background:var(--leaf-pale);color:var(--leaf)
+            {% elif 'rechazada' in n.tipo or 'bloqueada' in n.tipo %}background:var(--red-pale);color:var(--red)
+            {% elif 'limite' in n.tipo %}background:var(--amber-pale);color:var(--amber)
+            {% else %}background:var(--sky-pale);color:var(--sky){% endif %}">
+            <i class="bi bi-{% if 'aprobada' in n.tipo %}check-circle{% elif 'rechazada' in n.tipo %}x-circle{% elif 'limite' in n.tipo %}speedometer2{% else %}bell{% endif %}"></i>
+          </div>
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:0.86rem;margin-bottom:0.2rem">{{ n.titulo }}</div>
+            <div style="font-size:0.79rem;color:var(--stone)">{{ n.mensaje }}</div>
+            <div style="font-size:0.7rem;color:var(--ash);margin-top:0.35rem">{{ n.fecha|date:"d/m/Y H:i" }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state">
+        <i class="bi bi-bell es-icon"></i>
+        <p>No hay notificaciones por el momento.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

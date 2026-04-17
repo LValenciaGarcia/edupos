@@ -1,0 +1,95 @@
+{% extends 'app_docente/base_docente.html' %}
+{% block title %}Historial{% endblock %}
+{% block topbar_title %}Historial de Pedidos{% endblock %}
+
+{% block content %}
+
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.25rem; flex-wrap:wrap; gap:.75rem;">
+  <h1 class="page-title" style="margin-bottom:0;">Historial</h1>
+  <a href="{% url 'app_docente:exportar_csv' %}" class="btn btn-outline btn-sm">
+    <i class="bi bi-download"></i> Exportar CSV
+  </a>
+</div>
+
+<!-- Filtros -->
+<div class="filter-bar">
+  <form method="get" style="display:contents;">
+    <div style="display:flex; align-items:center; gap:.35rem;">
+      <i class="bi bi-funnel" style="color:var(--stone); font-size:.85rem;"></i>
+      <span style="font-size:.72rem; font-weight:700; color:var(--stone); text-transform:uppercase; letter-spacing:.06em;">Filtrar</span>
+    </div>
+    <select name="estado" class="form-select" style="max-width:190px; padding:.38rem .7rem; font-size:.78rem;" onchange="this.form.submit()">
+      <option value="">Todos los estados</option>
+      <option value="pendiente"  {% if estado_f == 'pendiente'  %}selected{% endif %}>Pendiente</option>
+      <option value="preparando" {% if estado_f == 'preparando' %}selected{% endif %}>Preparando</option>
+      <option value="listo"      {% if estado_f == 'listo'      %}selected{% endif %}>Listo</option>
+      <option value="entregado"  {% if estado_f == 'entregado'  %}selected{% endif %}>Entregado</option>
+      <option value="cancelado"  {% if estado_f == 'cancelado'  %}selected{% endif %}>Cancelado</option>
+    </select>
+    <input type="date" name="fecha" value="{{ fecha_f }}" class="form-input" style="max-width:165px; padding:.38rem .7rem; font-size:.78rem;" onchange="this.form.submit()">
+    {% if estado_f or fecha_f %}
+    <a href="{% url 'app_docente:historial' %}" class="btn btn-ghost btn-sm" style="margin-left:auto;">
+      <i class="bi bi-x"></i> Limpiar
+    </a>
+    {% endif %}
+  </form>
+</div>
+
+<!-- Tabla -->
+<div class="card card-flat" style="overflow:hidden;">
+  {% if pedidos %}
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Ticket</th>
+        <th>Fecha</th>
+        <th>Productos</th>
+        <th>Pago</th>
+        <th>Total</th>
+        <th>Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in pedidos %}
+      <tr>
+        <td>
+          <span style="font-weight:800; font-family:monospace; font-size:.8rem; background:var(--cream); padding:.2rem .5rem; border-radius:5px; border:1px solid var(--mist);">
+            {{ p.ticket }}
+          </span>
+        </td>
+        <td style="color:var(--stone); font-size:.78rem; white-space:nowrap;">{{ p.fecha_pedido|date:"d M Y" }}<br><span style="font-size:.67rem; color:var(--ash);">{{ p.fecha_pedido|date:"H:i" }}</span></td>
+        <td>
+          <div style="font-size:.75rem; color:var(--ink); max-width:220px;">
+            {% for d in p.detalles.all %}
+            <span style="display:inline-block; background:var(--cream); border:1px solid var(--mist); border-radius:4px; padding:.08rem .35rem; margin:.05rem; font-size:.68rem; font-weight:600;">
+              {{ d.cantidad }}× {{ d.producto.nombre }}
+            </span>
+            {% endfor %}
+          </div>
+        </td>
+        <td><span class="badge badge-{{ p.tipo_pago }}">{{ p.get_tipo_pago_display }}</span></td>
+        <td style="font-weight:800; color:var(--leaf); font-family:var(--serif); font-size:.95rem;">${{ p.total|floatformat:0 }}</td>
+        <td><span class="badge badge-{{ p.estado }}">{{ p.get_estado_display }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-clock-history es-icon"></i>
+    <h3>Sin pedidos</h3>
+    <p>
+      {% if estado_f or fecha_f %}
+        No hay pedidos con esos filtros. <a href="{% url 'app_docente:historial' %}" style="color:var(--leaf);">Ver todos</a>
+      {% else %}
+        Aún no has realizado ningún pedido.
+      {% endif %}
+    </p>
+    {% if not estado_f and not fecha_f %}
+    <a href="{% url 'app_docente:menu' %}" class="btn btn-primary btn-sm" style="margin-top:.75rem;"><i class="bi bi-shop"></i> Ir al menú</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

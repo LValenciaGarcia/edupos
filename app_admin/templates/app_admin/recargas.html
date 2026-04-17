@@ -1,0 +1,144 @@
+{% extends 'app_admin/base_admin.html' %}
+{% block title %}Recargas de Saldo{% endblock %}
+{% block page_title %}Recargas de Saldo{% endblock %}
+{% block nav_recargas %}active{% endblock %}
+
+{% block content %}
+<style>
+  .filtros-bar { display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+  .filtros-bar a {
+    padding: 0.38rem 0.9rem; border: 1px solid var(--fog); border-radius: 99px;
+    font-size: 0.77rem; font-weight: 600; color: var(--stone); text-decoration: none;
+    background: var(--ivory); transition: all 0.14s;
+  }
+  .filtros-bar a:hover, .filtros-bar a.active { border-color: var(--leaf); color: var(--leaf-dark); background: var(--leaf-pale); }
+
+  .recarga-row {
+    display: flex; align-items: flex-start; gap: 1rem;
+    padding: 1.1rem 1.4rem; border-bottom: 1px solid var(--mist); transition: background 0.12s;
+  }
+  .recarga-row:last-child { border-bottom: none; }
+  .recarga-row:hover { background: var(--cream); }
+  .recarga-monto { font-family: var(--serif); font-size: 1.4rem; color: var(--leaf); line-height: 1; flex-shrink: 0; width: 6rem; }
+  .recarga-info { flex: 1; min-width: 0; }
+  .recarga-nombre { font-size: 0.86rem; font-weight: 600; }
+  .recarga-meta { font-size: 0.73rem; color: var(--stone); margin-top: 0.1rem; }
+  .recarga-nota { font-size: 0.73rem; color: var(--ash); font-style: italic; margin-top: 0.1rem; }
+  .recarga-comprobante { flex-shrink: 0; }
+  .recarga-actions { flex-shrink: 0; display: flex; flex-direction: column; gap: 0.4rem; min-width: 9rem; }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+    display: none; align-items: center; justify-content: center; z-index: 500;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-box {
+    background: var(--ivory); border-radius: 12px; max-width: 30rem; width: 100%;
+    margin: 1rem; padding: 1.75rem; box-shadow: 0 24px 80px rgba(0,0,0,0.35);
+  }
+  .modal-title { font-family: var(--serif); font-size: 1.2rem; font-weight: 500; margin-bottom: 0.3rem; }
+  .modal-sub { font-size: 0.8rem; color: var(--stone); margin-bottom: 1.2rem; }
+</style>
+
+<!-- Filtros -->
+<div class="filtros-bar">
+  <a href="?estado=pendiente" class="{% if estado_activo == 'pendiente' %}active{% endif %}">
+    Pendientes {% if n_pendientes %}<span style="background:var(--red);color:#fff;border-radius:99px;padding:0 6px;font-size:0.65rem;">{{ n_pendientes }}</span>{% endif %}
+  </a>
+  <a href="?estado=aprobada"  class="{% if estado_activo == 'aprobada' %}active{% endif %}">Aprobadas</a>
+  <a href="?estado=rechazada" class="{% if estado_activo == 'rechazada' %}active{% endif %}">Rechazadas</a>
+  <a href="?estado=" class="{% if not estado_activo %}active{% endif %}">Todas</a>
+</div>
+
+<div class="card">
+  {% if recargas %}
+    {% for r in recargas %}
+    <div class="recarga-row">
+      <div class="recarga-monto">+${{ r.monto|floatformat:0 }}</div>
+      <div class="recarga-info">
+        <div class="recarga-nombre">{{ r.estudiante.perfil.user.get_full_name }} — {{ r.estudiante.codigo }}</div>
+        <div class="recarga-meta">
+          Padre: {{ r.padre.perfil.user.get_full_name|default:"–" }} &nbsp;·&nbsp; {{ r.fecha|date:"d M Y, H:i" }}
+        </div>
+        {% if r.nota %}<div class="recarga-nota">Nota: {{ r.nota }}</div>{% endif %}
+        {% if r.nota_admin %}<div class="recarga-nota" style="color:var(--red);">Resp. admin: {{ r.nota_admin }}</div>{% endif %}
+        {% if r.fecha_resolucion %}
+        <div class="recarga-meta" style="margin-top:0.15rem;">Resuelto: {{ r.fecha_resolucion|date:"d M Y, H:i" }}</div>
+        {% endif %}
+      </div>
+
+      <!-- Comprobante -->
+      <div class="recarga-comprobante">
+        {% if r.comprobante %}
+        <a href="{{ r.comprobante.url }}" target="_blank" class="btn btn-sky btn-xs">
+          <i class="bi bi-file-image"></i> Ver comprobante
+        </a>
+        {% else %}
+        <span style="font-size:0.72rem;color:var(--ash);">Sin comprobante</span>
+        {% endif %}
+      </div>
+
+      <!-- Estado / Acciones -->
+      <div class="recarga-actions">
+        <span class="badge badge-{{ r.estado }}">{{ r.get_estado_display }}</span>
+        {% if r.estado == 'pendiente' %}
+        <button class="btn btn-primary btn-xs" onclick="openModal('aprobar', {{ r.pk }}, '{{ r.estudiante.perfil.user.get_full_name }}', {{ r.monto }})">
+          <i class="bi bi-check-circle"></i> Aprobar
+        </button>
+        <button class="btn btn-danger btn-xs" onclick="openModal('rechazar', {{ r.pk }}, '{{ r.estudiante.perfil.user.get_full_name }}', {{ r.monto }})">
+          <i class="bi bi-x-circle"></i> Rechazar
+        </button>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state" style="padding:3.5rem 1rem;">
+      <i class="bi bi-cash-coin es-icon" style="font-size:2rem;"></i>
+      <p>No hay recargas {{ estado_activo }}s.</p>
+    </div>
+  {% endif %}
+</div>
+
+<!-- Modal Aprobar / Rechazar -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal-box">
+    <div class="modal-title" id="modalTitle">Confirmar acción</div>
+    <div class="modal-sub" id="modalSub"></div>
+    <form method="post" id="modalForm">
+      {% csrf_token %}
+      <input type="hidden" name="accion" id="modalAccion">
+      <div class="field" style="margin-bottom:1.1rem;">
+        <label for="nota_admin_input">Nota para el padre (opcional)</label>
+        <input type="text" id="nota_admin_input" name="nota_admin" placeholder="Ej: Pago no corresponde al monto…">
+      </div>
+      <div style="display:flex;gap:0.65rem;">
+        <button type="submit" class="btn btn-primary" id="modalSubmitBtn">Confirmar</button>
+        <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function openModal(accion, pk, nombre, monto) {
+    document.getElementById('modalAccion').value = accion;
+    document.getElementById('modalForm').action = `/admin-panel/recargas/${pk}/resolver/`;
+    const titulo = accion === 'aprobar' ? 'Aprobar recarga' : 'Rechazar recarga';
+    const color  = accion === 'aprobar' ? 'var(--leaf-dark)' : 'var(--red)';
+    document.getElementById('modalTitle').textContent = titulo;
+    document.getElementById('modalTitle').style.color = color;
+    document.getElementById('modalSub').textContent = `${nombre} · $${Math.floor(monto).toLocaleString('es-CO').replace(/,/g,'.')}`;
+    const btn = document.getElementById('modalSubmitBtn');
+    btn.textContent = titulo;
+    btn.style.background = accion === 'aprobar' ? 'var(--leaf)' : 'var(--red)';
+    document.getElementById('modalOverlay').classList.add('open');
+  }
+
+  function closeModal(e) {
+    if (!e || e.target === document.getElementById('modalOverlay')) {
+      document.getElementById('modalOverlay').classList.remove('open');
+    }
+  }
+</script>
+{% endblock %}

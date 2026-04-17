@@ -56,9 +56,9 @@
       <!-- Precio unitario -->
       <div class="field">
         <label>Precio por unidad (COP) *</label>
-        <input type="number" name="precio_unitario"
+        <input type="text" name="precio_unitario"
                value="{{ ingrediente.precio_unitario|default:'' }}"
-               min="0" step="0.0001" required placeholder="Ej: 3.5 (por gramo)">
+               required placeholder="Ej: 3.5" class="fmt-miles" inputmode="decimal">
         <span class="hint">Precio de 1 unidad de medida. Ej: $3,50 por gramo.</span>
       </div>
 

@@ -1,0 +1,233 @@
+{% extends 'app_estudiante/base_estudiante.html' %}
+{% load filtros %}
+{% block title %}Mis Pedidos{% endblock %}
+{% block page_title %}Mis Pedidos{% endblock %}
+{% block nav_historial %}active{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'app_estudiante:menu' %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-cart-plus"></i> Nuevo pedido
+  </a>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── Filtros ─────────────────────────────────────────────────────────────── */
+  .filter-bar {
+    display: flex; align-items: center; gap: 0.5rem;
+    flex-wrap: wrap; margin-bottom: 1.2rem;
+  }
+  .filter-bar select, .filter-bar input[type="date"] {
+    padding: 0.4rem 0.65rem; border: 1px solid var(--fog); border-radius: 7px;
+    background: var(--ivory); font-family: var(--sans); font-size: 0.8rem;
+    color: var(--ink); outline: none; transition: border-color 0.15s;
+  }
+  .filter-bar select:focus, .filter-bar input[type="date"]:focus {
+    border-color: var(--leaf); box-shadow: 0 0 0 3px rgba(34,197,94,0.1);
+  }
+
+  /* ── Tabla pedidos ───────────────────────────────────────────────────────── */
+  .pedido-row { cursor: pointer; }
+  .pedido-row:hover td { background: var(--cream); }
+
+  /* ── Detalle expandible ──────────────────────────────────────────────────── */
+  .detalles-row { display: none; }
+  .detalles-row.open { display: table-row; }
+  .detalles-inner {
+    padding: 0.85rem 1.4rem 1rem 2.8rem;
+    background: var(--cream);
+    border-top: 1px solid var(--mist);
+  }
+  .detalle-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.35rem 0; border-bottom: 1px solid var(--mist);
+    font-size: 0.8rem;
+  }
+  .detalle-item:last-child { border-bottom: none; }
+
+  /* ── Estado badges ───────────────────────────────────────────────────────── */
+  .est-pill {
+    display: inline-flex; align-items: center; gap: 0.28rem;
+    padding: 0.2rem 0.55rem; border-radius: 99px;
+    font-size: 0.67rem; font-weight: 700; letter-spacing: 0.03em;
+  }
+  .est-pendiente  { background: var(--amber-pale); color: var(--amber); }
+  .est-preparando { background: var(--sky-pale);   color: var(--sky); }
+  .est-listo      { background: var(--leaf-pale);  color: var(--leaf-dark); }
+  .est-entregado  { background: var(--mist);       color: var(--stone); }
+  .est-cancelado  { background: var(--red-pale);   color: var(--red); }
+
+  /* ── KPIs ────────────────────────────────────────────────────────────────── */
+  .hist-kpi {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 1rem; margin-bottom: 1.4rem;
+  }
+
+  /* ── Empty state ─────────────────────────────────────────────────────────── */
+  .hist-empty {
+    text-align: center; padding: 4rem 1rem; color: var(--ash);
+  }
+  .hist-empty i { font-size: 2.5rem; display: block; margin-bottom: 0.75rem; opacity: 0.35; }
+  .hist-empty p { font-size: 0.88rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- KPIs -->
+<div class="hist-kpi">
+  <div class="stat-card green">
+    <div class="stat-label">Total gastado</div>
+    <div class="stat-val">${{ gasto_total|miles }}</div>
+    <div class="stat-sub">pedidos entregados</div>
+  </div>
+  <div class="stat-card blue">
+    <div class="stat-label">Pedidos</div>
+    <div class="stat-val">{{ n_pedidos }}</div>
+    <div class="stat-sub">{% if estado_activo or fecha_desde or fecha_hasta %}con filtro{% else %}en total{% endif %}</div>
+  </div>
+</div>
+
+<!-- Filtros -->
+<div class="card" style="margin-bottom:1.2rem;">
+  <div class="card-body" style="padding:1rem 1.4rem;">
+    <form method="get" class="filter-bar">
+      <select name="estado" onchange="this.form.submit()">
+        <option value="">Todos los estados</option>
+        {% for val, label in ESTADO_CHOICES %}
+        <option value="{{ val }}" {% if estado_activo == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <input type="date" name="desde" value="{{ fecha_desde }}" onchange="this.form.submit()" title="Desde">
+      <input type="date" name="hasta" value="{{ fecha_hasta }}" onchange="this.form.submit()" title="Hasta">
+      {% if estado_activo or fecha_desde or fecha_hasta %}
+      <a href="{% url 'app_estudiante:historial' %}" class="btn btn-ghost btn-sm">
+        <i class="bi bi-x"></i> Limpiar
+      </a>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+<!-- Tabla -->
+<div class="card">
+  <div class="card-head">
+    <span class="card-title" style="display:flex;align-items:center;gap:0.5rem;">
+      <i class="bi bi-receipt" style="color:var(--leaf);font-size:1rem;"></i>
+      Pedidos
+      <span style="font-size:0.72rem;font-weight:600;color:var(--ash);background:var(--cream);padding:0.1rem 0.5rem;border-radius:99px;">{{ n_pedidos }}</span>
+    </span>
+  </div>
+
+  {% if pedidos %}
+  <div style="overflow-x:auto;">
+  <table class="tbl">
+    <thead>
+      <tr>
+        <th>Ticket</th>
+        <th>Fecha</th>
+        <th>Estado</th>
+        <th>Productos</th>
+        <th style="text-align:right;padding-right:1.4rem;">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for p in pedidos %}
+    <tr class="pedido-row" onclick="toggleDetalle({{ p.pk }})">
+      <td>
+        <span style="font-family:var(--serif);font-size:0.88rem;font-weight:500;">{{ p.ticket }}</span>
+        {% if p.nota %}
+        <div style="font-size:0.66rem;color:var(--ash);margin-top:0.1rem;">
+          <i class="bi bi-chat-left-text" style="font-size:0.6rem;"></i> {{ p.nota|truncatechars:40 }}
+        </div>
+        {% endif %}
+      </td>
+      <td style="font-size:0.8rem;color:var(--stone);white-space:nowrap;">
+        {{ p.fecha_pedido|date:"d/m/Y" }}<br>
+        <span style="font-size:0.68rem;color:var(--ash);">{{ p.fecha_pedido|date:"H:i" }}</span>
+      </td>
+      <td>
+        <span class="est-pill est-{{ p.estado }}">
+          <i class="bi bi-{% if p.estado == 'pendiente' %}hourglass-split{% elif p.estado == 'preparando' %}fire{% elif p.estado == 'listo' %}check-lg{% elif p.estado == 'entregado' %}check-circle-fill{% else %}x-circle{% endif %}"></i>
+          {{ p.get_estado_display }}
+        </span>
+      </td>
+      <td style="font-size:0.8rem;color:var(--stone);">
+        {{ p.detalles.count }} producto{{ p.detalles.count|pluralize }}
+        <i class="bi bi-chevron-down" style="font-size:0.65rem;color:var(--ash);margin-left:0.3rem;" id="chev-{{ p.pk }}"></i>
+      </td>
+      <td style="text-align:right;padding-right:1.4rem;">
+        <span style="font-family:var(--serif);font-size:0.98rem;font-weight:500;">${{ p.total|miles }}</span>
+      </td>
+    </tr>
+    <!-- Fila de detalle -->
+    <tr class="detalles-row" id="det-{{ p.pk }}">
+      <td colspan="5" style="padding:0;border-top:none;">
+        <div class="detalles-inner">
+          <div style="font-size:0.62rem;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--ash);margin-bottom:0.65rem;">
+            Detalle del pedido
+          </div>
+          {% for d in p.detalles.all %}
+          <div class="detalle-item">
+            <span style="color:var(--ink);font-weight:500;">{{ d.producto.nombre }}</span>
+            <span style="color:var(--ash);">{{ d.cantidad }} &times; ${{ d.precio_unitario|miles }}</span>
+          </div>
+          {% endfor %}
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.65rem;padding-top:0.5rem;border-top:1px solid var(--mist);">
+            <div>
+              {% if p.estado == 'pendiente' %}
+              <form method="post" action="{% url 'app_estudiante:cancelar_pedido' p.pk %}"
+                    onsubmit="return confirm('¿Cancelar el pedido {{ p.ticket }}? Se devolvera el saldo a tu cuenta.')">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger btn-xs">
+                  <i class="bi bi-x-circle"></i> Cancelar pedido
+                </button>
+              </form>
+              {% elif p.nota %}
+              <span style="font-size:0.72rem;color:var(--ash);">
+                <i class="bi bi-chat-left-text"></i> {{ p.nota }}
+              </span>
+              {% endif %}
+            </div>
+            <span style="font-family:var(--serif);font-weight:500;font-size:0.95rem;color:var(--leaf);">Total: ${{ p.total|miles }}</span>
+          </div>
+        </div>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <div class="hist-empty">
+    <i class="bi bi-receipt"></i>
+    <p>
+      {% if estado_activo or fecha_desde or fecha_hasta %}
+        No hay pedidos con esos filtros.
+      {% else %}
+        No tienes pedidos todavia.
+      {% endif %}
+    </p>
+    <a href="{% url 'app_estudiante:menu' %}" class="btn btn-primary btn-sm" style="margin-top:0.75rem;">
+      <i class="bi bi-cart-plus"></i> Hacer mi primer pedido
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleDetalle(pk) {
+  const row  = document.getElementById('det-' + pk);
+  const chev = document.getElementById('chev-' + pk);
+  if (!row) return;
+  const open = row.classList.toggle('open');
+  if (chev) {
+    chev.style.transform = open ? 'rotate(180deg)' : '';
+    chev.style.transition = 'transform 0.18s';
+  }
+}
+</script>
+{% endblock %}

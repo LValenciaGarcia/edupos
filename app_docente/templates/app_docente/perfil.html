@@ -1,0 +1,159 @@
+{% extends 'app_docente/base_docente.html' %}
+{% block title %}Mi Perfil{% endblock %}
+{% block topbar_title %}Mi Perfil{% endblock %}
+
+{% block content %}
+
+<div style="display:grid; grid-template-columns:1fr 300px; gap:1.5rem; align-items:start;">
+
+  <!-- Formulario principal -->
+  <div>
+    <!-- Encabezado de perfil inline -->
+    <div style="display:flex; align-items:center; gap:1.25rem; background:linear-gradient(130deg, var(--leaf-dark) 0%, var(--leaf) 60%, #22c55e 100%); border-radius:var(--radius-lg); padding:1.5rem 1.75rem; margin-bottom:1.25rem; position:relative; overflow:hidden;">
+      <div style="position:absolute; inset:0; background:url('data:image/svg+xml,%3Csvg width=\'40\' height=\'40\' viewBox=\'0 0 40 40\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.04\'%3E%3Cpath d=\'M20 20c0-5.5-4.5-10-10-10S0 14.5 0 20s4.5 10 10 10 10-4.5 10-10zm10 0c0-5.5-4.5-10-10-10s-10 4.5-10 10 4.5 10 10 10 10-4.5 10-10z\'/%3E%3C/g%3E%3C/svg%3E');"></div>
+      <div style="width:3.75rem; height:3.75rem; border-radius:50%; background:rgba(255,255,255,.2); border:2.5px solid rgba(255,255,255,.4); display:flex; align-items:center; justify-content:center; font-family:var(--serif); font-size:1.4rem; color:#fff; flex-shrink:0; position:relative; z-index:1;">
+        {{ user.first_name|first|upper }}{{ user.last_name|first|upper }}
+      </div>
+      <div style="position:relative; z-index:1;">
+        <div style="font-family:var(--serif); font-size:1.35rem; font-style:italic; color:#fff; line-height:1.1;">{{ user.get_full_name }}</div>
+        <div style="font-size:.72rem; color:rgba(255,255,255,.72); margin-top:.2rem;">@{{ user.username }} &middot; Docente</div>
+        {% if docente.materia %}
+        <div style="font-size:.75rem; color:rgba(255,255,255,.9); font-weight:600; margin-top:.2rem;"><i class="bi bi-mortarboard"></i> {{ docente.materia }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Formulario datos -->
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Datos personales</span>
+      </div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          <div class="form-grid">
+            <div class="field">
+              <label>Nombre</label>
+              <input type="text" name="first_name" value="{{ user.first_name }}" required placeholder="Tu nombre">
+            </div>
+            <div class="field">
+              <label>Apellido</label>
+              <input type="text" name="last_name" value="{{ user.last_name }}" required placeholder="Tu apellido">
+            </div>
+            <div class="field">
+              <label>Correo electrónico</label>
+              <input type="email" name="email" value="{{ user.email }}" placeholder="correo@ejemplo.com">
+            </div>
+            <div class="field">
+              <label>Teléfono</label>
+              <input type="text" name="telefono" value="{{ docente.perfil.telefono }}" placeholder="3001234567">
+            </div>
+            <div class="field">
+              <label>N° Documento (CC)</label>
+              <input type="text" name="documento" value="{{ docente.documento }}" placeholder="Número de cédula">
+            </div>
+            <div class="field">
+              <label>Materia / Área</label>
+              <input type="text" name="materia" value="{{ docente.materia }}" placeholder="Ej: Matemáticas">
+            </div>
+          </div>
+
+          <div style="border-top:1px solid var(--mist); padding-top:1.1rem; margin-top:1rem;">
+            <div style="font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--stone); margin-bottom:.75rem; display:flex; align-items:center; gap:.4rem;">
+              <i class="bi bi-shield-lock" style="color:var(--leaf);"></i> Cambiar contraseña (opcional)
+            </div>
+            <div class="form-grid">
+              <div class="field">
+                <label>Nueva contraseña</label>
+                <input type="password" name="password1" placeholder="8+ caracteres">
+              </div>
+              <div class="field">
+                <label>Confirmar contraseña</label>
+                <input type="password" name="password2" placeholder="Repite la contraseña">
+              </div>
+            </div>
+          </div>
+
+          <div class="form-footer">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-lg"></i> Guardar cambios
+            </button>
+            <a href="{% url 'app_docente:dashboard' %}" class="btn btn-ghost">Cancelar</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel lateral derecho -->
+  <div style="display:flex; flex-direction:column; gap:1rem;">
+
+    <!-- Estado financiero -->
+    <div class="card">
+      <div class="card-head" style="padding:.85rem 1.1rem;">
+        <span class="section-title" style="margin-bottom:0;">Estado financiero</span>
+      </div>
+      <div style="padding:.75rem 1.1rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:.5rem 0; border-bottom:1px solid var(--mist);">
+          <span style="font-size:.78rem; color:var(--stone);">Saldo actual</span>
+          <span style="font-family:var(--serif); font-size:1.1rem; color:var(--leaf); font-weight:400;">${{ docente.saldo|floatformat:0 }}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:.5rem 0; border-bottom:1px solid var(--mist);">
+          <span style="font-size:.78rem; color:var(--stone);">Límite fiado</span>
+          <span style="font-weight:700; font-size:.88rem;">${{ docente.limite_fiado|floatformat:0 }}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:.5rem 0; border-bottom:1px solid var(--mist);">
+          <span style="font-size:.78rem; color:var(--stone);">Deuda fiado</span>
+          <span style="font-weight:700; font-size:.88rem; color:{% if docente.deuda_fiado > 0 %}var(--amber){% else %}var(--leaf){% endif %};">
+            ${{ docente.deuda_fiado|floatformat:0 }}
+          </span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:.5rem 0 .35rem;">
+          <span style="font-size:.78rem; color:var(--stone);">Crédito disponible</span>
+          <span style="font-weight:700; font-size:.88rem; color:var(--leaf);">${{ docente.credito_disponible|floatformat:0 }}</span>
+        </div>
+        <!-- Progress bar uso crédito -->
+        <div style="margin-top:.5rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.3rem;">
+            <span style="font-size:.63rem; color:var(--ash); font-weight:600; text-transform:uppercase; letter-spacing:.06em;">Uso del crédito</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill green" id="fiado-bar"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Acciones rápidas -->
+    <div class="card">
+      <div class="card-head" style="padding:.85rem 1.1rem;">
+        <span class="section-title" style="margin-bottom:0;">Acciones rápidas</span>
+      </div>
+      <div style="padding:.6rem .75rem; display:flex; flex-direction:column; gap:.35rem;">
+        <a href="{% url 'app_docente:recargar_saldo' %}" class="btn btn-primary btn-full btn-sm"><i class="bi bi-cash-coin"></i> Recargar saldo</a>
+        <a href="{% url 'app_docente:historial' %}" class="btn btn-outline btn-full btn-sm"><i class="bi bi-clock-history"></i> Ver historial</a>
+        <a href="{% url 'app_docente:estadisticas' %}" class="btn btn-outline btn-full btn-sm"><i class="bi bi-bar-chart-line"></i> Estadísticas</a>
+        <div style="height:1px; background:var(--mist); margin:.15rem 0;"></div>
+        <a href="{% url 'authentication:logout' %}" class="btn btn-danger btn-full btn-sm">
+          <i class="bi bi-box-arrow-left"></i> Cerrar sesión
+        </a>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const bar = document.getElementById('fiado-bar');
+const deuda  = {{ docente.deuda_fiado }};
+const limite = {{ docente.limite_fiado }};
+if (limite > 0) {
+  const pct = Math.min((deuda / limite) * 100, 100);
+  bar.style.width = pct + '%';
+  if (pct > 80) bar.classList.replace('green', 'red');
+  else if (pct > 50) bar.classList.replace('green', 'amber');
+}
+</script>
+{% endblock %}

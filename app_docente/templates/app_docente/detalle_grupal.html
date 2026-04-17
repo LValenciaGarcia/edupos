@@ -1,0 +1,177 @@
+{% extends 'app_docente/base_docente.html' %}
+{% block title %}{{ grupal.titulo }}{% endblock %}
+{% block topbar_title %}Pedido Grupal{% endblock %}
+
+{% block content %}
+
+<!-- Cabecera -->
+<div style="display:flex; align-items:center; gap:.75rem; margin-bottom:1.25rem; flex-wrap:wrap;">
+  <a href="{% url 'app_docente:pedidos_grupales' %}" class="btn btn-ghost btn-sm"><i class="bi bi-arrow-left"></i></a>
+  <h1 class="page-title" style="margin-bottom:0; flex:1;">{{ grupal.titulo }}</h1>
+  <span class="badge badge-{{ grupal.estado }}" style="font-size:.72rem;">{{ grupal.get_estado_display }}</span>
+</div>
+
+<div style="display:grid; grid-template-columns:1fr 320px; gap:1.25rem; align-items:start;">
+
+  <!-- Lista de participantes -->
+  <div style="display:flex; flex-direction:column; gap:1rem;">
+
+    <!-- Organizador -->
+    <div class="card" style="padding:1rem 1.25rem; background:linear-gradient(135deg,rgba(22,163,74,.06),transparent);">
+      <div class="section-title" style="margin-bottom:.6rem;">Organizador</div>
+      <div style="display:flex; align-items:center; gap:.85rem;">
+        <div style="width:2.4rem; height:2.4rem; background:linear-gradient(135deg,var(--leaf-dark),var(--leaf)); border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-size:.85rem; font-weight:700; flex-shrink:0;">
+          {{ grupal.organizador.perfil.user.first_name|first }}{{ grupal.organizador.perfil.user.last_name|first }}
+        </div>
+        <div>
+          <div style="font-size:.85rem; font-weight:700;">{{ grupal.organizador.perfil.user.get_full_name }}</div>
+          {% if grupal.organizador.materia %}
+          <div style="font-size:.68rem; color:var(--stone);"><i class="bi bi-mortarboard" style="color:var(--leaf); font-size:.6rem;"></i> {{ grupal.organizador.materia }}</div>
+          {% endif %}
+        </div>
+        <span class="badge badge-listo" style="margin-left:auto;">Organiza</span>
+      </div>
+      {% if grupal.nota %}
+      <div style="margin-top:.75rem; padding:.55rem .75rem; background:var(--leaf-pale); border:1px solid var(--leaf-tint); border-radius:7px; font-size:.78rem; color:var(--stone); font-style:italic;">
+        "{{ grupal.nota }}"
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Pedidos del grupo -->
+    <div class="card card-flat" style="overflow:hidden;">
+      <div class="card-head">
+        <span class="card-title" style="font-size:.9rem;">Pedidos del grupo</span>
+        <span style="background:var(--leaf-pale); border:1px solid var(--leaf-tint); border-radius:99px; padding:.18rem .65rem; font-size:.7rem; font-weight:700; color:var(--leaf-dark);">{{ grupal.participantes_count }} participante{{ grupal.participantes_count|pluralize }}</span>
+      </div>
+      {% for p in pedidos %}
+      <div style="padding:.9rem 1.25rem; border-bottom:1px solid var(--mist); transition:background .12s;" onmouseenter="this.style.background='rgba(22,163,74,.03)'" onmouseleave="this.style.background='transparent'">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:.75rem; margin-bottom:.3rem;">
+          <div style="display:flex; align-items:center; gap:.6rem;">
+            <div style="width:1.85rem; height:1.85rem; background:linear-gradient(135deg,var(--leaf-dark),var(--leaf)); border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-size:.6rem; font-weight:700; flex-shrink:0;">
+              {{ p.docente.perfil.user.first_name|first }}{{ p.docente.perfil.user.last_name|first }}
+            </div>
+            <span style="font-size:.82rem; font-weight:700;">{{ p.docente.perfil.user.get_full_name }}</span>
+          </div>
+          <span style="font-family:var(--serif); font-size:.95rem; color:var(--leaf); font-weight:400;">${{ p.total|floatformat:0 }}</span>
+        </div>
+        <div style="font-size:.7rem; color:var(--stone); padding-left:2.45rem;">
+          {% for d in p.detalles.all %}
+          <span style="background:var(--cream); border:1px solid var(--mist); border-radius:4px; padding:.06rem .35rem; margin:.03rem; display:inline-block; font-size:.67rem; font-weight:600;">{{ d.cantidad }}× {{ d.producto.nombre }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% empty %}
+      <div class="empty-state" style="padding:2rem 1rem;">
+        <i class="bi bi-people es-icon" style="font-size:1.75rem;"></i>
+        <p>Aún no hay participantes. ¡Sé el primero!</p>
+      </div>
+      {% endfor %}
+      <div style="padding:.85rem 1.25rem; display:flex; justify-content:space-between; align-items:center; background:var(--cream); border-top:1px solid var(--mist);">
+        <span style="font-size:.8rem; font-weight:700; color:var(--stone);">Total grupal</span>
+        <span style="font-family:var(--serif); font-size:1.2rem; color:var(--leaf);">${{ grupal.total_grupal|floatformat:0 }}</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Panel de acción lateral -->
+  <div style="display:flex; flex-direction:column; gap:1rem;">
+
+    {% if grupal.estado == 'abierto' %}
+
+      {% if ya_participa %}
+      <div class="card" style="text-align:center; background:var(--leaf-pale); border-color:var(--leaf-tint); padding:1.5rem;">
+        <div style="width:3rem; height:3rem; background:linear-gradient(135deg,var(--leaf-dark),var(--leaf)); border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto .75rem; box-shadow:0 4px 12px rgba(22,163,74,.3);">
+          <i class="bi bi-check-lg" style="font-size:1.2rem; color:#fff;"></i>
+        </div>
+        <div style="font-size:.9rem; font-weight:700; color:var(--leaf-dark);">Ya estás participando</div>
+        <div style="font-size:.72rem; color:var(--stone); margin-top:.3rem;">Tu pedido está registrado en este grupo.</div>
+      </div>
+
+      {% else %}
+      <div class="card card-flat" style="overflow:hidden;">
+        <div class="card-head">
+          <span class="card-title" style="font-size:.9rem;">Unirse al pedido</span>
+        </div>
+        <div style="padding:1rem 1.1rem;">
+          <form id="unirse-form" action="{% url 'app_docente:unirse_grupal' grupal.pk %}" method="post">
+            {% csrf_token %}
+            <div style="max-height:260px; overflow-y:auto; display:grid; gap:.3rem; margin-bottom:.85rem; border:1.5px solid var(--fog); border-radius:8px; padding:.5rem;">
+              {% for p in productos %}
+              <div style="display:flex; align-items:center; justify-content:space-between; padding:.38rem .55rem; border-radius:7px; transition:background .12s;" onmouseenter="this.style.background='var(--leaf-pale)'" onmouseleave="this.style.background='transparent'">
+                <div>
+                  <div style="font-size:.76rem; font-weight:600;">{{ p.nombre }}</div>
+                  <div style="font-size:.63rem; color:var(--stone);">${{ p.precio_venta|floatformat:0 }}</div>
+                </div>
+                <div style="display:flex; align-items:center; gap:.25rem;">
+                  <button type="button" class="btn btn-ghost btn-xs" onclick="chg({{ p.pk }}, -1)" style="width:1.5rem; height:1.5rem; padding:0; justify-content:center;">−</button>
+                  <span id="gqty-{{ p.pk }}" style="font-size:.8rem; font-weight:700; min-width:1.1rem; text-align:center;">0</span>
+                  <button type="button" class="btn btn-primary btn-xs" onclick="chg({{ p.pk }}, 1, '{{ p.nombre }}', {{ p.precio_venta }})" style="width:1.5rem; height:1.5rem; padding:0; justify-content:center;">+</button>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+            <div class="field" style="margin-bottom:.75rem;">
+              <label>Pago</label>
+              <select name="tipo_pago">
+                <option value="saldo">Saldo</option>
+                <option value="fiado">Fiado</option>
+              </select>
+            </div>
+            <div class="field" style="margin-bottom:1rem;">
+              <label>Nota (opcional)</label>
+              <input type="text" name="nota" placeholder="Sin sal, etc.">
+            </div>
+            <input type="hidden" name="carrito" id="g-carrito">
+            <button type="submit" class="btn btn-primary btn-full" style="font-size:.84rem;">
+              <i class="bi bi-person-check"></i> Unirse al pedido
+            </button>
+          </form>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if es_organizador %}
+      <div class="card" style="border-color:var(--red-tint);">
+        <div class="section-title" style="margin-bottom:.6rem;">Acciones del organizador</div>
+        <p style="font-size:.75rem; color:var(--stone); margin-bottom:.75rem;">Al cerrar el pedido, ya no se aceptarán más participantes y la cafetería lo recibirá.</p>
+        <form action="{% url 'app_docente:cerrar_grupal' grupal.pk %}" method="post"
+              onsubmit="return confirm('¿Cerrar el pedido? Ya no se aceptarán más participantes.');">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger btn-full btn-sm">
+            <i class="bi bi-lock"></i> Cerrar pedido grupal
+          </button>
+        </form>
+      </div>
+      {% endif %}
+
+    {% else %}
+    <div class="card" style="text-align:center; color:var(--stone); padding:1.5rem;">
+      <i class="bi bi-lock" style="font-size:1.75rem; opacity:.3; display:block; margin-bottom:.5rem; color:var(--ash);"></i>
+      <div style="font-size:.85rem; font-weight:600;">Pedido {{ grupal.get_estado_display|lower }}</div>
+      <div style="font-size:.72rem; color:var(--ash); margin-top:.3rem;">Ya no se aceptan más participantes.</div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let gc = {};
+function chg(pk, delta, name, price) {
+  if (!gc[pk]) gc[pk] = { id: pk, cantidad: 0, name, price };
+  gc[pk].cantidad = Math.max(0, gc[pk].cantidad + delta);
+  if (gc[pk].cantidad === 0) delete gc[pk];
+  document.getElementById(`gqty-${pk}`).textContent = gc[pk]?.cantidad || 0;
+}
+document.getElementById('unirse-form')?.addEventListener('submit', e => {
+  const items = Object.values(gc).filter(i => i.cantidad > 0);
+  if (items.length === 0) { e.preventDefault(); alert('Selecciona al menos un producto.'); return; }
+  document.getElementById('g-carrito').value = JSON.stringify(items.map(i => ({ id: i.id, cantidad: i.cantidad })));
+});
+</script>
+{% endblock %}

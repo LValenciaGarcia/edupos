@@ -7,14 +7,10 @@
 {% block extra_css %}
 <style>
   .recarga-layout {
-    display: grid;
-    grid-template-columns: 1fr 340px;
-    gap: 1.4rem;
-    align-items: start;
+    display: grid; grid-template-columns: 1fr 340px; gap: 1.4rem; align-items: start;
   }
   @media (max-width: 960px) { .recarga-layout { grid-template-columns: 1fr; } }
 
-  /* ── Estudiante info box ─────────────────────────────────────────────── */
   .est-info-box {
     display: flex; align-items: center; gap: 1.1rem;
     background: var(--leaf-pale); border: 1px solid var(--leaf-tint);
@@ -32,31 +28,54 @@
   .est-saldo-val { font-family: var(--serif); font-size: 1.5rem; color: var(--leaf); line-height: 1; }
   .est-saldo-lbl { font-size: 0.62rem; color: var(--stone); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 0.1rem; }
 
-  /* ── Montos rápidos ────────────────────────────────────────────────────── */
-  .montos-rapidos {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem;
-    margin: 0.75rem 0 1.1rem;
+  /* Proceso pasos */
+  .proceso-steps {
+    display: flex; align-items: center; gap: 0; margin-bottom: 1.4rem;
+    background: var(--cream); border: 1px solid var(--mist); border-radius: 9px; padding: 0.9rem 1.2rem;
   }
+  .step { display: flex; align-items: center; gap: 0.5rem; flex: 1; }
+  .step-num {
+    width: 1.6rem; height: 1.6rem; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.7rem; font-weight: 700;
+  }
+  .step-num.done  { background: var(--leaf-tint); color: var(--leaf-dark); }
+  .step-num.active{ background: var(--leaf); color: #fff; }
+  .step-num.wait  { background: var(--mist); color: var(--ash); }
+  .step-text { font-size: 0.75rem; font-weight: 600; }
+  .step-text.active { color: var(--leaf-dark); }
+  .step-text.wait   { color: var(--ash); }
+  .step-sep { width: 2rem; height: 1px; background: var(--fog); flex-shrink: 0; margin: 0 0.35rem; }
+
+  /* Montos rápidos */
+  .montos-rapidos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem; margin: 0.75rem 0 1.1rem; }
   .monto-btn {
     padding: 0.65rem 0.5rem; border: 1px solid var(--fog);
     border-radius: 8px; background: var(--ivory); cursor: pointer;
     font-family: var(--sans); font-size: 0.79rem; font-weight: 600; color: var(--ink);
     transition: all 0.15s; text-align: center;
   }
-  .monto-btn:hover { border-color: var(--leaf); color: var(--leaf); background: var(--leaf-pale); }
-  .monto-btn.selected { border-color: var(--leaf); background: var(--leaf-pale); color: var(--leaf-dark); }
+  .monto-btn:hover, .monto-btn.selected { border-color: var(--leaf); color: var(--leaf); background: var(--leaf-pale); }
 
-  /* ── Historial lateral ───────────────────────────────────────────────── */
-  .historial-side { }
-  .hist-row {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--mist);
-    font-size: 0.8rem;
+  /* Upload comprobante */
+  .upload-zone {
+    border: 2px dashed var(--fog); border-radius: 9px; padding: 1.5rem;
+    text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s;
+    position: relative;
   }
+  .upload-zone:hover, .upload-zone.dragover { border-color: var(--leaf); background: var(--leaf-pale); }
+  .upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .upload-icon { font-size: 1.8rem; color: var(--ash); display: block; margin-bottom: 0.5rem; }
+  .upload-text { font-size: 0.81rem; color: var(--stone); }
+  .upload-hint { font-size: 0.7rem; color: var(--ash); margin-top: 0.25rem; }
+  #preview-img { max-height: 120px; max-width: 100%; border-radius: 7px; margin-top: 0.7rem; display: none; }
+
+  /* Historial lateral */
+  .hist-row { display: flex; align-items: flex-start; justify-content: space-between; padding: 0.8rem 1.5rem; border-bottom: 1px solid var(--mist); font-size: 0.8rem; }
   .hist-row:last-child { border-bottom: none; }
-  .hist-monto { font-family: var(--serif); font-size: 1rem; color: var(--leaf); font-weight: 500; }
+  .hist-monto { font-family: var(--serif); font-size: 0.95rem; color: var(--leaf); font-weight: 500; }
   .hist-fecha { font-size: 0.68rem; color: var(--ash); margin-top: 0.07rem; }
-  .hist-nota  { font-size: 0.71rem; color: var(--stone); margin-top: 0.1rem; font-style: italic; }
+  .hist-nota  { font-size: 0.71rem; color: var(--stone); margin-top: 0.08rem; font-style: italic; }
 </style>
 {% endblock %}
 
@@ -79,35 +98,66 @@
       </div>
     </div>
 
+    <!-- Proceso -->
+    <div class="proceso-steps">
+      <div class="step">
+        <div class="step-num active">1</div>
+        <div class="step-text active">Solicitar</div>
+      </div>
+      <div class="step-sep"></div>
+      <div class="step">
+        <div class="step-num wait">2</div>
+        <div class="step-text wait">Revisión admin</div>
+      </div>
+      <div class="step-sep"></div>
+      <div class="step">
+        <div class="step-num wait">3</div>
+        <div class="step-text wait">Saldo acreditado</div>
+      </div>
+    </div>
+
     <!-- Formulario recarga -->
     <div class="card">
       <div class="card-head">
-        <span class="card-title">Nueva recarga</span>
+        <span class="card-title">Nueva solicitud de recarga</span>
       </div>
       <div class="card-body">
-        <form method="post" novalidate>
+        <form method="post" enctype="multipart/form-data" novalidate>
           {% csrf_token %}
 
           <div class="field" style="margin-bottom:0.75rem;">
             <label for="monto">Monto a recargar *</label>
             <input type="number" id="monto" name="monto"
-                   min="1000" max="1000000" step="500"
+                   min="1000" max="2000000" step="500"
                    placeholder="Ingresa el monto en pesos" required
                    oninput="syncMontos(this.value)">
-            <span class="hint">Monto mínimo: $1.000 · Máximo: $1.000.000</span>
+            <span class="hint">Mínimo: $1.000 · Máximo: $2.000.000</span>
           </div>
 
           <!-- Montos rápidos -->
           <div class="montos-rapidos">
-            <button type="button" class="monto-btn" onclick="setMonto(5000)">$5.000</button>
-            <button type="button" class="monto-btn" onclick="setMonto(10000)">$10.000</button>
-            <button type="button" class="monto-btn" onclick="setMonto(20000)">$20.000</button>
-            <button type="button" class="monto-btn" onclick="setMonto(50000)">$50.000</button>
+            <button type="button" class="monto-btn" onclick="setMonto(5000,this)">$5.000</button>
+            <button type="button" class="monto-btn" onclick="setMonto(10000,this)">$10.000</button>
+            <button type="button" class="monto-btn" onclick="setMonto(20000,this)">$20.000</button>
+            <button type="button" class="monto-btn" onclick="setMonto(50000,this)">$50.000</button>
           </div>
 
-          <div class="field" style="margin-bottom:1.2rem;">
+          <!-- Comprobante de pago -->
+          <div class="field" style="margin-bottom:1.1rem;">
+            <label>Comprobante de pago <span style="color:var(--red);font-weight:700;">*</span> <span style="color:var(--stone);font-weight:400;">(obligatorio)</span></label>
+            <div class="upload-zone" id="uploadZone">
+              <input type="file" name="comprobante" id="comprobante" accept="image/*,.pdf"
+                     onchange="previewFile(this)" required>
+              <i class="bi bi-cloud-upload upload-icon"></i>
+              <div class="upload-text">Arrastra tu comprobante aquí o haz clic para seleccionar</div>
+              <div class="upload-hint">JPG, PNG o PDF · Máx. 5 MB · Requerido para procesar la recarga</div>
+              <img id="preview-img" src="" alt="Preview">
+            </div>
+          </div>
+
+          <div class="field" style="margin-bottom:1.1rem;">
             <label for="nota">Nota (opcional)</label>
-            <input type="text" id="nota" name="nota" placeholder="Ej: Semana del 5 al 11 de abril" maxlength="200">
+            <input type="text" id="nota" name="nota" placeholder="Ej: Semana del 5 al 11 de abril" maxlength="300">
           </div>
 
           <!-- Preview del nuevo saldo -->
@@ -117,18 +167,24 @@
               <span style="font-weight:600;">${{ estudiante.saldo|miles }}</span>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.3rem;">
-              <span style="color:var(--stone);">+ Recarga:</span>
+              <span style="color:var(--stone);">+ Recarga solicitada:</span>
               <span style="font-weight:600;color:var(--leaf);" id="monto-preview">$0</span>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--leaf-tint);margin-top:0.4rem;padding-top:0.4rem;">
-              <span style="font-weight:700;color:var(--leaf-dark);">Nuevo saldo:</span>
-              <span style="font-family:var(--serif);font-size:1.1rem;color:var(--leaf);font-weight:500;" id="saldo-nuevo">$0</span>
+              <span style="font-weight:700;color:var(--leaf-dark);">Saldo estimado tras aprobación:</span>
+              <span style="font-family:var(--serif);font-size:1.1rem;color:var(--leaf);" id="saldo-nuevo">$0</span>
             </div>
+          </div>
+
+          <!-- Aviso -->
+          <div style="background:var(--amber-pale);border:1px solid var(--amber-tint);border-radius:8px;padding:0.75rem 1rem;margin-bottom:1.2rem;font-size:0.8rem;color:var(--amber);display:flex;gap:0.5rem;align-items:flex-start;">
+            <i class="bi bi-info-circle-fill" style="flex-shrink:0;margin-top:0.1rem;"></i>
+            <span>El saldo <strong>no se acredita de inmediato</strong>. Un administrador revisará tu comprobante y aprobará la recarga. <strong>El comprobante es obligatorio</strong> para que la solicitud sea procesada.</span>
           </div>
 
           <div class="form-footer">
             <button type="submit" class="btn btn-primary">
-              <i class="bi bi-plus-circle"></i> Confirmar recarga
+              <i class="bi bi-send"></i> Enviar solicitud
             </button>
             <a href="{% url 'app_padre:hijos' %}" class="btn btn-ghost">Cancelar</a>
           </div>
@@ -138,9 +194,9 @@
   </div>
 
   <!-- Historial lateral -->
-  <div class="card historial-side">
+  <div class="card">
     <div class="card-head">
-      <span class="card-title">Recargas anteriores</span>
+      <span class="card-title">Historial de recargas</span>
     </div>
     {% if historial %}
       {% for recarga in historial %}
@@ -149,8 +205,11 @@
           <div class="hist-monto">+${{ recarga.monto|miles }}</div>
           <div class="hist-fecha">{{ recarga.fecha|date:"d M Y, H:i" }}</div>
           {% if recarga.nota %}<div class="hist-nota">{{ recarga.nota }}</div>{% endif %}
+          {% if recarga.nota_admin %}
+          <div class="hist-nota" style="color:var(--red);">Admin: {{ recarga.nota_admin }}</div>
+          {% endif %}
         </div>
-        <i class="bi bi-arrow-up-circle" style="color:var(--leaf);font-size:1.1rem;flex-shrink:0;"></i>
+        <span class="badge badge-{{ recarga.estado }}">{{ recarga.get_estado_display }}</span>
       </div>
       {% endfor %}
     {% else %}
@@ -172,11 +231,11 @@
     return '$' + Math.floor(n).toLocaleString('es-CO').replace(/,/g, '.');
   }
 
-  function setMonto(val) {
+  function setMonto(val, btn) {
     document.getElementById('monto').value = val;
     syncMontos(val);
     document.querySelectorAll('.monto-btn').forEach(b => b.classList.remove('selected'));
-    event.target.classList.add('selected');
+    if (btn) btn.classList.add('selected');
   }
 
   function syncMontos(val) {
@@ -189,5 +248,37 @@
       document.getElementById('saldo-preview').style.display = 'none';
     }
   }
+
+  function previewFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const label = document.querySelector('.upload-text');
+    label.textContent = file.name;
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const img = document.getElementById('preview-img');
+        img.src = e.target.result;
+        img.style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  // Drag & drop
+  const zone = document.getElementById('uploadZone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      const input = document.getElementById('comprobante');
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+      previewFile(input);
+    }
+  });
 </script>
 {% endblock %}

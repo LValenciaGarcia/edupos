@@ -1,0 +1,272 @@
+{% extends 'app_padre/base_padre.html' %}
+{% load filtros %}
+{% block title %}Estadísticas{% endblock %}
+{% block page_title %}Estadísticas{% endblock %}
+{% block nav_estadisticas %}active{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'app_padre:exportar_csv' %}?hijo={{ hijo_pk }}&dias={{ periodo }}" class="btn btn-ghost btn-sm">
+  <i class="bi bi-download"></i> Exportar CSV
+</a>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .filtros-bar {
+    display: flex; align-items: center; gap: 0.65rem;
+    flex-wrap: wrap; margin-bottom: 1.4rem;
+  }
+  .filtros-bar select, .filtros-bar input {
+    font-family: var(--sans); font-size: 0.8rem; padding: 0.42rem 0.85rem;
+    border: 1px solid var(--fog); border-radius: 7px; background: var(--ivory);
+    color: var(--ink); cursor: pointer;
+  }
+  .filtros-bar select:focus { outline: none; border-color: var(--leaf); }
+
+  .kpi-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0.85rem; margin-bottom: 1.4rem; }
+  .kpi-card {
+    background: var(--ivory); border: 1px solid var(--mist); border-radius: 10px;
+    padding: 1.1rem 1.3rem; display: flex; flex-direction: column; gap: 0.3rem;
+    position: relative; overflow: hidden;
+  }
+  .kpi-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; border-radius: 99px 0 0 99px; }
+  .kpi-card.green::before { background: var(--leaf); }
+  .kpi-card.amber::before { background: var(--amber); }
+  .kpi-card.sky::before   { background: var(--sky); }
+  .kpi-label { font-size: 0.59rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ash); }
+  .kpi-val   { font-family: var(--serif); font-size: 1.9rem; line-height: 1; }
+  .kpi-card.green .kpi-val { color: var(--leaf); }
+  .kpi-card.amber .kpi-val { color: var(--amber); }
+  .kpi-card.sky   .kpi-val { color: var(--sky); }
+  .kpi-sub { font-size: 0.68rem; color: var(--ash); }
+
+  .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin-bottom: 1.2rem; }
+  @media (max-width: 960px) { .charts-grid { grid-template-columns: 1fr; } }
+
+  .chart-card { background: var(--ivory); border: 1px solid var(--mist); border-radius: var(--radius); overflow: hidden; }
+  .chart-head { padding: 1rem 1.5rem; border-bottom: 1px solid var(--mist); display: flex; align-items: center; justify-content: space-between; }
+  .chart-title { font-family: var(--serif); font-size: 1rem; font-weight: 500; }
+  .chart-body { padding: 1.25rem 1.5rem; }
+
+  .comparativa-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .comp-box { background: var(--cream); border-radius: 9px; padding: 1rem 1.2rem; text-align: center; }
+  .comp-label { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ash); margin-bottom: 0.5rem; }
+  .comp-val { font-family: var(--serif); font-size: 2rem; line-height: 1; }
+  .comp-val.green { color: var(--leaf); }
+  .comp-val.amber { color: var(--amber); }
+  .comp-delta { font-size: 0.73rem; margin-top: 0.35rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Filtros -->
+<form method="get" class="filtros-bar">
+  <select name="hijo" onchange="this.form.submit()">
+    <option value="">Todos los hijos</option>
+    {% for h in hijos %}
+    <option value="{{ h.pk }}" {% if hijo_pk == h.pk|stringformat:"s" %}selected{% endif %}>{{ h.perfil.user.get_full_name }}</option>
+    {% endfor %}
+  </select>
+  <select name="periodo" onchange="this.form.submit()">
+    <option value="7"  {% if periodo == "7" %}selected{% endif %}>Últimos 7 días</option>
+    <option value="14" {% if periodo == "14" %}selected{% endif %}>Últimos 14 días</option>
+    <option value="30" {% if periodo == "30" %}selected{% endif %}>Últimos 30 días</option>
+    <option value="60" {% if periodo == "60" %}selected{% endif %}>Últimos 60 días</option>
+    <option value="90" {% if periodo == "90" %}selected{% endif %}>Últimos 90 días</option>
+  </select>
+  {% if hijo_pk %}<input type="hidden" name="hijo" value="{{ hijo_pk }}">{% endif %}
+</form>
+
+<!-- KPIs -->
+<div class="kpi-strip">
+  <div class="kpi-card green">
+    <div class="kpi-label">Gasto del período</div>
+    <div class="kpi-val">${{ gasto_periodo|miles }}</div>
+    <div class="kpi-sub">Últimos {{ periodo }} días</div>
+  </div>
+  <div class="kpi-card amber">
+    <div class="kpi-label">Pedidos realizados</div>
+    <div class="kpi-val">{{ n_pedidos }}</div>
+    <div class="kpi-sub">En el período</div>
+  </div>
+  <div class="kpi-card sky">
+    <div class="kpi-label">Ticket promedio</div>
+    <div class="kpi-val">${{ ticket_prom|floatformat:0|miles }}</div>
+    <div class="kpi-sub">Por pedido</div>
+  </div>
+</div>
+
+<!-- Comparativa semanas -->
+<div class="chart-card" style="margin-bottom:1.2rem;">
+  <div class="chart-head">
+    <span class="chart-title">Comparativa semanal</span>
+  </div>
+  <div class="chart-body">
+    <div class="comparativa-grid">
+      <div class="comp-box">
+        <div class="comp-label">Semana actual</div>
+        <div class="comp-val green">${{ sem_actual|miles }}</div>
+        {% if sem_anterior > 0 %}
+        <div class="comp-delta" style="color:{% if sem_actual <= sem_anterior %}var(--leaf){% else %}var(--red){% endif %}">
+          {% if sem_actual <= sem_anterior %}<i class="bi bi-arrow-down"></i>{% else %}<i class="bi bi-arrow-up"></i>{% endif %}
+          vs. semana anterior
+        </div>
+        {% endif %}
+      </div>
+      <div class="comp-box">
+        <div class="comp-label">Semana anterior</div>
+        <div class="comp-val amber">${{ sem_anterior|miles }}</div>
+        <div class="comp-delta" style="color:var(--ash);">Referencia</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Charts 2 columnas -->
+<div class="charts-grid">
+
+  <!-- Gasto diario -->
+  <div class="chart-card">
+    <div class="chart-head"><span class="chart-title">Gasto por día</span></div>
+    <div class="chart-body">
+      <canvas id="chartDiario" height="180"></canvas>
+    </div>
+  </div>
+
+  <!-- Top productos -->
+  <div class="chart-card">
+    <div class="chart-head"><span class="chart-title">Productos más comprados</span></div>
+    <div class="chart-body">
+      <canvas id="chartTop" height="180"></canvas>
+    </div>
+  </div>
+
+  <!-- Gasto por categoría -->
+  <div class="chart-card">
+    <div class="chart-head"><span class="chart-title">Distribución por categoría</span></div>
+    <div class="chart-body">
+      <canvas id="chartCat" height="180"></canvas>
+    </div>
+  </div>
+
+  <!-- Gasto por hijo (si hay >1) -->
+  {% if not hijo_pk and hijos.count > 1 %}
+  <div class="chart-card">
+    <div class="chart-head"><span class="chart-title">Gasto por hijo</span></div>
+    <div class="chart-body">
+      <canvas id="chartHijos" height="180"></canvas>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+const COLORS = ['#16a34a','#0284c7','#d97706','#7c3aed','#dc2626','#14532d','#0ea5e9','#f59e0b'];
+const COLORS_ALPHA = COLORS.map(c => c + '22');
+
+Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+Chart.defaults.color = '#6b6b63';
+
+// Gasto diario
+new Chart(document.getElementById('chartDiario'), {
+  type: 'bar',
+  data: {
+    labels: {{ labels_dias|safe }},
+    datasets: [{
+      label: 'Gasto ($)',
+      data: {{ data_dias|safe }},
+      backgroundColor: 'rgba(22,163,74,0.18)',
+      borderColor: '#16a34a',
+      borderWidth: 1.5,
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+      y: { grid: { color: '#e8e7e2' }, ticks: { font: { size: 10 }, callback: v => '$' + v.toLocaleString('es-CO') } }
+    }
+  }
+});
+
+// Top productos
+const topLabels = {{ top_labels|safe }};
+const topData   = {{ top_data|safe }};
+if (topLabels.length > 0) {
+  new Chart(document.getElementById('chartTop'), {
+    type: 'bar',
+    data: {
+      labels: topLabels,
+      datasets: [{
+        label: 'Unidades',
+        data: topData,
+        backgroundColor: COLORS.slice(0, topLabels.length),
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: '#e8e7e2' }, ticks: { font: { size: 10 } } },
+        y: { grid: { display: false }, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+// Categorías
+const catLabels = {{ cat_labels|safe }};
+const catData   = {{ cat_data|safe }};
+if (catLabels.length > 0) {
+  new Chart(document.getElementById('chartCat'), {
+    type: 'doughnut',
+    data: {
+      labels: catLabels,
+      datasets: [{ data: catData, backgroundColor: COLORS.slice(0, catLabels.length), borderWidth: 0 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 14 } }
+      }
+    }
+  });
+}
+
+// Gasto por hijo
+const gastoHijoData = {{ gasto_hijo|safe }};
+const chartHijosEl = document.getElementById('chartHijos');
+if (gastoHijoData.length > 0 && chartHijosEl) {
+  new Chart(chartHijosEl, {
+    type: 'bar',
+    data: {
+      labels: gastoHijoData.map(h => h.nombre),
+      datasets: [{
+        label: 'Gasto ($)',
+        data: gastoHijoData.map(h => h.gasto),
+        backgroundColor: COLORS.slice(0, gastoHijoData.length),
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { grid: { color: '#e8e7e2' }, ticks: { font: { size: 10 }, callback: v => '$' + v.toLocaleString('es-CO') } }
+      }
+    }
+  });
+}
+</script>
+{% endblock %}

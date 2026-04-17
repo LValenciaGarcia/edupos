@@ -1,0 +1,138 @@
+{% extends 'app_docente/base_docente.html' %}
+{% block title %}Sala de Profes{% endblock %}
+{% block topbar_title %}Sala de Profes{% endblock %}
+
+{% block content %}
+
+<!-- Header -->
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:.5rem; flex-wrap:wrap; gap:.75rem;">
+  <div>
+    <h1 class="page-title" style="margin-bottom:.2rem;">Sala de Profes</h1>
+    <p style="font-size:.8rem; color:var(--stone);">Organiza un pedido con tus colegas. Cada docente elige sus productos y paga por separado.</p>
+  </div>
+  <button class="btn btn-primary" onclick="document.getElementById('crear-modal').style.display='flex'">
+    <i class="bi bi-people"></i> Crear pedido grupal
+  </button>
+</div>
+
+<!-- Pedidos abiertos de colegas -->
+{% if abiertos %}
+<div style="margin-bottom:1.5rem;">
+  <div class="section-title" style="margin-bottom:.85rem;">Pedidos abiertos para unirse</div>
+  <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:1rem;">
+    {% for g in abiertos %}
+    <div class="card card-hover" style="border-left:3px solid var(--sky); padding:1rem 1.1rem;">
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:.5rem; margin-bottom:.5rem;">
+        <div>
+          <div style="font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--sky); margin-bottom:.2rem; display:flex; align-items:center; gap:.3rem;">
+            <i class="bi bi-circle-fill" style="font-size:.4rem;"></i> Abierto
+          </div>
+          <div style="font-size:.9rem; font-weight:700;">{{ g.titulo }}</div>
+        </div>
+        <span class="badge badge-abierto">{{ g.participantes_count }} participante{{ g.participantes_count|pluralize }}</span>
+      </div>
+      <div style="font-size:.72rem; color:var(--stone); margin-bottom:.5rem;">
+        <i class="bi bi-person" style="color:var(--sky);"></i>
+        <strong>{{ g.organizador.perfil.user.get_full_name }}</strong>
+        &middot; {{ g.fecha|date:"d M, H:i" }}
+      </div>
+      {% if g.nota %}
+      <div style="font-size:.72rem; color:var(--stone); font-style:italic; margin-bottom:.5rem; padding:.4rem .6rem; background:var(--sky-pale); border-radius:6px; border:1px solid var(--sky-tint);">"{{ g.nota }}"</div>
+      {% endif %}
+      <a href="{% url 'app_docente:detalle_grupal' g.pk %}" class="btn btn-sky btn-sm btn-full">
+        <i class="bi bi-person-plus"></i> Ver y unirse
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:1.25rem;">
+
+  <!-- Mis pedidos organizados -->
+  <div>
+    <div class="section-title" style="margin-bottom:.85rem;">Pedidos que organizo</div>
+    {% if mis_grupales %}
+      {% for g in mis_grupales %}
+      <div class="card card-sm card-hover" style="margin-bottom:.7rem;">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:.5rem;">
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:.83rem; font-weight:700; margin-bottom:.15rem;">{{ g.titulo }}</div>
+            <div style="font-size:.68rem; color:var(--stone);">
+              {{ g.fecha|date:"d M Y" }} &middot; {{ g.participantes_count }} participante{{ g.participantes_count|pluralize }}
+            </div>
+            <div style="font-size:.7rem; color:var(--stone); margin-top:.1rem;">
+              Total: <strong style="color:var(--ink);">${{ g.total_grupal|floatformat:0 }}</strong>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:flex-end; gap:.35rem;">
+            <span class="badge badge-{{ g.estado }}">{{ g.get_estado_display }}</span>
+            <a href="{% url 'app_docente:detalle_grupal' g.pk %}" class="btn btn-outline btn-xs">Ver</a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="card card-sm" style="text-align:center; color:var(--ash); padding:1.5rem;">
+        <i class="bi bi-people" style="font-size:1.75rem; opacity:.3; display:block; margin-bottom:.5rem; color:var(--leaf);"></i>
+        <p style="font-size:.78rem; margin-bottom:.75rem;">No has organizado pedidos.</p>
+        <button onclick="document.getElementById('crear-modal').style.display='flex'" class="btn btn-primary btn-sm">
+          <i class="bi bi-plus"></i> Crear ahora
+        </button>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Pedidos en los que participo -->
+  <div>
+    <div class="section-title" style="margin-bottom:.85rem;">Pedidos en los que participo</div>
+    {% if participando %}
+      {% for g in participando %}
+      <div class="card card-sm card-hover" style="margin-bottom:.7rem; border-left:3px solid var(--leaf);">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:.5rem;">
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:.83rem; font-weight:700; margin-bottom:.15rem;">{{ g.titulo }}</div>
+            <div style="font-size:.68rem; color:var(--stone);">
+              <i class="bi bi-person" style="color:var(--leaf);"></i>
+              Organiza: {{ g.organizador.perfil.user.get_full_name }}
+            </div>
+          </div>
+          <span class="badge badge-{{ g.estado }}">{{ g.get_estado_display }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="card card-sm" style="text-align:center; color:var(--ash); padding:1.5rem;">
+        <i class="bi bi-person-check" style="font-size:1.75rem; opacity:.3; display:block; margin-bottom:.5rem; color:var(--leaf);"></i>
+        <p style="font-size:.78rem;">No participas en pedidos grupales activos.</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Modal crear grupal -->
+<div id="crear-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:800; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
+  <div style="background:var(--ivory); border-radius:var(--radius-lg); width:100%; max-width:420px; padding:1.5rem; box-shadow:0 24px 64px rgba(0,0,0,.18);">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.1rem;">
+      <h2 style="font-family:var(--serif); font-size:1.25rem; font-weight:400; font-style:italic;">Nuevo pedido grupal</h2>
+      <button onclick="document.getElementById('crear-modal').style.display='none'" class="btn btn-ghost btn-sm"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <form action="{% url 'app_docente:crear_grupal' %}" method="post">
+      {% csrf_token %}
+      <div class="field" style="margin-bottom:.85rem;">
+        <label>Título del pedido</label>
+        <input type="text" name="titulo" value="Pedido grupal sala de profes" required>
+      </div>
+      <div class="field" style="margin-bottom:1rem;">
+        <label>Nota para los colegas</label>
+        <textarea name="nota" rows="2" placeholder="Ej: Para el recreo de las 10am…"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full" style="font-size:.84rem;">
+        <i class="bi bi-people"></i> Crear pedido grupal
+      </button>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

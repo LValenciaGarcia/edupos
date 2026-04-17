@@ -1,0 +1,385 @@
+{% extends 'app_estudiante/base_estudiante.html' %}
+{% load filtros %}
+{% block title %}Menu{% endblock %}
+{% block page_title %}Menu{% endblock %}
+{% block nav_menu %}active{% endblock %}
+
+{% block topbar_actions %}
+  <form method="get" style="display:flex;align-items:center;gap:0.5rem;" id="search-form">
+    {% if cat_activa %}<input type="hidden" name="cat" value="{{ cat_activa }}">{% endif %}
+    <div style="position:relative;">
+      <i class="bi bi-search" style="position:absolute;left:0.65rem;top:50%;transform:translateY(-50%);color:var(--ash);font-size:0.8rem;pointer-events:none;"></i>
+      <input type="text" name="q" value="{{ q }}"
+             placeholder="Buscar producto..."
+             style="padding:0.33rem 0.8rem 0.33rem 2rem;border:1px solid var(--fog);border-radius:7px;background:var(--ivory);font-family:var(--sans);font-size:0.79rem;width:200px;"
+             oninput="this.form.submit()">
+    </div>
+  </form>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .menu-layout { display: grid; grid-template-columns: 1fr 300px; gap: 1.4rem; align-items: start; }
+  @media (max-width: 1000px) { .menu-layout { grid-template-columns: 1fr; } }
+
+  /* ── Saldo chip ──────────────────────────────────────────────────────────── */
+  .saldo-banner {
+    display: flex; align-items: center; gap: 0.85rem;
+    background: var(--ink); border-radius: 10px; padding: 0.9rem 1.2rem; margin-bottom: 1.2rem;
+  }
+  .saldo-banner-icon {
+    width: 2.2rem; height: 2.2rem; border-radius: 50%;
+    background: rgba(34,197,94,0.18); border: 1px solid rgba(34,197,94,0.25);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--leaf-bright); font-size: 1rem;
+  }
+  .saldo-banner-val { font-family: var(--serif); font-size: 1.3rem; color: var(--leaf-bright); }
+  .saldo-banner-lbl { font-size: 0.6rem; color: rgba(255,255,255,0.35); letter-spacing: 0.07em; text-transform: uppercase; }
+
+  /* ── Category tabs ───────────────────────────────────────────────────────── */
+  .cat-tabs { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .cat-tab {
+    padding: 0.35rem 0.85rem; border: 1px solid var(--fog); border-radius: 99px;
+    font-size: 0.76rem; font-weight: 600; color: var(--stone); cursor: pointer;
+    background: var(--ivory); transition: all 0.14s; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 0.35rem;
+  }
+  .cat-tab:hover { border-color: var(--leaf); color: var(--leaf-dark); background: var(--leaf-pale); }
+  .cat-tab.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+  /* ── Product grid ────────────────────────────────────────────────────────── */
+  .productos-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr)); gap: 0.85rem;
+  }
+
+  .prod-card {
+    background: var(--ivory); border: 1px solid var(--mist); border-radius: 10px;
+    overflow: hidden; transition: box-shadow 0.18s, border-color 0.18s, transform 0.18s;
+    position: relative; display: flex; flex-direction: column;
+  }
+  .prod-card:hover { box-shadow: 0 6px 22px rgba(0,0,0,0.08); border-color: var(--fog); transform: translateY(-2px); }
+  .prod-card.restringido { opacity: 0.45; pointer-events: none; }
+  .prod-card.restringido::after {
+    content: 'RESTRINGIDO'; position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.6rem; font-weight: 800; color: var(--red); letter-spacing: 0.12em;
+    border: 1.5px dashed var(--red); border-radius: 10px; pointer-events: none;
+    background: rgba(220,38,38,0.05);
+  }
+  .prod-card.agotado { opacity: 0.55; }
+  .prod-img {
+    height: 90px; background: var(--cream);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; position: relative; flex-shrink: 0;
+  }
+  .prod-img img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.35s var(--ease); }
+  .prod-card:hover .prod-img img { transform: scale(1.05); }
+  .prod-img .prod-icon { font-size: 1.8rem; color: var(--fog); }
+  .prod-cat-badge {
+    position: absolute; top: 0.45rem; left: 0.45rem;
+    padding: 0.18rem 0.48rem; border-radius: 99px;
+    font-size: 0.55rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    backdrop-filter: blur(8px);
+  }
+  .cat-desayuno { background: rgba(217,119,6,0.82);  color: #fff; }
+  .cat-almuerzo { background: rgba(22,163,74,0.82);  color: #fff; }
+  .cat-snacks   { background: rgba(124,58,237,0.82); color: #fff; }
+  .cat-bebidas  { background: rgba(2,132,199,0.82);  color: #fff; }
+
+  .prod-body { padding: 0.65rem 0.75rem 0.55rem; flex: 1; display: flex; flex-direction: column; }
+  .prod-nombre { font-size: 0.82rem; font-weight: 600; line-height: 1.3; color: var(--ink); }
+  .prod-cat    { font-size: 0.62rem; color: var(--ash); margin-top: 0.08rem; }
+  .prod-precio { font-family: var(--serif); font-size: 1.05rem; color: var(--leaf); margin-top: 0.3rem; }
+
+  .qty-control {
+    display: flex; align-items: center; gap: 0.38rem; margin-top: 0.55rem;
+  }
+  .qty-btn {
+    width: 1.55rem; height: 1.55rem; border-radius: 5px; border: 1px solid var(--fog);
+    background: var(--cream); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.88rem; font-weight: 700; color: var(--stone);
+    transition: background 0.1s, border-color 0.1s; flex-shrink: 0;
+  }
+  .qty-btn:hover { background: var(--leaf-pale); border-color: var(--leaf); color: var(--leaf-dark); }
+  .qty-input {
+    flex: 1; text-align: center; border: 1px solid var(--fog); border-radius: 5px;
+    padding: 0.18rem; font-size: 0.85rem; font-weight: 700; background: var(--ivory);
+    color: var(--ink); font-family: var(--serif);
+  }
+  .qty-input:read-only { background: var(--ivory); }
+
+  /* agotado badge */
+  .agotado-badge {
+    display: inline-flex; align-items: center; gap: 0.28rem;
+    font-size: 0.65rem; font-weight: 700; color: var(--red);
+    margin-top: 0.55rem; padding: 0.22rem 0.5rem;
+    background: var(--red-pale); border-radius: 5px;
+  }
+
+  /* ── Carrito lateral ─────────────────────────────────────────────────────── */
+  .carrito-card { position: sticky; top: calc(var(--topbar-h) + 1rem); }
+  .carrito-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.65rem 1.4rem; border-bottom: 1px solid var(--mist); font-size: 0.8rem;
+  }
+  .carrito-item:last-child { border-bottom: none; }
+  .carrito-nombre { font-weight: 600; color: var(--ink); }
+  .carrito-qty    { color: var(--ash); font-size: 0.7rem; }
+  .carrito-sub    { font-weight: 700; flex-shrink: 0; }
+
+  /* ── Animaciones ─────────────────────────────────────────────────────────── */
+  @keyframes cardIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .prod-card { animation: cardIn 0.28s var(--ease) both; }
+  .prod-card:nth-child(1) { animation-delay: 0.02s; }
+  .prod-card:nth-child(2) { animation-delay: 0.05s; }
+  .prod-card:nth-child(3) { animation-delay: 0.08s; }
+  .prod-card:nth-child(4) { animation-delay: 0.11s; }
+  .prod-card:nth-child(5) { animation-delay: 0.14s; }
+  .prod-card:nth-child(n+6) { animation-delay: 0.17s; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Banner saldo -->
+<div class="saldo-banner">
+  <div class="saldo-banner-icon"><i class="bi bi-wallet2"></i></div>
+  <div>
+    <div class="saldo-banner-val">${{ estudiante.saldo|miles }}</div>
+    <div class="saldo-banner-lbl">saldo disponible</div>
+  </div>
+  {% if restricciones_prod or restricciones_cat %}
+  <div style="margin-left:auto;display:flex;align-items:center;gap:0.5rem;font-size:0.74rem;color:rgba(255,255,255,0.45);">
+    <i class="bi bi-shield-x" style="color:#f87171;"></i>
+    Algunos productos estan restringidos por tu acudiente
+  </div>
+  {% endif %}
+</div>
+
+<form method="post" id="formPedido" novalidate>
+{% csrf_token %}
+
+<div class="menu-layout">
+
+  <!-- Productos -->
+  <div>
+    <!-- Tabs categorias -->
+    <div class="cat-tabs">
+      <a href="{% url 'app_estudiante:menu' %}{% if q %}?q={{ q }}{% endif %}"
+         class="cat-tab {% if not cat_activa %}active{% endif %}">
+        <i class="bi bi-grid-2x2"></i> Todos
+      </a>
+      {% for cat in categorias %}
+      <a href="{% url 'app_estudiante:menu' %}?cat={{ cat.nombre }}{% if q %}&q={{ q }}{% endif %}"
+         class="cat-tab {% if cat_activa == cat.nombre %}active{% endif %}">
+        <i class="bi bi-{% if cat.nombre == 'desayuno' %}cup-hot{% elif cat.nombre == 'almuerzo' %}egg-fried{% elif cat.nombre == 'bebidas' %}cup-straw{% else %}bag{% endif %}"></i>
+        {{ cat.get_nombre_display }}
+      </a>
+      {% endfor %}
+    </div>
+
+    {% if q or cat_activa %}
+    <div style="margin-bottom:0.85rem;font-size:0.78rem;color:var(--ash);">
+      {% if prods_lista %}
+        <strong style="color:var(--ink);">{{ prods_lista|length }}</strong> resultado{{ prods_lista|length|pluralize }}
+        {% if q %}para <em>"{{ q }}"</em>{% endif %}
+        &mdash; <a href="{% url 'app_estudiante:menu' %}" style="color:var(--leaf);text-decoration:none;font-weight:500;">Limpiar</a>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="productos-grid" id="prodGrid">
+      {% for prod, restringido in prods_lista %}
+      <div class="prod-card {% if restringido %}restringido{% elif prod.sin_stock %}agotado{% endif %}"
+           data-nombre="{{ prod.nombre|lower }}" data-id="{{ prod.pk }}">
+        <div class="prod-img">
+          {% if prod.imagen %}
+          <img src="{{ prod.imagen.url }}" alt="{{ prod.nombre }}" loading="lazy">
+          {% else %}
+          <i class="bi bi-{% if prod.categoria.nombre == 'desayuno' %}cup-hot{% elif prod.categoria.nombre == 'almuerzo' %}egg-fried{% elif prod.categoria.nombre == 'bebidas' %}cup-straw{% else %}bag{% endif %} prod-icon"></i>
+          {% endif %}
+          <span class="prod-cat-badge cat-{{ prod.categoria.nombre }}">{{ prod.categoria.get_nombre_display }}</span>
+        </div>
+        <div class="prod-body">
+          <div class="prod-nombre">{{ prod.nombre }}</div>
+          <div class="prod-cat">{{ prod.categoria.get_nombre_display }}</div>
+          <div class="prod-precio">${{ prod.precio_venta|miles }}</div>
+          {% if prod.sin_stock %}
+          <div class="agotado-badge"><i class="bi bi-x-circle-fill"></i> Agotado</div>
+          {% elif not restringido %}
+          <div class="qty-control">
+            <button type="button" class="qty-btn" onclick="changeQty({{ prod.pk }}, -1)">
+              <i class="bi bi-dash"></i>
+            </button>
+            <input type="number" class="qty-input" name="qty_{{ prod.pk }}" id="qty_{{ prod.pk }}"
+                   value="0" min="0" max="20" readonly
+                   data-precio="{{ prod.precio_venta|stringformat:'f'|cut:',' }}" data-nombre="{{ prod.nombre }}">
+            <button type="button" class="qty-btn" onclick="changeQty({{ prod.pk }}, +1)">
+              <i class="bi bi-plus"></i>
+            </button>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% empty %}
+      <div style="grid-column:1/-1;padding:3rem 1rem;text-align:center;color:var(--ash);">
+        <i class="bi bi-basket2" style="font-size:2.5rem;display:block;margin-bottom:0.75rem;opacity:0.35;"></i>
+        <p style="font-size:0.88rem;">
+          {% if q %}No se encontraron productos para "<strong>{{ q }}</strong>".
+          {% elif cat_activa %}No hay productos disponibles en esta categoria.
+          {% else %}No hay productos disponibles en este momento.
+          {% endif %}
+        </p>
+        {% if q or cat_activa %}
+        <a href="{% url 'app_estudiante:menu' %}" class="btn btn-ghost btn-sm" style="margin-top:0.75rem;">
+          Limpiar filtros
+        </a>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Carrito -->
+  <div class="carrito-card">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title" style="font-size:0.95rem;">
+          <i class="bi bi-cart3" style="color:var(--leaf);margin-right:0.3rem;"></i>
+          Tu pedido
+        </span>
+        <span id="carrito-count" style="font-size:0.72rem;color:var(--ash);"></span>
+      </div>
+
+      <!-- Items -->
+      <div id="carritoItems">
+        <div id="carritoItemsList"></div>
+        <div id="carritoVacio" class="empty-state" style="padding:2rem 1rem;">
+          <i class="bi bi-cart es-icon"></i>
+          <p>Agrega productos al carrito</p>
+        </div>
+      </div>
+
+      <!-- Total -->
+      <div style="padding:1rem 1.4rem;border-top:1px solid var(--mist);background:var(--cream);">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:0.72rem;font-weight:700;color:var(--stone);text-transform:uppercase;letter-spacing:0.07em;">Total</span>
+          <span style="font-family:var(--serif);font-size:1.55rem;color:var(--leaf);" id="totalDisplay">$0</span>
+        </div>
+        <div id="saldo-alerta" style="display:none;font-size:0.73rem;color:var(--red);margin-top:0.35rem;font-weight:600;">
+          <i class="bi bi-exclamation-triangle-fill"></i> Saldo insuficiente
+        </div>
+      </div>
+
+      <!-- Nota -->
+      <div style="padding:0.75rem 1.4rem;border-top:1px solid var(--mist);">
+        <div class="field">
+          <label for="notaPedido">Nota (opcional)</label>
+          <input type="text" id="notaPedido" name="nota" placeholder="Instrucciones especiales..." maxlength="200">
+        </div>
+      </div>
+
+      <!-- Botones -->
+      <div style="padding:0 1.4rem 1.2rem;">
+        <button type="submit" class="btn btn-primary btn-full" id="btnConfirmar" disabled>
+          <i class="bi bi-cart-check"></i> Confirmar pedido
+        </button>
+        <button type="button" class="btn btn-ghost btn-full" style="margin-top:0.4rem;" onclick="limpiarCarrito()">
+          <i class="bi bi-x"></i> Limpiar
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+</form>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const carrito = {};
+  const MI_SALDO  = {{ estudiante.saldo|floatformat:"0"|default:"0" }};
+
+  // Referencias fijas al DOM — se toman una sola vez para no perderlas
+  const _vacio    = document.getElementById('carritoVacio');
+  const _lista    = document.getElementById('carritoItemsList');
+  const _count    = document.getElementById('carrito-count');
+  const _total    = document.getElementById('totalDisplay');
+  const _btn      = document.getElementById('btnConfirmar');
+  const _alerta   = document.getElementById('saldo-alerta');
+
+  function changeQty(id, delta) {
+    const input = document.getElementById('qty_' + id);
+    if (!input) return;
+    let val = parseInt(input.value || '0') + delta;
+    if (val < 0) val = 0;
+    if (val > 20) val = 20;
+    input.value = val;
+    carrito[id] = {
+      qty:    val,
+      precio: parseFloat(input.dataset.precio),
+      nombre: input.dataset.nombre,
+    };
+    renderCarrito();
+  }
+
+  function renderCarrito() {
+    let total = 0;
+    let html  = '';
+    let n     = 0;
+
+    for (const [id, item] of Object.entries(carrito)) {
+      if (item.qty > 0) {
+        n++;
+        const sub = item.qty * item.precio;
+        total += sub;
+        html += `<div class="carrito-item">
+          <div>
+            <div class="carrito-nombre">${item.nombre}</div>
+            <div class="carrito-qty">${item.qty} &times; $${fmt(item.precio)}</div>
+          </div>
+          <div class="carrito-sub">$${fmt(sub)}</div>
+        </div>`;
+      }
+    }
+
+    // Actualizar lista de items sin tocar el elemento carritoVacio
+    _lista.innerHTML = html;
+    _vacio.style.display = n > 0 ? 'none' : '';
+    _count.textContent = n > 0 ? (n + ' producto' + (n > 1 ? 's' : '')) : '';
+    _total.textContent = '$' + fmt(total);
+
+    if (n === 0) {
+      _btn.disabled = true;
+      _btn.innerHTML = '<i class="bi bi-cart-check"></i> Confirmar pedido';
+      _btn.style.background = '';
+      _alerta.style.display = 'none';
+    } else if (total > MI_SALDO) {
+      _btn.disabled = true;
+      _btn.innerHTML = '<i class="bi bi-cart-x"></i> Saldo insuficiente';
+      _btn.style.background = 'var(--red)';
+      _alerta.style.display = '';
+    } else {
+      _btn.disabled = false;
+      _btn.innerHTML = '<i class="bi bi-cart-check"></i> Confirmar pedido';
+      _btn.style.background = '';
+      _alerta.style.display = 'none';
+    }
+  }
+
+  function limpiarCarrito() {
+    for (const id of Object.keys(carrito)) {
+      const input = document.getElementById('qty_' + id);
+      if (input) input.value = 0;
+      carrito[id] = { qty: 0, precio: carrito[id]?.precio || 0, nombre: carrito[id]?.nombre || '' };
+    }
+    renderCarrito();
+  }
+
+  function fmt(n) {
+    return Math.floor(n).toLocaleString('es-CO').replace(/,/g, '.');
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,145 @@
+{% extends 'app_padre/base_padre.html' %}
+{% load filtros %}
+{% block title %}Notificaciones{% endblock %}
+{% block page_title %}Notificaciones{% endblock %}
+{% block nav_notificaciones %}active{% endblock %}
+
+{% block topbar_actions %}
+{% if n_no_leidas %}
+<form method="post" style="display:inline;">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="marcar_todas">
+  <button type="submit" class="btn btn-ghost btn-sm"><i class="bi bi-check-all"></i> Marcar todas leídas</button>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .notif-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1.1rem; flex-wrap: wrap; gap: 0.5rem;
+  }
+  .notif-counter {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    background: var(--red-pale); color: var(--red); border: 1px solid var(--red-tint);
+    border-radius: 99px; padding: 0.2rem 0.7rem; font-size: 0.76rem; font-weight: 700;
+  }
+
+  .notif-list-card { background: var(--ivory); border: 1px solid var(--mist); border-radius: var(--radius); overflow: hidden; }
+  .notif-item {
+    display: flex; align-items: flex-start; gap: 0.85rem;
+    padding: 1rem 1.4rem; border-bottom: 1px solid var(--mist);
+    transition: background 0.12s; position: relative;
+  }
+  .notif-item:last-child { border-bottom: none; }
+  .notif-item:hover { background: var(--cream); }
+  .notif-item.no-leida { background: rgba(22,163,74,0.03); }
+  .notif-item.no-leida::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px; background: var(--leaf);
+  }
+
+  .notif-ico {
+    width: 2.2rem; height: 2.2rem; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 0.88rem;
+    margin-top: 0.1rem;
+  }
+  .ico-verde   { background: var(--leaf-tint);   color: var(--leaf-dark); }
+  .ico-rojo    { background: var(--red-tint);    color: var(--red); }
+  .ico-amarillo{ background: var(--amber-tint);  color: var(--amber); }
+  .ico-azul    { background: var(--sky-tint);    color: var(--sky); }
+  .ico-violeta { background: var(--violet-tint); color: var(--violet); }
+
+  .notif-body { flex: 1; min-width: 0; }
+  .notif-titulo { font-size: 0.84rem; font-weight: 600; }
+  .notif-msg    { font-size: 0.77rem; color: var(--stone); margin-top: 0.15rem; line-height: 1.4; }
+  .notif-fecha  { font-size: 0.67rem; color: var(--ash); margin-top: 0.25rem; }
+  .notif-link   { font-size: 0.72rem; color: var(--leaf); font-weight: 600; text-decoration: none; margin-top: 0.2rem; display: inline-block; }
+  .notif-link:hover { text-decoration: underline; }
+
+  .notif-item-actions { display: flex; gap: 0.3rem; flex-shrink: 0; align-items: flex-start; }
+
+  /* Mapa de iconos por tipo */
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="notif-header">
+  <div style="display:flex;align-items:center;gap:0.75rem;">
+    <h2 style="font-family:var(--serif);font-size:1.3rem;font-weight:500;">Centro de notificaciones</h2>
+    {% if n_no_leidas %}
+    <span class="notif-counter"><i class="bi bi-bell-fill"></i> {{ n_no_leidas }} sin leer</span>
+    {% endif %}
+  </div>
+  {% if notificaciones %}
+  <form method="post" onsubmit="return confirm('¿Eliminar todas las notificaciones leídas?')">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="eliminar_leidas">
+    <button type="submit" class="btn btn-danger btn-sm"><i class="bi bi-trash"></i> Limpiar leídas</button>
+  </form>
+  {% endif %}
+</div>
+
+{% if notificaciones %}
+<div class="notif-list-card">
+  {% for notif in notificaciones %}
+  {% with tipo=notif.tipo %}
+  <div class="notif-item {% if not notif.leida %}no-leida{% endif %}">
+    <div class="notif-ico
+      {% if 'aprobada' in tipo %}ico-verde
+      {% elif 'rechazada' in tipo or 'superado' in tipo %}ico-rojo
+      {% elif 'cerca' in tipo or 'pendiente' in tipo or 'bajo' in tipo %}ico-amarillo
+      {% elif 'padre' in tipo %}ico-violeta
+      {% else %}ico-azul{% endif %}">
+      <i class="bi bi-
+        {% if 'aprobada' in tipo %}check-circle-fill
+        {% elif 'rechazada' in tipo %}x-circle-fill
+        {% elif 'limite' in tipo %}speedometer2
+        {% elif 'compra' in tipo %}cart-fill
+        {% elif 'padre' in tipo %}person-check-fill
+        {% elif 'saldo' in tipo %}wallet2
+        {% else %}bell-fill{% endif %}"></i>
+    </div>
+    <div class="notif-body">
+      <div class="notif-titulo">
+        {{ notif.titulo }}
+        {% if not notif.leida %}<span style="display:inline-block;width:7px;height:7px;background:var(--leaf);border-radius:50%;margin-left:6px;vertical-align:middle;"></span>{% endif %}
+      </div>
+      <div class="notif-msg">{{ notif.mensaje }}</div>
+      <div class="notif-fecha"><i class="bi bi-clock" style="font-size:0.65rem;"></i> {{ notif.fecha|date:"d M Y, H:i" }}</div>
+      {% if notif.url_accion %}
+      <a href="{{ notif.url_accion }}" class="notif-link"><i class="bi bi-arrow-right"></i> Ver detalle</a>
+      {% endif %}
+    </div>
+    <div class="notif-item-actions">
+      {% if not notif.leida %}
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="marcar_una">
+        <input type="hidden" name="notif_id" value="{{ notif.pk }}">
+        <button type="submit" class="btn btn-ghost btn-xs" title="Marcar leída"><i class="bi bi-check2"></i></button>
+      </form>
+      {% endif %}
+      <form method="post" onsubmit="return confirm('¿Eliminar esta notificación?')">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="eliminar">
+        <input type="hidden" name="notif_id" value="{{ notif.pk }}">
+        <button type="submit" class="btn btn-danger btn-xs"><i class="bi bi-x"></i></button>
+      </form>
+    </div>
+  </div>
+  {% endwith %}
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="empty-state" style="padding:4rem;">
+    <i class="bi bi-bell-slash es-icon" style="font-size:2.5rem;"></i>
+    <p>No tienes notificaciones.</p>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

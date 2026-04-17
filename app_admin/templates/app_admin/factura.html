@@ -1,0 +1,595 @@
+{% extends 'app_admin/base_admin.html' %}
+{% load filtros %}
+{% block title %}Factura {{ pedido.ticket }}{% endblock %}
+{% block page_title %}Factura de Venta{% endblock %}
+{% block nav_pedidos %}active{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'app_admin:pedido_detalle' pedido.pk %}" class="btn btn-ghost btn-sm">
+    <i class="bi bi-arrow-left"></i> Volver al pedido
+  </a>
+  <button onclick="window.print()" class="btn btn-ghost btn-sm">
+    <i class="bi bi-printer"></i> Imprimir
+  </button>
+  <a href="{% url 'app_admin:factura_pdf' pedido.pk %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-file-earmark-pdf"></i> Descargar PDF
+  </a>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── Factura wrapper ────────────────────────────────────────────────────── */
+  .factura-wrap {
+    max-width: 860px;
+    margin: 0 auto;
+  }
+
+  .factura {
+    background: #fff;
+    border: 1px solid var(--mist);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.07);
+  }
+
+  /* ── Header band ────────────────────────────────────────────────────────── */
+  .fac-header {
+    background: #0f2d1e;
+    color: #fff;
+    padding: 1.8rem 2rem;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+  .fac-emisor-nombre {
+    font-family: var(--serif);
+    font-size: 1.55rem;
+    letter-spacing: -0.01em;
+    margin-bottom: 0.2rem;
+    line-height: 1.1;
+  }
+  .fac-emisor-sub {
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.6);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 0.65rem;
+  }
+  .fac-emisor-dato {
+    font-size: 0.76rem;
+    color: rgba(255,255,255,0.78);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.18rem;
+  }
+  .fac-emisor-dato i { font-size: 0.68rem; opacity: 0.7; }
+
+  .fac-doc-block {
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .fac-tipo-doc {
+    display: inline-block;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 6px;
+    padding: 0.35rem 0.85rem;
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #fff;
+    margin-bottom: 0.55rem;
+  }
+  .fac-numero {
+    font-family: var(--serif);
+    font-size: 1.75rem;
+    line-height: 1;
+    margin-bottom: 0.2rem;
+    color: #7fffa0;
+  }
+  .fac-numero-label {
+    font-size: 0.62rem;
+    color: rgba(255,255,255,0.5);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  /* ── Resolution bar ─────────────────────────────────────────────────────── */
+  .fac-resolucion {
+    background: #193d2a;
+    color: rgba(255,255,255,0.6);
+    font-size: 0.66rem;
+    padding: 0.38rem 2rem;
+    letter-spacing: 0.02em;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+  }
+
+  /* ── Dates ribbon ───────────────────────────────────────────────────────── */
+  .fac-ribbon {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border-bottom: 1px solid var(--mist);
+  }
+  .fac-ribbon-item {
+    padding: 0.85rem 2rem;
+    border-right: 1px solid var(--mist);
+  }
+  .fac-ribbon-item:last-child { border-right: none; }
+  .fac-ribbon-label {
+    font-size: 0.58rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ash);
+    margin-bottom: 0.22rem;
+  }
+  .fac-ribbon-val {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--ink);
+    font-family: var(--serif);
+  }
+
+  /* ── Partes section ─────────────────────────────────────────────────────── */
+  .fac-partes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-bottom: 1px solid var(--mist);
+  }
+  .fac-parte {
+    padding: 1.2rem 2rem;
+    position: relative;
+  }
+  .fac-parte:first-child { border-right: 1px solid var(--mist); }
+  .fac-parte-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.58rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ash);
+    margin-bottom: 0.75rem;
+  }
+  .fac-parte-nombre {
+    font-family: var(--serif);
+    font-size: 1.05rem;
+    color: var(--ink);
+    margin-bottom: 0.4rem;
+    line-height: 1.2;
+  }
+  .fac-parte-fila {
+    font-size: 0.78rem;
+    color: var(--stone);
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    margin-bottom: 0.14rem;
+  }
+  .fac-parte-fila i { font-size: 0.68rem; color: var(--ash); flex-shrink: 0; }
+  .fac-parte-fila strong { color: var(--ink); font-weight: 600; }
+
+  /* ── Products table ─────────────────────────────────────────────────────── */
+  .fac-table-wrap {
+    padding: 0 2rem;
+    margin-bottom: 0;
+  }
+  .fac-table-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 1rem 0 0.6rem;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ash);
+    border-bottom: 2px solid var(--mist);
+  }
+  .fac-tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.84rem;
+  }
+  .fac-tbl thead th {
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ash);
+    padding: 0.8rem 0.6rem 0.55rem;
+    border-bottom: 1px solid var(--mist);
+    background: var(--ivory);
+  }
+  .fac-tbl thead th:first-child { padding-left: 0; text-align: left; }
+  .fac-tbl thead th:not(:first-child) { text-align: right; }
+  .fac-tbl tbody td {
+    padding: 0.75rem 0.6rem;
+    border-bottom: 1px solid var(--cream);
+    vertical-align: top;
+  }
+  .fac-tbl tbody td:first-child { padding-left: 0; }
+  .fac-tbl tbody td:not(:first-child) { text-align: right; }
+  .fac-tbl tbody tr:last-child td { border-bottom: none; }
+  .fac-tbl .item-nombre { font-weight: 600; color: var(--ink); }
+  .fac-tbl .item-cat { font-size: 0.7rem; color: var(--ash); margin-top: 0.08rem; }
+
+  /* ── Totals block ───────────────────────────────────────────────────────── */
+  .fac-totals-wrap {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2rem;
+    padding: 1.2rem 2rem 1.8rem;
+    border-top: 1px solid var(--mist);
+    background: var(--ivory);
+  }
+  .fac-nota-box {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    justify-content: flex-end;
+  }
+  .fac-nota-label {
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ash);
+    margin-bottom: 0.15rem;
+  }
+  .fac-nota-text {
+    font-size: 0.78rem;
+    color: var(--stone);
+    line-height: 1.5;
+  }
+  .fac-totals-table {
+    min-width: 260px;
+  }
+  .fac-total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 0.28rem 0;
+    font-size: 0.83rem;
+  }
+  .fac-total-row .lbl { color: var(--stone); }
+  .fac-total-row .val { font-weight: 600; color: var(--ink); font-family: monospace; font-size: 0.88rem; }
+  .fac-total-row.divider { border-top: 1px solid var(--mist); padding-top: 0.55rem; margin-top: 0.2rem; }
+  .fac-total-row.grand {
+    border-top: 2px solid var(--ink);
+    padding-top: 0.65rem;
+    margin-top: 0.3rem;
+  }
+  .fac-total-row.grand .lbl { font-weight: 800; font-size: 0.88rem; color: var(--ink); }
+  .fac-total-row.grand .val {
+    font-weight: 800;
+    font-size: 1.15rem;
+    color: #0f2d1e;
+    font-family: var(--serif);
+  }
+
+  /* ── Footer band ────────────────────────────────────────────────────────── */
+  .fac-footer {
+    background: #0f2d1e;
+    color: rgba(255,255,255,0.55);
+    padding: 1rem 2rem;
+    font-size: 0.65rem;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 1rem;
+  }
+  .fac-footer a { color: rgba(255,255,255,0.55); }
+  .fac-footer-right {
+    text-align: right;
+    font-size: 0.62rem;
+    letter-spacing: 0.04em;
+  }
+  .fac-footer-ticket {
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: #7fffa0;
+    font-weight: 700;
+    margin-bottom: 0.15rem;
+  }
+
+  /* ── Regime tag ─────────────────────────────────────────────────────────── */
+  .regime-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.55rem;
+    background: rgba(127,255,160,0.15);
+    border: 1px solid rgba(127,255,160,0.25);
+    border-radius: 99px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #7fffa0;
+    margin-top: 0.5rem;
+  }
+
+  /* ── Pago badge ─────────────────────────────────────────────────────────── */
+  .pago-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.22rem 0.65rem;
+    background: var(--leaf-pale);
+    border: 1px solid var(--leaf-tint);
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--leaf-dark);
+  }
+
+  /* ── Watermark entregado ────────────────────────────────────────────────── */
+  .fac-stamp {
+    position: absolute;
+    right: 1.5rem;
+    top: 50%;
+    transform: translateY(-50%) rotate(-12deg);
+    font-family: var(--serif);
+    font-size: 1.8rem;
+    font-weight: 900;
+    color: var(--leaf);
+    opacity: 0.1;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  /* ── Print styles ───────────────────────────────────────────────────────── */
+  @media print {
+    body { background: #fff !important; }
+    .sidebar, .topbar, .topbar-actions, .btn, button { display: none !important; }
+    .main-content { margin-left: 0 !important; padding: 0 !important; }
+    .factura { box-shadow: none !important; border: 1px solid #ccc !important; border-radius: 0 !important; }
+    .factura-wrap { max-width: 100%; margin: 0; }
+    .fac-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .fac-footer { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .fac-resolucion { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .fac-totals-wrap { background: #f9f9f7 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="factura-wrap">
+<div class="factura">
+
+  <!-- ── Cabecera ──────────────────────────────────────────────────────────── -->
+  <div class="fac-header">
+    <div>
+      <div class="fac-emisor-sub">Cafetería Escolar</div>
+      <div class="fac-emisor-nombre">Punto Asis</div>
+      <div class="fac-emisor-dato"><i class="bi bi-geo-alt"></i> {{ config.direccion }}</div>
+      <div class="fac-emisor-dato"><i class="bi bi-building"></i> {{ config.ciudad }} — {{ config.departamento }}</div>
+      {% if config.telefono %}
+      <div class="fac-emisor-dato"><i class="bi bi-telephone"></i> {{ config.telefono }}</div>
+      {% endif %}
+      {% if config.email %}
+      <div class="fac-emisor-dato"><i class="bi bi-envelope"></i> {{ config.email }}</div>
+      {% endif %}
+      <div class="fac-emisor-dato"><i class="bi bi-hash"></i> NIT: {{ config.nit }}</div>
+      <div class="regime-tag"><i class="bi bi-shield-check"></i> {{ config.regimen }}</div>
+    </div>
+    <div class="fac-doc-block">
+      <div class="fac-tipo-doc">Factura de Venta</div>
+      <div class="fac-numero">{{ pedido.ticket }}</div>
+      <div class="fac-numero-label">N° de Documento</div>
+    </div>
+  </div>
+
+  <!-- ── Barra de resolución DIAN ──────────────────────────────────────────── -->
+  <div class="fac-resolucion">
+    Habilitación DIAN: {{ config.resolucion }} — Actividad económica CIIU: {{ config.ciiu }} · {{ config.actividad }}
+  </div>
+
+  <!-- ── Cinta de fechas ───────────────────────────────────────────────────── -->
+  <div class="fac-ribbon">
+    <div class="fac-ribbon-item">
+      <div class="fac-ribbon-label">Fecha de expedición</div>
+      <div class="fac-ribbon-val">{{ pedido.fecha_pedido|date:"d/m/Y" }}</div>
+    </div>
+    <div class="fac-ribbon-item">
+      <div class="fac-ribbon-label">Hora</div>
+      <div class="fac-ribbon-val">{{ pedido.fecha_pedido|date:"H:i" }} hrs</div>
+    </div>
+    <div class="fac-ribbon-item">
+      <div class="fac-ribbon-label">Forma de pago</div>
+      <div class="fac-ribbon-val">
+        <span class="pago-badge"><i class="bi bi-wallet2"></i> Saldo prepagado</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Emisor / Receptor ─────────────────────────────────────────────────── -->
+  <div class="fac-partes">
+
+    <!-- VENDEDOR -->
+    <div class="fac-parte">
+      <div class="fac-parte-tag"><i class="bi bi-shop"></i> Vendedor / Emisor</div>
+      <div class="fac-parte-nombre">Cafetería Punto Asis</div>
+      <div class="fac-parte-fila">
+        <i class="bi bi-hash"></i>
+        <span><strong>NIT:</strong> {{ config.nit }}</span>
+      </div>
+      <div class="fac-parte-fila">
+        <i class="bi bi-geo-alt"></i>
+        <span>{{ config.direccion }}, {{ config.ciudad }}</span>
+      </div>
+      <div class="fac-parte-fila">
+        <i class="bi bi-building-fill-gear"></i>
+        <span><strong>Régimen:</strong> {{ config.regimen }}</span>
+      </div>
+      <div class="fac-parte-fila">
+        <i class="bi bi-telephone"></i>
+        <span>{{ config.telefono }}</span>
+      </div>
+      {% if responsable %}
+      <div class="fac-parte-fila">
+        <i class="bi bi-person-badge"></i>
+        <span><strong>Responsable:</strong> {{ responsable.nombre }} — CC {{ responsable.documento }}</span>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- ADQUIRENTE -->
+    <div class="fac-parte" style="position:relative;">
+      <div class="fac-stamp">PAGADO</div>
+      <div class="fac-parte-tag"><i class="bi bi-person"></i> Adquirente / Comprador</div>
+      <div class="fac-parte-nombre">{{ nombre_estudiante }}</div>
+      <div class="fac-parte-fila">
+        <i class="bi bi-person-vcard"></i>
+        <span><strong>Tipo doc.:</strong> Tarjeta de Identidad / Código estudiantil</span>
+      </div>
+      <div class="fac-parte-fila">
+        <i class="bi bi-hash"></i>
+        <span><strong>N° documento:</strong> {{ pedido.estudiante.codigo }}</span>
+      </div>
+      <div class="fac-parte-fila">
+        <i class="bi bi-mortarboard"></i>
+        <span><strong>Grado:</strong> {{ pedido.estudiante.grado }}</span>
+      </div>
+      {% if pedido.estudiante.padre %}
+      <div class="fac-parte-fila">
+        <i class="bi bi-people"></i>
+        <span><strong>Acudiente:</strong> {{ nombre_padre }}</span>
+      </div>
+      {% if telefono_padre %}
+      <div class="fac-parte-fila">
+        <i class="bi bi-telephone"></i>
+        <span>{{ telefono_padre }}</span>
+      </div>
+      {% endif %}
+      {% endif %}
+      <div class="fac-parte-fila">
+        <i class="bi bi-geo-alt"></i>
+        <span><strong>Ciudad:</strong> {{ config.ciudad }}</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Tabla de productos ────────────────────────────────────────────────── -->
+  <div class="fac-table-wrap">
+    <table class="fac-tbl">
+      <thead>
+        <tr>
+          <th style="width:40%;">Descripción del bien / servicio</th>
+          <th>Cant.</th>
+          <th>Vlr. Unitario</th>
+          <th>Descuento</th>
+          <th>IVA</th>
+          <th>Vlr. Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in pedido.detalles.all %}
+        <tr>
+          <td>
+            <div class="item-nombre">{{ d.producto.nombre }}</div>
+            <div class="item-cat">{{ d.producto.categoria }} · {{ d.producto.get_tipo_display }}</div>
+          </td>
+          <td>{{ d.cantidad }}</td>
+          <td>${{ d.precio_unitario|miles }}</td>
+          <td style="color:var(--ash);">$0</td>
+          <td>
+            <span style="font-size:0.72rem;color:var(--ash);">Excluido</span>
+          </td>
+          <td style="font-weight:700;">${{ d.subtotal|miles }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── Totales + Notas ───────────────────────────────────────────────────── -->
+  <div class="fac-totals-wrap">
+
+    <!-- Notas / observaciones -->
+    <div class="fac-nota-box">
+      {% if pedido.nota %}
+      <div>
+        <div class="fac-nota-label">Observaciones del pedido</div>
+        <div class="fac-nota-text">{{ pedido.nota }}</div>
+      </div>
+      {% endif %}
+      <div>
+        <div class="fac-nota-label">Leyenda tributaria</div>
+        <div class="fac-nota-text">
+          Los bienes y servicios de alimentación escolar están excluidos de IVA según
+          el Art. 424 del Estatuto Tributario y el Dec. 1625 de 2016.<br>
+          No somos responsables del IVA (Régimen Simplificado).
+        </div>
+      </div>
+      <div>
+        <div class="fac-nota-label">Forma de pago</div>
+        <div class="fac-nota-text">
+          <span class="pago-badge" style="font-size:0.72rem;">
+            <i class="bi bi-wallet2"></i> Saldo prepagado escolar — Pago de contado
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Columna de totales -->
+    <div class="fac-totals-table">
+      <div class="fac-total-row">
+        <span class="lbl">Subtotal bruto</span>
+        <span class="val">${{ pedido.total|miles }}</span>
+      </div>
+      <div class="fac-total-row">
+        <span class="lbl">Descuentos</span>
+        <span class="val">$0</span>
+      </div>
+      <div class="fac-total-row">
+        <span class="lbl">Base gravable</span>
+        <span class="val">${{ pedido.total|miles }}</span>
+      </div>
+      <div class="fac-total-row">
+        <span class="lbl">IVA (0% — Excluido)</span>
+        <span class="val">$0</span>
+      </div>
+      <div class="fac-total-row">
+        <span class="lbl">Retención en la fuente</span>
+        <span class="val">$0</span>
+      </div>
+      <div class="fac-total-row grand">
+        <span class="lbl">TOTAL A PAGAR</span>
+        <span class="val">${{ pedido.total|miles }}</span>
+      </div>
+      <div style="margin-top:0.6rem;padding:0.5rem 0.75rem;background:#f0fdf4;border:1px solid #dcfce7;border-radius:8px;font-size:0.72rem;color:var(--leaf-dark);display:flex;align-items:center;gap:0.4rem;">
+        <i class="bi bi-check-circle-fill" style="color:var(--leaf);"></i>
+        <strong>PAGADO</strong> — Saldo descontado exitosamente
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Footer ────────────────────────────────────────────────────────────── -->
+  <div class="fac-footer">
+    <div>
+      Documento generado por el sistema <strong style="color:rgba(255,255,255,0.8);">Punto Asis</strong>
+      · Este documento es válido como comprobante de pago para uso interno escolar.<br>
+      Conserve este documento para cualquier reclamación. Ante dudas comuníquese con la cafetería.
+    </div>
+    <div class="fac-footer-right">
+      <div class="fac-footer-ticket">{{ pedido.ticket }}</div>
+      <div>Emitido: {{ pedido.fecha_pedido|date:"d/m/Y H:i" }}</div>
+      <div>Estado: <span style="color:#7fffa0;font-weight:700;">{{ pedido.get_estado_display }}</span></div>
+    </div>
+  </div>
+
+</div>
+</div>
+{% endblock %}

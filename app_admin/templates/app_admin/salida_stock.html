@@ -279,7 +279,8 @@ function mostrarInfoItem() {
   document.getElementById('info-nombre').textContent = item.nombre;
   document.getElementById('info-unidad').textContent = '(' + item.unidad + ')';
   const stockEl = document.getElementById('info-stock');
-  stockEl.textContent = item.stock + ' ' + item.unidad;
+  const stockFmt = Number(item.stock).toLocaleString('es-CO');
+  stockEl.textContent = stockFmt + ' ' + item.unidad;
   if (item.stock <= 0) {
     stockEl.style.background = 'var(--red-pale)';
     stockEl.style.color = 'var(--red)';
@@ -287,7 +288,7 @@ function mostrarInfoItem() {
     stockEl.style.background = 'var(--leaf-pale)';
     stockEl.style.color = 'var(--leaf-dark)';
   }
-  document.getElementById('disp-stock').textContent = item.stock + ' ' + item.unidad;
+  document.getElementById('disp-stock').textContent = stockFmt + ' ' + item.unidad;
   bar.classList.add('visible');
 
   // Habilitar botón

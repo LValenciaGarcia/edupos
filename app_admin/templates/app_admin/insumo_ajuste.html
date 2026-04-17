@@ -1,0 +1,389 @@
+{% extends 'app_admin/base_admin.html' %}
+{% block title %}Movimiento — {{ insumo.nombre }}{% endblock %}
+{% block page_title %}Movimiento de insumo{% endblock %}
+{% block nav_insumos %}active{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'app_admin:insumos' %}" class="btn btn-ghost btn-sm">
+    <i class="bi bi-arrow-left"></i> Volver
+  </a>
+{% endblock %}
+
+{% block content %}
+<style>
+  .ajuste-wrap {
+    max-width: 660px;
+    margin: 0 auto;
+  }
+  .step-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    background: var(--amber-tint);
+    color: var(--amber);
+    font-size: 0.72rem;
+    font-weight: 700;
+    margin-right: 0.5rem;
+    flex-shrink: 0;
+  }
+  .tipo-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+  .tipo-card {
+    border: 2px solid var(--mist);
+    border-radius: 12px;
+    padding: 0.95rem 1.1rem;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    background: var(--ivory);
+    user-select: none;
+  }
+  .tipo-card:hover { border-color: var(--fog); box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+  .tipo-card.sel-entrada { border-color: var(--leaf);  background: var(--leaf-pale);  box-shadow: 0 0 0 3px rgba(22,163,74,0.1); }
+  .tipo-card.sel-salida  { border-color: var(--amber); background: var(--amber-pale); box-shadow: 0 0 0 3px rgba(217,119,6,0.1); }
+  .tipo-card.sel-merma   { border-color: var(--red);   background: var(--red-pale);   box-shadow: 0 0 0 3px rgba(220,38,38,0.1); }
+  .tipo-card.sel-ajuste  { border-color: var(--sky);   background: var(--sky-pale,#e0f2fe); box-shadow: 0 0 0 3px rgba(14,165,233,0.1); }
+  .tipo-card-icon {
+    width: 2.2rem; height: 2.2rem;
+    border-radius: 50%;
+    background: var(--cream);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem; color: var(--ash); flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
+  }
+  .tipo-card.sel-entrada .tipo-card-icon { background: rgba(22,163,74,0.12); color: var(--leaf); }
+  .tipo-card.sel-salida  .tipo-card-icon { background: var(--amber-tint); color: var(--amber); }
+  .tipo-card.sel-merma   .tipo-card-icon { background: var(--red-pale); color: var(--red); }
+  .tipo-card.sel-ajuste  .tipo-card-icon { background: #e0f2fe; color: var(--sky); }
+  .tipo-card-label { font-weight: 700; font-size: 0.84rem; color: var(--ink); }
+  .tipo-card-sub   { font-size: 0.70rem; color: var(--ash); margin-top: 0.05rem; }
+
+  .costo-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.8rem 1.2rem;
+    border-top: 1px solid var(--mist);
+    background: var(--cream);
+    border-radius: 0 0 12px 12px;
+  }
+  .costo-label  { font-size: 0.78rem; font-weight: 700; color: var(--stone); text-transform: uppercase; letter-spacing: 0.05em; }
+  .costo-amount { font-size: 1.05rem; font-weight: 800; color: var(--leaf-dark, #166534); }
+
+  .stock-info-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    padding: 1rem 1.2rem;
+  }
+  .stock-stat {
+    background: var(--cream);
+    border: 1px solid var(--mist);
+    border-radius: 9px;
+    padding: 0.75rem 0.95rem;
+  }
+  .stock-stat-label { font-size: 0.59rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ash); margin-bottom: 0.2rem; }
+  .stock-stat-val   { font-family: var(--serif); font-size: 1.3rem; line-height: 1; }
+  .stock-stat-val.green  { color: var(--leaf); }
+  .stock-stat-val.amber  { color: var(--amber); }
+  .stock-stat-val.red    { color: var(--red); }
+  .stock-stat-sub   { font-size: 0.68rem; color: var(--ash); margin-top: 0.15rem; }
+</style>
+
+<div class="ajuste-wrap">
+  <form method="post" id="form-ajuste">
+    {% csrf_token %}
+    <input type="hidden" name="tipo"     id="inp-tipo"     value="{{ tipo_inicial|default:'entrada' }}">
+    <input type="hidden" name="cantidad" id="inp-cantidad-real">
+
+    <!-- ── Info del insumo ── -->
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="card-head">
+        <span class="card-title" style="font-size:0.95rem;display:flex;align-items:center;gap:0.5rem;">
+          {% if insumo.imagen %}
+          <img src="{{ insumo.imagen.url }}" alt="{{ insumo.nombre }}"
+               style="width:2rem;height:2rem;object-fit:cover;border-radius:6px;flex-shrink:0;border:1px solid var(--mist);">
+          {% endif %}
+          {{ insumo.nombre }}
+        </span>
+        <span style="font-size:0.72rem;font-weight:600;padding:0.18rem 0.55rem;border-radius:99px;background:var(--cream);color:var(--stone);border:1px solid var(--mist);">
+          {{ insumo.get_categoria_display }}
+        </span>
+      </div>
+      <div class="stock-info-row">
+        <div class="stock-stat">
+          <div class="stock-stat-label">Stock actual</div>
+          <div class="stock-stat-val {% if insumo.sin_stock %}red{% elif insumo.stock_bajo %}amber{% else %}green{% endif %}">
+            {{ insumo.stock|floatformat:"-2" }}
+          </div>
+          <div class="stock-stat-sub">{{ insumo.get_unidad_display }}</div>
+        </div>
+        <div class="stock-stat">
+          <div class="stock-stat-label">Stock mínimo</div>
+          <div class="stock-stat-val">{{ insumo.stock_minimo|floatformat:"-2" }}</div>
+          <div class="stock-stat-sub">{{ insumo.get_unidad_display }}</div>
+        </div>
+        <div class="stock-stat">
+          <div class="stock-stat-label">Precio ref.</div>
+          <div class="stock-stat-val green">${{ insumo.precio_unitario|floatformat:0 }}</div>
+          <div class="stock-stat-sub">/ {{ insumo.get_unidad_display }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Paso 1: Tipo ── -->
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="card-head">
+        <span class="card-title" style="font-size:0.95rem;">
+          <span class="step-badge">1</span>
+          Tipo de movimiento
+        </span>
+      </div>
+      <div style="padding:1.1rem 1.2rem;">
+        <div class="tipo-grid">
+
+          <div class="tipo-card" id="card-entrada" onclick="seleccionarTipo('entrada')">
+            <div class="tipo-card-icon"><i class="bi bi-box-arrow-in-down"></i></div>
+            <div>
+              <div class="tipo-card-label">Entrada</div>
+              <div class="tipo-card-sub">Compra / reposición</div>
+            </div>
+          </div>
+
+          <div class="tipo-card" id="card-salida" onclick="seleccionarTipo('salida')">
+            <div class="tipo-card-icon"><i class="bi bi-box-arrow-up"></i></div>
+            <div>
+              <div class="tipo-card-label">Salida</div>
+              <div class="tipo-card-sub">Consumo operativo</div>
+            </div>
+          </div>
+
+          <div class="tipo-card" id="card-merma" onclick="seleccionarTipo('merma')">
+            <div class="tipo-card-icon"><i class="bi bi-exclamation-triangle"></i></div>
+            <div>
+              <div class="tipo-card-label">Merma</div>
+              <div class="tipo-card-sub">Pérdida / daño</div>
+            </div>
+          </div>
+
+          <div class="tipo-card" id="card-ajuste" onclick="seleccionarTipo('ajuste')">
+            <div class="tipo-card-icon"><i class="bi bi-sliders"></i></div>
+            <div>
+              <div class="tipo-card-label">Ajuste</div>
+              <div class="tipo-card-sub">Corrección de inventario</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Paso 2: Cantidad y detalles ── -->
+    <div class="card" style="margin-bottom:1rem;overflow:hidden;">
+      <div class="card-head">
+        <span class="card-title" style="font-size:0.95rem;">
+          <span class="step-badge">2</span>
+          Cantidad y detalles
+        </span>
+      </div>
+      <div style="padding:1.1rem 1.2rem;display:grid;gap:1rem;">
+
+        <!-- Bloque entrada -->
+        <div id="bloque-entrada">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+            <div class="field">
+              <label>Cantidad entrante <span style="color:var(--red);">*</span></label>
+              <input type="number" id="vis-cant-entrada" min="0.01" step="0.01"
+                     placeholder="0" style="font-size:1.1rem;font-weight:700;"
+                     oninput="calcularCosto()">
+              <span class="hint">{{ insumo.get_unidad_display }}</span>
+            </div>
+            <div class="field">
+              <label>Precio / {{ insumo.get_unidad_display }} <span style="color:var(--ash);font-size:0.72rem;">(referencia visual)</span></label>
+              <input type="text" id="vis-precio-ref" inputmode="numeric"
+                     class="fmt-miles"
+                     value="{{ insumo.precio_unitario|floatformat:0 }}"
+                     style="font-size:1.1rem;font-weight:700;"
+                     oninput="calcularCosto()">
+            </div>
+          </div>
+        </div>
+
+        <!-- Bloque salida / merma -->
+        <div id="bloque-salida" style="display:none;">
+          <div class="field">
+            <label>Cantidad a descontar <span style="color:var(--red);">*</span></label>
+            <input type="number" id="vis-cant-salida" min="0.01" step="0.01"
+                   max="{{ insumo.stock }}" placeholder="0"
+                   style="font-size:1.1rem;font-weight:700;">
+            <span class="hint">Disponible: {{ insumo.stock|floatformat:"-2" }} {{ insumo.get_unidad_display }}</span>
+          </div>
+        </div>
+
+        <!-- Bloque ajuste -->
+        <div id="bloque-ajuste" style="display:none;">
+          <div class="field">
+            <label>Nuevo stock total <span style="color:var(--red);">*</span></label>
+            <input type="number" id="vis-cant-ajuste" min="0.01" step="0.01"
+                   placeholder="{{ insumo.stock|floatformat:'-2' }}"
+                   style="font-size:1.1rem;font-weight:700;">
+            <span class="hint">El stock quedará exactamente en este valor</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Nota / motivo (opcional)</label>
+          <input type="text" name="nota" id="inp-nota" maxlength="200"
+                 placeholder="Describe el motivo del movimiento…">
+        </div>
+
+      </div>
+
+      <!-- Barra de costo estimado (solo entrada) -->
+      <div class="costo-bar" id="costo-bar" style="display:none;">
+        <span class="costo-label">Costo estimado</span>
+        <span class="costo-amount" id="costo-amount">$0</span>
+      </div>
+    </div>
+
+    <!-- ── Botones ── -->
+    <div style="display:flex;gap:0.75rem;justify-content:flex-end;margin-top:0.5rem;">
+      <a href="{% url 'app_admin:insumos' %}" class="btn btn-ghost">Cancelar</a>
+      <button type="submit" class="btn btn-primary" id="btn-submit">
+        <i class="bi bi-check-lg" id="btn-icon"></i>
+        <span id="btn-text">Registrar entrada</span>
+      </button>
+    </div>
+
+  </form>
+
+  <!-- ── Historial reciente ── -->
+  {% with movs=insumo.movimientos.all|slice:":8" %}
+  {% if movs %}
+  <div class="card" style="margin-top:1.5rem;">
+    <div class="card-head">
+      <span class="card-title" style="font-size:0.88rem;color:var(--ash);">
+        <i class="bi bi-clock-history" style="margin-right:0.35rem;"></i>
+        Últimos movimientos
+      </span>
+      <a href="{% url 'app_admin:insumo_historial' insumo.pk %}" class="btn btn-ghost btn-sm">
+        Ver todo <i class="bi bi-arrow-right"></i>
+      </a>
+    </div>
+    <div style="overflow-x:auto;">
+    <table class="tbl">
+      <thead>
+        <tr><th>Tipo</th><th>Cantidad</th><th>Nota</th><th>Fecha</th></tr>
+      </thead>
+      <tbody>
+      {% for m in movs %}
+      <tr>
+        <td>
+          <span class="badge {% if m.tipo == 'entrada' %}badge-ok{% elif m.tipo == 'salida' %}badge-entregado{% elif m.tipo == 'merma' %}badge-out{% else %}badge-low{% endif %}">
+            {{ m.get_tipo_display }}
+          </span>
+        </td>
+        <td>
+          <span style="font-weight:600;">{{ m.cantidad|floatformat:"-2" }}</span>
+          <span style="color:var(--ash);font-size:0.78rem;">{{ insumo.get_unidad_display }}</span>
+        </td>
+        <td style="color:var(--stone);font-size:0.8rem;">{{ m.nota|default:"—" }}</td>
+        <td style="font-size:0.75rem;color:var(--ash);">{{ m.fecha|date:"d/m/Y H:i" }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  {% endif %}
+  {% endwith %}
+</div>
+
+<script>
+let tipoActual = '{{ tipo_inicial|default:"entrada" }}';
+
+const TIPO_CFG = {
+  'entrada': { cls: 'sel-entrada', icon: 'bi-box-arrow-in-down', btn: 'btn-primary',  txt: 'Registrar entrada', nota: 'Compra / reposición de stock'  },
+  'salida' : { cls: 'sel-salida',  icon: 'bi-box-arrow-up',      btn: 'btn-amber',    txt: 'Registrar salida',  nota: 'Consumo en operación'          },
+  'merma'  : { cls: 'sel-merma',   icon: 'bi-exclamation-triangle', btn: 'btn-danger', txt: 'Registrar merma',  nota: 'Pérdida / daño'                },
+  'ajuste' : { cls: 'sel-ajuste',  icon: 'bi-sliders',           btn: 'btn-ghost',    txt: 'Guardar ajuste',    nota: 'Ajuste de inventario físico'   },
+};
+
+function seleccionarTipo(tipo) {
+  tipoActual = tipo;
+  document.getElementById('inp-tipo').value = tipo;
+
+  // Cards
+  ['entrada','salida','merma','ajuste'].forEach(t => {
+    const c = document.getElementById('card-' + t);
+    c.className = 'tipo-card';
+  });
+  const cfg = TIPO_CFG[tipo];
+  document.getElementById('card-' + tipo).classList.add(cfg.cls);
+
+  // Bloques
+  const esEntrada = tipo === 'entrada';
+  const esSalida  = tipo === 'salida' || tipo === 'merma';
+  const esAjuste  = tipo === 'ajuste';
+  document.getElementById('bloque-entrada').style.display = esEntrada ? '' : 'none';
+  document.getElementById('bloque-salida').style.display  = esSalida  ? '' : 'none';
+  document.getElementById('bloque-ajuste').style.display  = esAjuste  ? '' : 'none';
+  document.getElementById('costo-bar').style.display      = esEntrada ? '' : 'none';
+
+  // Botón
+  const btn = document.getElementById('btn-submit');
+  btn.className = 'btn ' + cfg.btn;
+  document.getElementById('btn-icon').className = 'bi ' + cfg.icon;
+  document.getElementById('btn-text').textContent = cfg.txt;
+
+  // Nota placeholder
+  const notaInp = document.getElementById('inp-nota');
+  if (!notaInp.value) notaInp.placeholder = cfg.nota;
+
+  calcularCosto();
+}
+
+function calcularCosto() {
+  if (tipoActual !== 'entrada') return;
+  const cant   = parseFloat(document.getElementById('vis-cant-entrada').value) || 0;
+  const rawP   = (document.getElementById('vis-precio-ref').value || '0').replace(/\./g, '').replace(',', '.');
+  const precio = parseFloat(rawP) || 0;
+  const costo  = cant * precio;
+  document.getElementById('costo-amount').textContent = '$' + costo.toLocaleString('es-CO');
+}
+
+// Validación y preparación del submit
+document.getElementById('form-ajuste').addEventListener('submit', function(e) {
+  const esEntrada = tipoActual === 'entrada';
+  const esSalida  = tipoActual === 'salida' || tipoActual === 'merma';
+  const esAjuste  = tipoActual === 'ajuste';
+
+  let valor;
+  if (esEntrada) {
+    valor = document.getElementById('vis-cant-entrada').value;
+  } else if (esSalida) {
+    valor = document.getElementById('vis-cant-salida').value;
+  } else {
+    valor = document.getElementById('vis-cant-ajuste').value;
+  }
+
+  const num = parseFloat(valor);
+  if (!valor || isNaN(num) || num <= 0) {
+    e.preventDefault();
+    alert('La cantidad debe ser mayor a 0.');
+    return;
+  }
+
+  document.getElementById('inp-cantidad-real').value = num;
+});
+
+// Inicializar con el tipo correcto
+seleccionarTipo(tipoActual);
+</script>
+{% endblock %}

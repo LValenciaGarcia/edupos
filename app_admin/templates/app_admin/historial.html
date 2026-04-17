@@ -471,17 +471,17 @@ const MOV_CFG = {
 /* ── Estado interno ── */
 let ultimosFiltros = null;
 
-/* ── Formateo de fecha relativa ── */
-function fechaRelativa(isoStr) {
+/* ── Formateo de fecha relativa usando timestamp ── */
+function fechaRelativa(timestampMs) {
   const ahora = new Date();
-  const fecha = new Date(isoStr);
+  const fecha = new Date(timestampMs);
   const diff  = Math.floor((ahora - fecha) / 1000);
   if (isNaN(diff)) return '';
-  if (diff < 60)           return 'Hace un momento';
-  if (diff < 3600)         return `Hace ${Math.floor(diff/60)} min`;
-  if (diff < 86400)        return `Hace ${Math.floor(diff/3600)} h`;
-  if (diff < 86400 * 2)    return 'Ayer';
-  if (diff < 86400 * 7)    return `Hace ${Math.floor(diff/86400)} días`;
+  if (diff < 60) return 'Hace un momento';
+  if (diff < 3600) return `Hace ${Math.floor(diff/60)} min`;
+  if (diff < 86400) return `Hace ${Math.floor(diff/3600)} h`;
+  if (diff < 86400 * 2) return 'Ayer';
+  if (diff < 86400 * 7) return `Hace ${Math.floor(diff/86400)} días`;
   return fecha.toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' });
 }
 
@@ -547,7 +547,7 @@ function mostrarEstado(id) {
     });
 }
 
-/* ── Carga principal ── */
+/* ── Carga principal (CORREGIDA) ── */
 function aplicarFiltros() {
   const tipo  = document.getElementById('f-tipo').value;
   const mov   = document.getElementById('f-mov').value;
@@ -608,16 +608,16 @@ function aplicarFiltros() {
           <td>
             <div class="fecha-wrap">
               <div class="fecha-abs">${m.fecha}</div>
-              <div class="fecha-rel" id="fr-${i}"></div>
+              <div class="fecha-rel" data-ts="${m.fecha_timestamp}"></div>
             </div>
           </td>
         </tr>`;
       }).join('');
 
-      /* Fechas relativas */
-      filas.forEach((m, i) => {
-        const el = document.getElementById(`fr-${i}`);
-        if (el && m.fecha_iso) el.textContent = fechaRelativa(m.fecha_iso);
+      // Actualizar las fechas relativas usando los timestamps
+      document.querySelectorAll('.fecha-rel').forEach(el => {
+        const ts = el.getAttribute('data-ts');
+        if (ts) el.textContent = fechaRelativa(parseInt(ts));
       });
     })
     .catch(() => {
@@ -625,7 +625,7 @@ function aplicarFiltros() {
     });
 }
 
-/* ── Limpiar ── */
+/* ── Limpiar filtros ── */
 function limpiarFiltros() {
   ['f-tipo','f-mov'].forEach(id => { document.getElementById(id).selectedIndex = 0; });
   ['f-desde','f-hasta','f-q'].forEach(id => { document.getElementById(id).value = ''; });

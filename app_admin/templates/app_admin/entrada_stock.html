@@ -12,131 +12,54 @@
 
 {% block content %}
 <style>
-  .entrada-wrap {
-    max-width: 720px;
-    margin: 0 auto;
-  }
-  .step-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.5rem;
-    height: 1.5rem;
-    border-radius: 50%;
-    background: var(--amber-tint);
-    color: var(--amber);
-    font-size: 0.72rem;
-    font-weight: 700;
-    margin-right: 0.5rem;
-    flex-shrink: 0;
-  }
-  .compra-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    padding: 1.2rem 1.4rem;
-  }
+  /* (Mantén aquí los mismos estilos que tenías, no los repito por brevedad) */
+  .entrada-wrap { max-width: 720px; margin: 0 auto; }
+  .step-badge { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--amber-tint); color: var(--amber); font-size: 0.72rem; font-weight: 700; margin-right: 0.5rem; flex-shrink: 0; }
+  .compra-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; padding: 1.2rem 1.4rem; }
   .compra-grid .field-full { grid-column: 1 / -1; }
-
   .items-wrap { padding: 0 1.4rem 1.4rem; }
-
-  .item-fila {
-    display: grid;
-    grid-template-columns: 120px 1fr 100px 120px 110px 36px;
-    gap: 0.6rem;
-    align-items: center;
-    padding: 0.7rem 0.9rem;
-    border: 1.5px solid var(--mist);
-    border-radius: 10px;
-    background: var(--ivory);
-    margin-bottom: 0.55rem;
-    transition: border-color 0.15s, box-shadow 0.15s;
-  }
-  .item-fila:hover {
-    border-color: var(--fog);
-    box-shadow: 0 2px 10px rgba(0,0,0,0.04);
-  }
-  .item-fila:focus-within {
-    border-color: var(--amber);
-    box-shadow: 0 0 0 3px rgba(217,119,6,0.08);
-  }
-  .fila-label {
-    font-size: 0.65rem;
-    font-weight: 700;
-    color: var(--stone);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    margin-bottom: 0.2rem;
-  }
+  .item-fila { display: grid; grid-template-columns: 120px 1fr 100px 120px 110px 36px; gap: 0.6rem; align-items: center; padding: 0.7rem 0.9rem; border: 1.5px solid var(--mist); border-radius: 10px; background: var(--ivory); margin-bottom: 0.55rem; transition: border-color 0.15s, box-shadow 0.15s; }
+  .item-fila:hover { border-color: var(--fog); box-shadow: 0 2px 10px rgba(0,0,0,0.04); }
+  .item-fila:focus-within { border-color: var(--amber); box-shadow: 0 0 0 3px rgba(217,119,6,0.08); }
+  .fila-label { font-size: 0.65rem; font-weight: 700; color: var(--stone); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.2rem; }
   .fila-cell { display: flex; flex-direction: column; }
-  .fila-cell select,
-  .fila-cell input {
-    border: none;
-    background: transparent;
-    padding: 0.1rem 0;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--ink);
-    outline: none;
-    width: 100%;
-  }
+  .fila-cell select, .fila-cell input { border: none; background: transparent; padding: 0.1rem 0; font-size: 0.85rem; font-weight: 600; color: var(--ink); outline: none; width: 100%; }
   .fila-cell select { cursor: pointer; }
   .fila-cell input::placeholder { color: var(--fog); font-weight: 400; }
-  .subtotal-val {
-    font-size: 0.92rem;
-    font-weight: 800;
-    color: var(--leaf-dark, #166534);
-  }
-  .btn-del {
-    width: 2rem; height: 2rem;
-    border-radius: 6px;
-    border: 1.5px solid var(--mist);
-    background: transparent;
-    color: var(--stone);
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
-    transition: all 0.14s;
-    flex-shrink: 0;
-  }
+  .subtotal-val { font-size: 0.92rem; font-weight: 800; color: var(--leaf-dark, #166534); }
+  .btn-del { width: 2rem; height: 2rem; border-radius: 6px; border: 1.5px solid var(--mist); background: transparent; color: var(--stone); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.14s; flex-shrink: 0; }
   .btn-del:hover { border-color: var(--red); color: var(--red); background: var(--red-pale); }
-
-  .add-row-btn {
-    display: flex; align-items: center; gap: 0.5rem;
-    padding: 0.6rem 1rem;
-    border: 1.5px dashed var(--fog);
-    border-radius: 10px;
-    background: transparent;
-    color: var(--ash);
-    font-size: 0.82rem; font-weight: 600;
-    cursor: pointer;
-    transition: all 0.14s;
-    width: 100%; justify-content: center;
-    margin-top: 0.2rem;
-  }
+  .add-row-btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1rem; border: 1.5px dashed var(--fog); border-radius: 10px; background: transparent; color: var(--ash); font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.14s; width: 100%; justify-content: center; margin-top: 0.2rem; }
   .add-row-btn:hover { border-color: var(--amber); color: var(--amber); background: var(--amber-pale); }
-
-  .total-bar {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 0.85rem 1.4rem;
-    border-top: 1px solid var(--mist);
-    background: var(--cream);
-    border-radius: 0 0 12px 12px;
-  }
+  .total-bar { display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 1.4rem; border-top: 1px solid var(--mist); background: var(--cream); border-radius: 0 0 12px 12px; }
   .total-label { font-size: 0.82rem; font-weight: 700; color: var(--stone); text-transform: uppercase; letter-spacing: 0.05em; }
   .total-amount { font-size: 1.15rem; font-weight: 800; color: var(--leaf-dark, #166534); }
-
-  @media (max-width: 640px) {
-    .item-fila { grid-template-columns: 1fr 1fr; }
-    .fila-cell-item { grid-column: 1 / -1; }
-    .compra-grid { grid-template-columns: 1fr; }
-  }
+  @media (max-width: 640px) { .item-fila { grid-template-columns: 1fr 1fr; } .fila-cell-item { grid-column: 1 / -1; } .compra-grid { grid-template-columns: 1fr; } }
+  .prov-wrap { position: relative; }
+  .prov-trigger { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0.85rem; border: 1px solid var(--fog); border-radius: 7px; background: var(--ivory); cursor: pointer; font-size: 0.88rem; font-weight: 500; color: var(--ink); transition: border-color 0.14s, box-shadow 0.14s; user-select: none; min-height: 2.25rem; }
+  .prov-trigger:hover { border-color: var(--leaf); }
+  .prov-trigger.open { border-color: var(--amber); box-shadow: 0 0 0 3px rgba(217,119,6,0.1); }
+  .prov-trigger .prov-chevron { font-size: 0.72rem; color: var(--ash); transition: transform 0.15s; flex-shrink: 0; }
+  .prov-trigger.open .prov-chevron { transform: rotate(180deg); }
+  .prov-panel { display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--ivory); border: 1px solid var(--fog); border-radius: 9px; z-index: 60; box-shadow: 0 8px 28px rgba(0,0,0,0.14); overflow: hidden; }
+  .prov-panel.open { display: block; }
+  .prov-search-inp { width: 100%; padding: 0.52rem 0.85rem; border: none; border-bottom: 1px solid var(--cream); font-size: 0.82rem; outline: none; background: var(--ivory); font-family: var(--sans); color: var(--ink); }
+  .prov-list { max-height: 170px; overflow-y: auto; }
+  .prov-item { padding: 0.5rem 0.85rem; font-size: 0.83rem; cursor: pointer; display: flex; align-items: center; gap: 0.45rem; transition: background 0.1s; color: var(--ink); }
+  .prov-item:hover { background: var(--cream); }
+  .prov-item.selected { background: var(--amber-pale); color: var(--amber); font-weight: 600; }
+  .prov-item i { color: var(--ash); font-size: 0.78rem; flex-shrink: 0; }
+  .prov-item.selected i { color: var(--amber); }
+  .prov-empty { padding: 0.7rem 0.85rem; font-size: 0.8rem; color: var(--ash); text-align: center; }
+  .prov-label-placeholder { color: var(--fog); }
 </style>
+
 
 <div class="entrada-wrap">
 <form method="post" id="form-entrada">
 {% csrf_token %}
 
-  <!-- ── Paso 1: Datos de la compra ── -->
+  <!-- Paso 1: Datos de la compra -->
   <div class="card" style="margin-bottom:1rem;">
     <div class="card-head">
       <span class="card-title" style="font-size:0.95rem;">
@@ -145,10 +68,9 @@
       </span>
     </div>
     <div class="compra-grid">
-
       <div class="field">
         <label>Proveedor <span style="color:var(--red);">*</span></label>
-        <select name="proveedor" id="sel-proveedor" required>
+        <select name="proveedor" id="sel-proveedor" required style="display:none;">
           <option value="">— Seleccionar —</option>
           {% for prov in proveedores %}
           <option value="{{ prov.pk }}"
@@ -157,10 +79,30 @@
             {% elif producto_sel and producto_sel.proveedor and producto_sel.proveedor.pk == prov.pk %}selected
             {% elif ingrediente_sel and ingrediente_sel.proveedor and ingrediente_sel.proveedor.pk == prov.pk %}selected
             {% endif %}>
-            {{ prov.nombre }}
+            {{ prov.nombre }}{% if prov.nit %} · {{ prov.nit }}{% endif %}
           </option>
           {% endfor %}
         </select>
+        <div class="prov-wrap" id="prov-wrap">
+          <div class="prov-trigger" id="prov-trigger" tabindex="0">
+            <span id="prov-label" class="prov-label-placeholder">— Seleccionar proveedor —</span>
+            <i class="bi bi-chevron-down prov-chevron"></i>
+          </div>
+          <div class="prov-panel" id="prov-panel">
+            <input type="text" class="prov-search-inp" id="prov-search" placeholder="Buscar proveedor…">
+            <div class="prov-list" id="prov-list">
+              {% for prov in proveedores %}
+              <div class="prov-item" data-value="{{ prov.pk }}"
+                   data-label="{{ prov.nombre }}{% if prov.nit %} · {{ prov.nit }}{% endif %}">
+                <i class="bi bi-building"></i>
+                {{ prov.nombre }}{% if prov.nit %} <span style="color:var(--ash);font-size:0.75rem;">· {{ prov.nit }}</span>{% endif %}
+              </div>
+              {% empty %}
+              <div class="prov-empty">Sin proveedores activos</div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="field">
@@ -172,11 +114,10 @@
         <label>Nota (opcional)</label>
         <input type="text" name="nota" id="inp-nota" placeholder="Ej: factura #123, compra semanal…">
       </div>
-
     </div>
   </div>
 
-  <!-- ── Paso 2: Ítems ── -->
+  <!-- Paso 2: Ítems -->
   <div class="card" style="margin-bottom:1rem; overflow:hidden;">
     <div class="card-head">
       <span class="card-title" style="font-size:0.95rem;">
@@ -198,98 +139,94 @@
       </div>
 
       <div id="filas-body">
-
         {% if producto_sel %}
-        <div class="item-fila">
+        <div class="item-fila" data-fila="existente">
           <div class="fila-cell fila-cell-tipo">
-            <select name="item_tipo" class="tipo-sel" onchange="actualizarSelectItem(this)">
+            <select name="item_tipo" class="tipo-sel">
               <option value="producto" selected>Producto</option>
               <option value="ingrediente">Ingrediente</option>
             </select>
           </div>
           <div class="fila-cell fila-cell-item">
-            <select name="item_id" class="item-sel" onchange="autocompletarPrecio(this)">
+            <select name="item_id" class="item-sel">
               {% for p in productos %}
-              <option value="{{ p.pk }}" data-precio="{{ p.precio_costo|default:0 }}" {% if p.pk == producto_sel.pk %}selected{% endif %}>{{ p.nombre }}</option>
+              <option value="{{ p.pk }}" data-precio="{{ p.precio_costo|default:0|floatformat:'2' }}" {% if p.pk == producto_sel.pk %}selected{% endif %}>{{ p.nombre }}</option>
               {% endfor %}
             </select>
           </div>
           <div class="fila-cell fila-cell-cant">
-            <input type="number" name="item_cantidad" min="0.01" step="0.01" class="cant-inp" oninput="calcularSubtotal(this)" placeholder="0">
+            <input type="number" name="item_cantidad" min="0.01" step="0.01" class="cant-inp" placeholder="0">
           </div>
           <div class="fila-cell fila-cell-precio">
-            <input type="number" name="item_precio" min="0" step="0.01" class="precio-inp" oninput="calcularSubtotal(this)" placeholder="0">
+            <input type="text" name="item_precio" inputmode="numeric" class="precio-inp" placeholder="0">
           </div>
           <div class="fila-cell fila-cell-sub">
             <span class="subtotal-val">$0</span>
           </div>
-          <button type="button" class="btn-del" onclick="eliminarFila(this)" title="Eliminar">
+          <button type="button" class="btn-del" title="Eliminar">
             <i class="bi bi-trash" style="font-size:0.8rem;"></i>
           </button>
         </div>
-
         {% elif ingrediente_sel %}
-        <div class="item-fila">
+        <div class="item-fila" data-fila="existente">
           <div class="fila-cell fila-cell-tipo">
-            <select name="item_tipo" class="tipo-sel" onchange="actualizarSelectItem(this)">
+            <select name="item_tipo" class="tipo-sel">
               <option value="producto">Producto</option>
               <option value="ingrediente" selected>Ingrediente</option>
             </select>
           </div>
           <div class="fila-cell fila-cell-item">
-            <select name="item_id" class="item-sel" onchange="autocompletarPrecio(this)">
+            <select name="item_id" class="item-sel">
               {% for ing in ingredientes %}
-              <option value="{{ ing.pk }}" data-precio="{{ ing.precio_unitario }}" {% if ing.pk == ingrediente_sel.pk %}selected{% endif %}>{{ ing.nombre }}</option>
+              <option value="{{ ing.pk }}" data-precio="{{ ing.precio_unitario|default:0|floatformat:'2' }}" {% if ing.pk == ingrediente_sel.pk %}selected{% endif %}>{{ ing.nombre }}</option>
               {% endfor %}
             </select>
           </div>
           <div class="fila-cell fila-cell-cant">
-            <input type="number" name="item_cantidad" min="0.01" step="0.01" class="cant-inp" oninput="calcularSubtotal(this)" placeholder="0">
+            <input type="number" name="item_cantidad" min="0.01" step="0.01" class="cant-inp" placeholder="0">
           </div>
           <div class="fila-cell fila-cell-precio">
-            <input type="number" name="item_precio" min="0" step="1" class="precio-inp" oninput="calcularSubtotal(this)" placeholder="0" value="{{ ingrediente_sel.precio_unitario }}">
+            <input type="text" name="item_precio" inputmode="numeric" class="precio-inp" placeholder="0" value="{{ ingrediente_sel.precio_unitario|default:0|floatformat:'2' }}">
           </div>
           <div class="fila-cell fila-cell-sub">
             <span class="subtotal-val">$0</span>
           </div>
-          <button type="button" class="btn-del" onclick="eliminarFila(this)" title="Eliminar">
+          <button type="button" class="btn-del" title="Eliminar">
             <i class="bi bi-trash" style="font-size:0.8rem;"></i>
           </button>
         </div>
-
         {% else %}
-        <div class="item-fila">
+        <div class="item-fila" data-fila="existente">
           <div class="fila-cell fila-cell-tipo">
-            <select name="item_tipo" class="tipo-sel" onchange="actualizarSelectItem(this)">
+            <select name="item_tipo" class="tipo-sel">
               <option value="producto">Producto</option>
               <option value="ingrediente">Ingrediente</option>
             </select>
           </div>
           <div class="fila-cell fila-cell-item">
-            <select name="item_id" class="item-sel" onchange="autocompletarPrecio(this)">
+            <select name="item_id" class="item-sel">
               {% for p in productos %}
-              <option value="{{ p.pk }}" data-precio="{{ p.precio_costo|default:0 }}">{{ p.nombre }}</option>
+              <option value="{{ p.pk }}" data-precio="{{ p.precio_costo|default:0|floatformat:'2' }}">{{ p.nombre }}</option>
               {% endfor %}
             </select>
           </div>
           <div class="fila-cell fila-cell-cant">
-            <input type="number" name="item_cantidad" min="0.01" step="0.01" class="cant-inp" oninput="calcularSubtotal(this)" placeholder="0">
+            <input type="number" name="item_cantidad" min="0.01" step="0.01" class="cant-inp" placeholder="0">
           </div>
           <div class="fila-cell fila-cell-precio">
-            <input type="number" name="item_precio" min="0" step="0.01" class="precio-inp" oninput="calcularSubtotal(this)" placeholder="0">
+            <input type="text" name="item_precio" inputmode="numeric" class="precio-inp" placeholder="0">
           </div>
           <div class="fila-cell fila-cell-sub">
             <span class="subtotal-val">$0</span>
           </div>
-          <button type="button" class="btn-del" onclick="eliminarFila(this)" title="Eliminar">
+          <button type="button" class="btn-del" title="Eliminar">
             <i class="bi bi-trash" style="font-size:0.8rem;"></i>
           </button>
         </div>
         {% endif %}
-
       </div>
 
-      <button type="button" class="add-row-btn" onclick="agregarFila()">
+      <button type="button" class="add-row-btn" id="agregar-item-btn">
         <i class="bi bi-plus-lg"></i> Agregar ítem
       </button>
     </div>
@@ -300,7 +237,7 @@
     </div>
   </div>
 
-  <!-- ── Botones ── -->
+  <!-- Botones -->
   <div style="display:flex;gap:0.75rem;justify-content:flex-end;margin-top:0.5rem;">
     <a href="{% url 'app_admin:inventario' %}" class="btn btn-ghost">Cancelar</a>
     <button type="submit" class="btn btn-primary">
@@ -312,177 +249,346 @@
 </div>
 
 <script>
+// ========== 1. FUNCIONES DE FORMATO ==========
+function parseMiles(valor) {
+    if (!valor) return '';
+    return String(valor).replace(/\./g, '').replace(',', '.');
+}
+function fmtMiles(numero) {
+    if (isNaN(numero) || numero === '') return '';
+    let [entero, decimal] = String(Number(numero)).split('.');
+    entero = entero.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return decimal ? entero + ',' + decimal : entero;
+}
+function fmtPrecio(numero) {
+    if (isNaN(numero) || numero === '') return '0,00';
+    const redondeado = Math.round(numero * 100) / 100;
+    let [entero, decimal] = String(redondeado).split('.');
+    if (!decimal) decimal = '00';
+    else if (decimal.length === 1) decimal = decimal + '0';
+    entero = entero.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return entero + ',' + decimal;
+}
+
+// ========== 2. DATOS SEGUROS (precios con punto decimal) ==========
 const PRODUCTOS = [
-  {% for p in productos %}{"id": {{ p.pk }}, "nombre": "{{ p.nombre|escapejs }}", "precio": {{ p.precio_costo|default:0 }}},{% endfor %}
+  {% for p in productos %}{"id": {{ p.pk }}, "nombre": "{{ p.nombre|escapejs }}", "precio": {{ p.precio_costo|default:0|stringformat:".2f" }} },{% endfor %}
 ];
 const INGREDIENTES = [
-  {% for ing in ingredientes %}{"id": {{ ing.pk }}, "nombre": "{{ ing.nombre|escapejs }}", "precio": {{ ing.precio_unitario }}},{% endfor %}
+  {% for ing in ingredientes %}{"id": {{ ing.pk }}, "nombre": "{{ ing.nombre|escapejs }}", "precio": {{ ing.precio_unitario|default:0|stringformat:".2f" }} },{% endfor %}
 ];
 
-// ── FIX: al cambiar tipo, reconstruye el select de ítem con la lista correcta
+// ========== 3. FUNCIONES DE LA DINÁMICA ==========
+function initPrecioFmt(inp) {
+    if (inp._precioFmtInit) return;
+    inp._precioFmtInit = true;
+    inp.addEventListener('focus', function() {
+        const raw = parseMiles(this.value);
+        const num = parseFloat(raw);
+        if (!isNaN(num)) this.value = num;
+    });
+    inp.addEventListener('blur', function() {
+        const raw = parseFloat(parseMiles(this.value));
+        if (!isNaN(raw) && raw > 0) this.value = fmtMiles(raw);
+        calcularSubtotal(this);
+    });
+}
+
+function parsePrecio(v) {
+    return parseFloat(parseMiles(v || '0')) || 0;
+}
+
 function actualizarSelectItem(tipoSel) {
-  const fila      = tipoSel.closest('.item-fila');
-  const itemSel   = fila.querySelector('.item-sel');
-  const precioInp = fila.querySelector('.precio-inp');
-  const cantInp   = fila.querySelector('.cant-inp');
-  const lista     = tipoSel.value === 'producto' ? PRODUCTOS : INGREDIENTES;
+    const fila = tipoSel.closest('.item-fila');
+    const itemSel = fila.querySelector('.item-sel');
+    const precioInp = fila.querySelector('.precio-inp');
+    const cantInp = fila.querySelector('.cant-inp');
+    const lista = tipoSel.value === 'producto' ? PRODUCTOS : INGREDIENTES;
 
-  // Reconstruir opciones con la lista nueva
-  itemSel.innerHTML = lista.map(x =>
-    `<option value="${x.id}" data-precio="${x.precio || 0}">${x.nombre}</option>`
-  ).join('');
+    itemSel.innerHTML = lista.map(x => `<option value="${x.id}" data-precio="${x.precio}">${escapeHtml(x.nombre)}</option>`).join('');
 
-  // Limpiar precio y cantidad al cambiar de tipo
-  if (precioInp) precioInp.value = '';
-  if (cantInp)   cantInp.value   = '';
-  fila.querySelector('.subtotal-val').textContent = '$0';
-  recalcularTotal();
+    if (precioInp) precioInp.value = '';
+    if (cantInp) cantInp.value = '';
+    fila.querySelector('.subtotal-val').textContent = '$0';
+    recalcularTotal();
+    autocompletarPrecio(itemSel);
+}
 
-  // Sugerir precio del primer ítem de la lista nueva
-  autocompletarPrecio(itemSel);
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>]/g, function(m) {
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+        return m;
+    });
 }
 
 function autocompletarPrecio(itemSel) {
-  const fila      = itemSel.closest('.item-fila');
-  const opt       = itemSel.options[itemSel.selectedIndex];
-  const precio    = opt ? parseFloat(opt.dataset.precio) || 0 : 0;
-  const precioInp = fila.querySelector('.precio-inp');
-  if (precioInp && precio >= 0) {
-    precioInp.value = precio;
-    calcularSubtotal(precioInp);
-  }
+    const fila = itemSel.closest('.item-fila');
+    if (!fila) return;
+    const opt = itemSel.options[itemSel.selectedIndex];
+    const precio = opt ? parseFloat(opt.dataset.precio) || 0 : 0;
+    const precioInp = fila.querySelector('.precio-inp');
+    if (precioInp) {
+        precioInp.value = precio >= 0 ? fmtMiles(precio) : '';
+        initPrecioFmt(precioInp);
+        calcularSubtotal(precioInp);
+    }
 }
 
 function calcularSubtotal(inp) {
-  const fila   = inp.closest('.item-fila');
-  const cant   = parseFloat(fila.querySelector('.cant-inp').value)   || 0;
-  const precio = parseFloat(fila.querySelector('.precio-inp').value) || 0;
-  const sub    = cant * precio;
-  fila.querySelector('.subtotal-val').textContent = '$' + sub.toLocaleString('es-CO');
-  recalcularTotal();
+    if (!inp) return;
+    const fila = inp.closest('.item-fila');
+    if (!fila) return;
+
+    const cantInp = fila.querySelector('.cant-inp');
+    const precioInp = fila.querySelector('.precio-inp');
+    const subtotalEl = fila.querySelector('.subtotal-val');
+
+    if (!cantInp || !precioInp || !subtotalEl) return;
+
+    const cant = parseFloat(cantInp.value) || 0;
+    const precio = parsePrecio(precioInp.value);
+    const sub = cant * precio;
+
+    subtotalEl.textContent = '$' + fmtPrecio(sub);
+    recalcularTotal();
 }
 
 function recalcularTotal() {
-  let total = 0;
-  document.querySelectorAll('.item-fila').forEach(fila => {
-    const cant = parseFloat(fila.querySelector('.cant-inp').value) || 0;
-    const precio = parseFloat(fila.querySelector('.precio-inp').value) || 0;
-    total += cant * precio;
-  });
-  document.getElementById('total-general').textContent = '$' + total.toLocaleString('es-CO');
+    let total = 0;
+    document.querySelectorAll('.item-fila').forEach(fila => {
+        const cantInp = fila.querySelector('.cant-inp');
+        const precioInp = fila.querySelector('.precio-inp');
+        if (cantInp && precioInp) {
+            const cant = parseFloat(cantInp.value) || 0;
+            const precio = parsePrecio(precioInp.value);
+            total += cant * precio;
+        }
+    });
+    const totalEl = document.getElementById('total-general');
+    if (totalEl) {
+        totalEl.textContent = '$' + fmtPrecio(total);
+    }
 }
 
 function crearFila() {
-  const div = document.createElement('div');
-  div.className = 'item-fila';
-  div.innerHTML = `
-    <div class="fila-cell fila-cell-tipo">
-      <select name="item_tipo" class="tipo-sel" onchange="actualizarSelectItem(this)">
-        <option value="producto">Producto</option>
-        <option value="ingrediente">Ingrediente</option>
-      </select>
-    </div>
-    <div class="fila-cell fila-cell-item">
-      <select name="item_id" class="item-sel" onchange="autocompletarPrecio(this)">
-        ${PRODUCTOS.map(p => `<option value="${p.id}" data-precio="${p.precio || 0}">${p.nombre}</option>`).join('')}
-      </select>
-    </div>
-    <div class="fila-cell fila-cell-cant">
-      <input type="number" name="item_cantidad" min="0.01" step="0.01" class="cant-inp" oninput="calcularSubtotal(this)" placeholder="0">
-    </div>
-    <div class="fila-cell fila-cell-precio">
-      <input type="number" name="item_precio" min="0" step="1" class="precio-inp" oninput="calcularSubtotal(this)" placeholder="0">
-    </div>
-    <div class="fila-cell fila-cell-sub">
-      <span class="subtotal-val">$0</span>
-    </div>
-    <button type="button" class="btn-del" onclick="eliminarFila(this)" title="Eliminar">
-      <i class="bi bi-trash" style="font-size:0.8rem;"></i>
-    </button>
-  `;
-  return div;
+    const div = document.createElement('div');
+    div.className = 'item-fila';
+    div.innerHTML = `
+        <div class="fila-cell fila-cell-tipo">
+            <select name="item_tipo" class="tipo-sel">
+                <option value="producto">Producto</option>
+                <option value="ingrediente">Ingrediente</option>
+            </select>
+        </div>
+        <div class="fila-cell fila-cell-item">
+            <select name="item_id" class="item-sel">
+                ${PRODUCTOS.map(p => `<option value="${p.id}" data-precio="${p.precio}">${escapeHtml(p.nombre)}</option>`).join('')}
+            </select>
+        </div>
+        <div class="fila-cell fila-cell-cant">
+            <input type="number" name="item_cantidad" min="0.01" step="0.01" class="cant-inp" placeholder="0">
+        </div>
+        <div class="fila-cell fila-cell-precio">
+            <input type="text" name="item_precio" inputmode="numeric" class="precio-inp" placeholder="0">
+        </div>
+        <div class="fila-cell fila-cell-sub">
+            <span class="subtotal-val">$0</span>
+        </div>
+        <button type="button" class="btn-del"><i class="bi bi-trash"></i></button>
+    `;
+    return div;
 }
 
 function agregarFila() {
-  const body = document.getElementById('filas-body');
-  const fila = crearFila();
-  fila.style.opacity = '0';
-  fila.style.transform = 'translateY(-6px)';
-  body.appendChild(fila);
-  requestAnimationFrame(() => {
-    fila.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
-    fila.style.opacity = '1';
-    fila.style.transform = 'translateY(0)';
-    // Autocompletar precio de la nueva fila
-    const itemSel = fila.querySelector('.item-sel');
-    if (itemSel) autocompletarPrecio(itemSel);
-  });
+    const body = document.getElementById('filas-body');
+    const fila = crearFila();
+    fila.style.opacity = '0';
+    fila.style.transform = 'translateY(-6px)';
+    body.appendChild(fila);
+    requestAnimationFrame(() => {
+        fila.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+        fila.style.opacity = '1';
+        fila.style.transform = 'translateY(0)';
+        asignarEventosFila(fila);
+        const precioInp = fila.querySelector('.precio-inp');
+        if (precioInp) initPrecioFmt(precioInp);
+        const itemSel = fila.querySelector('.item-sel');
+        if (itemSel) autocompletarPrecio(itemSel);
+    });
 }
 
 function eliminarFila(btn) {
-  const filas = document.querySelectorAll('.item-fila');
-  if (filas.length <= 1) { alert('Debe haber al menos un ítem.'); return; }
-  const fila = btn.closest('.item-fila');
-  fila.style.transition = 'opacity 0.15s ease, transform 0.15s ease';
-  fila.style.opacity = '0';
-  fila.style.transform = 'translateX(8px)';
-  setTimeout(() => { fila.remove(); recalcularTotal(); }, 150);
+    const filas = document.querySelectorAll('.item-fila');
+    if (filas.length <= 1) { alert('Debe haber al menos un ítem.'); return; }
+    const fila = btn.closest('.item-fila');
+    fila.style.transition = 'opacity 0.15s ease, transform 0.15s ease';
+    fila.style.opacity = '0';
+    fila.style.transform = 'translateX(8px)';
+    setTimeout(() => { fila.remove(); recalcularTotal(); }, 150);
 }
 
-document.getElementById('form-entrada').addEventListener('submit', function(e) {
-  const filas = document.querySelectorAll('.item-fila');
+function asignarEventosFila(fila) {
+    const tipoSel = fila.querySelector('.tipo-sel');
+    const itemSel = fila.querySelector('.item-sel');
+    const cantInp = fila.querySelector('.cant-inp');
+    const precioInp = fila.querySelector('.precio-inp');
+    const delBtn = fila.querySelector('.btn-del');
 
-  // Validar que hay al menos una fila con datos completos
-  let tieneItems = false;
-  for (let fila of filas) {
-    const itemId = fila.querySelector('.item-sel').value;
-    const cant = parseFloat(fila.querySelector('.cant-inp').value) || 0;
-    const precio = parseFloat(fila.querySelector('.precio-inp').value) || 0;
+    if (tipoSel) tipoSel.addEventListener('change', () => actualizarSelectItem(tipoSel));
+    if (itemSel) itemSel.addEventListener('change', () => autocompletarPrecio(itemSel));
+    if (cantInp) cantInp.addEventListener('input', () => calcularSubtotal(cantInp));
+    if (precioInp) precioInp.addEventListener('input', () => calcularSubtotal(precioInp));
+    if (delBtn) delBtn.addEventListener('click', () => eliminarFila(delBtn));
+}
 
-    if (itemId && cant > 0 && precio > 0) {
-      tieneItems = true;
-      break;
+// ========== 4. PROVEEDOR DROPDOWN ==========
+function toggleProvPanel(e) {
+    e.stopPropagation();
+    const panel = document.getElementById('prov-panel');
+    const trigger = document.getElementById('prov-trigger');
+    const isOpen = panel.classList.contains('open');
+    if (isOpen) {
+        panel.classList.remove('open');
+        trigger.classList.remove('open');
+    } else {
+        panel.classList.add('open');
+        trigger.classList.add('open');
+        setTimeout(() => document.getElementById('prov-search').focus(), 50);
     }
-  }
+}
 
-  if (!tieneItems) {
-    e.preventDefault();
-    alert('Ingresa al menos un ítem con cantidad y precio mayor a 0.');
-  }
+function filtrarProveedores(q) {
+    const qLow = q.toLowerCase();
+    let anyVis = false;
+    document.querySelectorAll('#prov-list .prov-item').forEach(item => {
+        const vis = item.dataset.label.toLowerCase().includes(qLow);
+        item.style.display = vis ? '' : 'none';
+        if (vis) anyVis = true;
+    });
+    let emptyEl = document.getElementById('prov-list-empty');
+    if (!anyVis) {
+        if (!emptyEl) {
+            emptyEl = document.createElement('div');
+            emptyEl.id = 'prov-list-empty';
+            emptyEl.className = 'prov-empty';
+            emptyEl.textContent = 'Sin resultados';
+            document.getElementById('prov-list').appendChild(emptyEl);
+        }
+        emptyEl.style.display = '';
+    } else if (emptyEl) {
+        emptyEl.style.display = 'none';
+    }
+}
+
+function seleccionarProveedor(value, label) {
+    document.getElementById('sel-proveedor').value = value;
+    const labelEl = document.getElementById('prov-label');
+    labelEl.textContent = label;
+    labelEl.classList.remove('prov-label-placeholder');
+    document.querySelectorAll('#prov-list .prov-item').forEach(i => i.classList.remove('selected'));
+    const sel = document.querySelector(`#prov-list .prov-item[data-value="${value}"]`);
+    if (sel) sel.classList.add('selected');
+    document.getElementById('prov-panel').classList.remove('open');
+    document.getElementById('prov-trigger').classList.remove('open');
+}
+
+function initProvDropdown() {
+    const sel = document.getElementById('sel-proveedor');
+    if (!sel || !sel.value) return;
+    const opt = sel.options[sel.selectedIndex];
+    if (opt && opt.value) {
+        seleccionarProveedor(opt.value, opt.text);
+    }
+}
+
+// ========== 5. VALIDACIÓN DEL FORMULARIO ==========
+document.getElementById('form-entrada').addEventListener('submit', function(e) {
+    if (!document.getElementById('sel-proveedor').value) {
+        e.preventDefault();
+        alert('Selecciona un proveedor.');
+        document.getElementById('prov-trigger').classList.add('open');
+        document.getElementById('prov-panel').classList.add('open');
+        return;
+    }
+
+    document.querySelectorAll('.precio-inp').forEach(function(inp) {
+        const raw = parseMiles(inp.value);
+        const num = parseFloat(raw);
+        if (!isNaN(num)) inp.value = num;
+    });
+
+    const filas = document.querySelectorAll('.item-fila');
+    let tieneItems = false;
+    for (let fila of filas) {
+        const itemId = fila.querySelector('.item-sel').value;
+        const cant = parseFloat(fila.querySelector('.cant-inp').value) || 0;
+        const precio = parseFloat(fila.querySelector('.precio-inp').value) || 0;
+        if (itemId && cant > 0 && precio > 0) { tieneItems = true; break; }
+    }
+    if (!tieneItems) {
+        e.preventDefault();
+        alert('Ingresa al menos un ítem con cantidad y precio mayor a 0.');
+    }
 });
 
-// ── Init: fecha de hoy automática + nota personalizada editable + cálculo inicial
-(function init() {
-  // Fecha de hoy en formato YYYY-MM-DD (local, no UTC)
-  const hoy = new Date();
-  const yyyy = hoy.getFullYear();
-  const mm   = String(hoy.getMonth() + 1).padStart(2, '0');
-  const dd   = String(hoy.getDate()).padStart(2, '0');
-  const fechaHoy = `${yyyy}-${mm}-${dd}`;
+// ========== 6. INICIALIZACIÓN ==========
+document.addEventListener('DOMContentLoaded', function() {
+    // Asignar eventos a filas existentes
+    document.querySelectorAll('.item-fila').forEach(fila => {
+        asignarEventosFila(fila);
+        const precioInp = fila.querySelector('.precio-inp');
+        if (precioInp) initPrecioFmt(precioInp);
+        const itemSel = fila.querySelector('.item-sel');
+        if (itemSel) autocompletarPrecio(itemSel);
+    });
 
-  const inpFecha = document.getElementById('inp-fecha');
-  if (inpFecha) {
-    inpFecha.value = fechaHoy;
-    inpFecha.max   = fechaHoy;  // no permitir fechas futuras
-  }
+    // Inicializar subtotales y total para filas que ya tengan datos precargados
+    document.querySelectorAll('.item-fila').forEach(fila => {
+        const precioInp = fila.querySelector('.precio-inp');
+        if (precioInp && (precioInp.value || fila.querySelector('.cant-inp')?.value)) {
+            calcularSubtotal(precioInp);
+        }
+    });
+    recalcularTotal();
 
-  // Nota personalizada con día y mes en español, editable
-  const dias   = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-  const meses  = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-  const diaNom = dias[hoy.getDay()];
-  const mesNom = meses[hoy.getMonth()];
-  const notaDef = `Compra del ${diaNom} ${dd} de ${mesNom}`;
+    // Fecha por defecto
+    const hoy = new Date();
+    const yyyy = hoy.getFullYear();
+    const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+    const dd = String(hoy.getDate()).padStart(2, '0');
+    const fechaHoy = `${yyyy}-${mm}-${dd}`;
+    const inpFecha = document.getElementById('inp-fecha');
+    if (inpFecha) { inpFecha.value = fechaHoy; inpFecha.max = fechaHoy; }
 
-  const inpNota = document.getElementById('inp-nota');
-  if (inpNota && !inpNota.value) {
-    inpNota.value = notaDef;
-  }
+    // Nota por defecto
+    const dias = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+    const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    const notaDef = `Compra del ${dias[hoy.getDay()]} ${dd} de ${meses[hoy.getMonth()]}`;
+    const inpNota = document.getElementById('inp-nota');
+    if (inpNota && !inpNota.value) inpNota.value = notaDef;
 
-  // Calcular subtotales iniciales y total
-  document.querySelectorAll('.precio-inp').forEach(inp => {
-    if (inp.value) calcularSubtotal(inp);
-  });
-  recalcularTotal();
-})();
+    // Botón agregar fila
+    const addBtn = document.getElementById('agregar-item-btn');
+    if (addBtn) addBtn.onclick = agregarFila;
+
+    // Proveedor
+    initProvDropdown();
+
+    // Eventos del proveedor
+    const provTrigger = document.getElementById('prov-trigger');
+    const provSearch = document.getElementById('prov-search');
+    if (provTrigger) provTrigger.addEventListener('click', toggleProvPanel);
+    if (provSearch) provSearch.addEventListener('input', (e) => filtrarProveedores(e.target.value));
+    document.addEventListener('click', function(e) {
+        const wrap = document.getElementById('prov-wrap');
+        if (wrap && !wrap.contains(e.target)) {
+            document.getElementById('prov-panel')?.classList.remove('open');
+            document.getElementById('prov-trigger')?.classList.remove('open');
+        }
+    });
+});
 </script>
 {% endblock %}

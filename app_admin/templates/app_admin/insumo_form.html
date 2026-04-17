@@ -1,0 +1,101 @@
+{% extends 'app_admin/base_admin.html' %}
+{% block title %}{{ accion }} Insumo{% endblock %}
+{% block page_title %}{{ accion }} insumo{% endblock %}
+{% block nav_insumos %}active{% endblock %}
+
+{% block content %}
+<div class="form-page">
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">{{ accion }} insumo</span>
+      <a href="{% url 'app_admin:insumos' %}" class="btn btn-ghost btn-sm">
+        <i class="bi bi-arrow-left"></i> Volver
+      </a>
+    </div>
+    <div class="card-body">
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="form-grid">
+          <div class="field full">
+            <label>Nombre *</label>
+            <input type="text" name="nombre" value="{{ insumo.nombre|default:'' }}" placeholder="Ej: Servilletas, Cucharas desechables…" required>
+          </div>
+          <div class="field">
+            <label>Categoría</label>
+            <select name="categoria">
+              {% for val, lbl in CATEGORIA_CHOICES %}
+                <option value="{{ val }}" {% if insumo.categoria == val %}selected{% endif %}>{{ lbl }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label>Unidad de medida</label>
+            <select name="unidad">
+              {% for val, lbl in UNIDAD_CHOICES %}
+                <option value="{{ val }}" {% if insumo.unidad == val %}selected{% endif %}>{{ lbl }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% if accion == 'Nuevo' %}
+          <div class="field">
+            <label>Stock inicial</label>
+            <input type="number" name="stock" value="0" min="0" step="0.01">
+            <span class="hint">Cantidad disponible al registrar</span>
+          </div>
+          {% endif %}
+          <div class="field">
+            <label>Stock mínimo</label>
+            <input type="number" name="stock_minimo" value="{{ insumo.stock_minimo|default:'0' }}" min="0" step="0.01">
+            <span class="hint">Genera alerta cuando el stock baje de este valor</span>
+          </div>
+          <div class="field">
+            <label>Precio unitario (referencia)</label>
+            <input type="text" name="precio_unitario" value="{{ insumo.precio_unitario|default:'0' }}" placeholder="0" class="fmt-miles" inputmode="numeric">
+            <span class="hint">Solo para referencia de costos</span>
+          </div>
+          <div class="field">
+            <label>Proveedor</label>
+            <select name="proveedor">
+              <option value="">Sin proveedor</option>
+              {% for prov in proveedores %}
+                <option value="{{ prov.pk }}" {% if insumo.proveedor_id == prov.pk %}selected{% endif %}>{{ prov.nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <!-- Imagen -->
+          <div class="field">
+            <label>Imagen</label>
+            {% if insumo.imagen %}
+            <div style="margin-bottom:0.5rem;">
+              <img src="{{ insumo.imagen.url }}" alt="{{ insumo.nombre }}"
+                   style="width:5rem;height:5rem;object-fit:cover;border-radius:8px;border:1px solid var(--mist);">
+            </div>
+            {% endif %}
+            <input type="file" name="imagen" accept="image/*" id="img-input" style="display:none;">
+            <label for="img-input" style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.42rem 0.9rem;border:1px dashed var(--fog);border-radius:7px;cursor:pointer;font-size:0.81rem;color:var(--stone);background:var(--ivory);transition:all 0.15s;" onmouseover="this.style.borderColor='var(--leaf)';this.style.color='var(--leaf)'" onmouseout="this.style.borderColor='var(--fog)';this.style.color='var(--stone)'">
+              <i class="bi bi-image"></i> <span id="img-label">{% if insumo.imagen %}Cambiar imagen{% else %}Seleccionar imagen{% endif %}</span>
+            </label>
+            <span class="hint">Opcional. PNG, JPG o WEBP.</span>
+          </div>
+          <div class="field full">
+            <label>Descripción</label>
+            <textarea name="descripcion" rows="2" placeholder="Descripción opcional…">{{ insumo.descripcion|default:'' }}</textarea>
+          </div>
+        </div>
+        <div class="form-footer">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg"></i> {{ accion }} insumo
+          </button>
+          <a href="{% url 'app_admin:insumos' %}" class="btn btn-ghost">Cancelar</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+document.getElementById('img-input').addEventListener('change', function () {
+  const label = document.getElementById('img-label');
+  label.textContent = this.files.length ? this.files[0].name : '{% if insumo.imagen %}Cambiar imagen{% else %}Seleccionar imagen{% endif %}';
+});
+</script>
+{% endblock %}

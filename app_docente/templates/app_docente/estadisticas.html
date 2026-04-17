@@ -1,0 +1,195 @@
+{% extends 'app_docente/base_docente.html' %}
+{% block title %}Estadísticas{% endblock %}
+{% block topbar_title %}Mis Estadísticas{% endblock %}
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.25rem;">
+  <h1 class="page-title" style="margin-bottom:0;">Estadísticas</h1>
+  <span style="font-size:.72rem; color:var(--stone); background:var(--cream); border:1px solid var(--mist); border-radius:6px; padding:.3rem .7rem;">
+    <i class="bi bi-calendar3"></i> Datos históricos
+  </span>
+</div>
+
+<!-- KPIs resumen -->
+<div class="kpi-grid" style="margin-bottom:1.5rem;">
+  <div class="kpi kpi-green">
+    <div class="kpi-icon"><i class="bi bi-cash-stack"></i></div>
+    <div class="kpi-label">Total gastado</div>
+    <div class="kpi-value">${{ resumen.total_gastado|floatformat:0 }}</div>
+  </div>
+  <div class="kpi kpi-violet">
+    <div class="kpi-icon"><i class="bi bi-bag-check"></i></div>
+    <div class="kpi-label">Total pedidos</div>
+    <div class="kpi-value">{{ resumen.total_pedidos }}</div>
+  </div>
+  <div class="kpi kpi-sky">
+    <div class="kpi-icon"><i class="bi bi-wallet2"></i></div>
+    <div class="kpi-label">Saldo actual</div>
+    <div class="kpi-value">${{ resumen.saldo|floatformat:0 }}</div>
+  </div>
+  <div class="kpi {% if resumen.deuda_fiado > 0 %}kpi-amber{% endif %}">
+    <div class="kpi-icon"><i class="bi bi-receipt"></i></div>
+    <div class="kpi-label">Deuda fiado</div>
+    <div class="kpi-value" style="{% if resumen.deuda_fiado > 0 %}color:var(--amber);{% else %}color:var(--leaf);{% endif %}">
+      ${{ resumen.deuda_fiado|floatformat:0 }}
+    </div>
+    <div class="kpi-sub">Límite: ${{ resumen.limite_fiado|floatformat:0 }}</div>
+  </div>
+</div>
+
+<div style="display:grid; grid-template-columns:2fr 1fr; gap:1.25rem; margin-bottom:1.25rem;">
+  <!-- Gasto mensual -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title" style="font-size:.9rem;">Gasto mensual</span>
+      <span style="font-size:.68rem; color:var(--ash);">Últimos 6 meses</span>
+    </div>
+    <div class="card-body" style="padding:1.25rem 1.5rem;">
+      <canvas id="gastoChart" height="140"></canvas>
+    </div>
+  </div>
+
+  <!-- Por categoría -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title" style="font-size:.9rem;">Por categoría</span>
+    </div>
+    <div class="card-body" style="padding:1rem 1.25rem;">
+      <canvas id="catChart" height="180"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Top productos -->
+<div class="card card-flat" style="overflow:hidden; margin-bottom:{% if resumen.deuda_fiado > 0 %}1.25rem{% else %}0{% endif %};">
+  <div class="card-head">
+    <span class="card-title" style="font-size:.9rem;">Top 5 productos más pedidos</span>
+  </div>
+  {% if top_prods %}
+  {% for t in top_prods %}
+  <div style="display:flex; align-items:center; gap:.9rem; padding:.85rem 1.5rem; border-bottom:1px solid var(--mist);">
+    <div style="font-family:var(--serif); font-size:1.4rem; font-weight:400; color:{% if forloop.counter == 1 %}var(--amber){% elif forloop.counter == 2 %}var(--stone){% elif forloop.counter == 3 %}var(--amber){% else %}var(--ash){% endif %}; min-width:2rem; text-align:center; line-height:1;">
+      {% if forloop.counter == 1 %}<i class="bi bi-trophy-fill" style="font-size:1.1rem;"></i>{% else %}{{ forloop.counter }}{% endif %}
+    </div>
+    <div style="flex:1; min-width:0;">
+      <div style="font-size:.83rem; font-weight:700;">{{ t.producto__nombre }}</div>
+      <div style="font-size:.68rem; color:var(--stone); margin-top:.1rem;">{{ t.total_cant }} unidades pedidas</div>
+    </div>
+    <div style="width:100px;">
+      <div class="progress-bar">
+        <div class="progress-fill green" id="bar-{{ forloop.counter }}" data-cant="{{ t.total_cant }}"></div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-bar-chart es-icon"></i>
+    <p>Aún no tienes pedidos entregados.</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Fiado gauge -->
+{% if resumen.deuda_fiado > 0 %}
+<div class="card" style="background:linear-gradient(135deg,var(--amber-pale),#fffdf5); border-color:var(--amber-tint);">
+  <div style="display:flex; align-items:center; gap:.75rem; margin-bottom:.75rem;">
+    <div style="width:2.2rem; height:2.2rem; background:var(--amber-tint); border-radius:50%; display:flex; align-items:center; justify-content:center;">
+      <i class="bi bi-exclamation-triangle" style="color:var(--amber); font-size:.85rem;"></i>
+    </div>
+    <div class="section-title" style="margin-bottom:0; color:var(--amber);">Estado del crédito (fiado)</div>
+  </div>
+  <div class="progress-bar" style="height:10px; margin-bottom:.55rem;">
+    <div class="progress-fill" id="fiado-bar" style="height:100%;"></div>
+  </div>
+  <div style="display:flex; justify-content:space-between; font-size:.78rem; font-weight:700; color:var(--amber);">
+    <span>Deuda: ${{ resumen.deuda_fiado|floatformat:0 }}</span>
+    <span>Límite: ${{ resumen.limite_fiado|floatformat:0 }}</span>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const gastoData = {{ gasto_meses|safe }};
+const catData   = {{ cat_data|safe }};
+
+// Gasto mensual
+new Chart(document.getElementById('gastoChart'), {
+  type: 'bar',
+  data: {
+    labels: gastoData.map(d => d.mes),
+    datasets: [{
+      label: 'Gasto ($)',
+      data: gastoData.map(d => d.total),
+      backgroundColor: 'rgba(22,163,74,.18)',
+      borderColor: '#16a34a',
+      borderWidth: 2,
+      borderRadius: 8,
+      borderSkipped: false,
+      hoverBackgroundColor: 'rgba(22,163,74,.32)',
+    }],
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: {
+        beginAtZero: true,
+        grid: { color: 'rgba(0,0,0,0.04)' },
+        ticks: { callback: v => '$' + v.toLocaleString('es-CO'), font: { size: 10 } },
+      },
+      x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+    },
+  },
+});
+
+// Categorías
+if (catData.length > 0) {
+  new Chart(document.getElementById('catChart'), {
+    type: 'doughnut',
+    data: {
+      labels: catData.map(d => d.nombre),
+      datasets: [{
+        data: catData.map(d => d.total),
+        backgroundColor: ['#16a34a','#22c55e','#0284c7','#d97706','#7c3aed','#dc2626'],
+        borderWidth: 3,
+        borderColor: '#faf9f6',
+        hoverBorderWidth: 2,
+      }],
+    },
+    options: {
+      responsive: true,
+      cutout: '62%',
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 10 }, padding: 12, usePointStyle: true } }
+      },
+    },
+  });
+}
+
+// Barras top productos
+const maxCant = Math.max(...Array.from(document.querySelectorAll('[data-cant]')).map(el => parseFloat(el.dataset.cant) || 0), 1);
+document.querySelectorAll('[id^="bar-"]').forEach(bar => {
+  const cant = parseFloat(bar.dataset.cant) || 0;
+  bar.classList.add('green');
+  bar.style.width = Math.min((cant / maxCant) * 100, 100) + '%';
+});
+
+// Fiado bar
+const fiadoBar = document.getElementById('fiado-bar');
+if (fiadoBar) {
+  const deuda  = {{ resumen.deuda_fiado }};
+  const limite = {{ resumen.limite_fiado }};
+  const pct = Math.min((deuda / limite) * 100, 100);
+  fiadoBar.style.width = pct + '%';
+  fiadoBar.style.background = pct > 80 ? 'var(--red)' : 'var(--amber)';
+}
+</script>
+{% endblock %}

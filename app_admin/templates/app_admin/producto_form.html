@@ -47,7 +47,7 @@
       </div>
       <div class="field">
         <label>Precio de venta (COP) *</label>
-        <input type="number" name="precio_venta" value="{{ producto.precio_venta|default:'' }}" min="0" step="50" required placeholder="3500">
+        <input type="text" name="precio_venta" value="{{ producto.precio_venta|default:'' }}" required placeholder="3.500" class="fmt-miles" inputmode="numeric">
       </div>
       <div class="field full">
         <label>Descripción</label>
@@ -63,7 +63,7 @@
       <div class="form-grid">
         <div class="field">
           <label>Precio de costo (COP)</label>
-          <input type="number" name="precio_costo" value="{{ producto.precio_costo|default:'' }}" min="0" step="50" placeholder="0">
+          <input type="text" name="precio_costo" value="{{ producto.precio_costo|default:'' }}" placeholder="0" class="fmt-miles" inputmode="numeric">
           <span class="hint">Precio al que compras este producto al proveedor</span>
         </div>
         <div class="field">

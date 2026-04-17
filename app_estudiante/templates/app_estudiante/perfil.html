@@ -1,0 +1,252 @@
+{% extends 'app_estudiante/base_estudiante.html' %}
+{% load filtros %}
+{% block title %}Mi Perfil{% endblock %}
+{% block page_title %}Mi Perfil{% endblock %}
+{% block nav_perfil %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+  .perfil-layout {
+    display: grid; grid-template-columns: 320px 1fr;
+    gap: 1.4rem; align-items: start;
+  }
+  @media (max-width: 900px) { .perfil-layout { grid-template-columns: 1fr; } }
+
+  /* ── Info card ───────────────────────────────────────────────────────────── */
+  .perfil-avatar-wrap {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 2rem 1.5rem 1.5rem;
+    border-bottom: 1px solid var(--mist);
+  }
+  .perfil-avatar {
+    width: 5rem; height: 5rem; border-radius: 50%;
+    background: var(--leaf-pale); border: 2px solid var(--leaf-tint);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--serif); font-size: 2.2rem; font-weight: 500;
+    color: var(--leaf-dark); margin-bottom: 1rem;
+  }
+  .perfil-name { font-family: var(--serif); font-size: 1.3rem; text-align: center; line-height: 1.2; }
+  .perfil-role { font-size: 0.68rem; color: var(--ash); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin-top: 0.3rem; }
+
+  .perfil-info-list { padding: 1.2rem 1.5rem; }
+  .perfil-info-item {
+    display: flex; align-items: flex-start; gap: 0.75rem;
+    padding: 0.65rem 0; border-bottom: 1px solid var(--mist);
+  }
+  .perfil-info-item:last-child { border-bottom: none; }
+  .perfil-info-icon {
+    width: 1.75rem; height: 1.75rem; border-radius: 6px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.8rem;
+  }
+  .perfil-info-icon.green { background: var(--leaf-pale); color: var(--leaf); }
+  .perfil-info-icon.blue  { background: var(--sky-pale);  color: var(--sky); }
+  .perfil-info-icon.amber { background: var(--amber-pale);color: var(--amber); }
+  .perfil-info-icon.violet{ background: var(--violet-pale);color: var(--violet); }
+  .perfil-info-label { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ash); }
+  .perfil-info-val   { font-size: 0.85rem; font-weight: 600; color: var(--ink); margin-top: 0.1rem; }
+
+  /* ── Saldo card ──────────────────────────────────────────────────────────── */
+  .saldo-card-inner {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1.4rem 1.5rem; background: var(--ink); border-radius: var(--radius);
+    margin-bottom: 1.2rem;
+  }
+  .saldo-card-val { font-family: var(--serif); font-size: 2.4rem; color: var(--leaf-bright); line-height: 1; }
+  .saldo-card-lbl { font-size: 0.6rem; color: rgba(255,255,255,0.35); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.35rem; }
+  .saldo-card-note { font-size: 0.7rem; color: rgba(255,255,255,0.3); margin-top: 0.4rem; }
+
+  /* ── Limites ─────────────────────────────────────────────────────────────── */
+  .limite-item { padding: 0.85rem 1.4rem; border-bottom: 1px solid var(--mist); }
+  .limite-item:last-child { border-bottom: none; }
+  .limite-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.5rem; }
+  .limite-tipo { font-size: 0.78rem; font-weight: 600; color: var(--ink); }
+  .limite-nums { font-size: 0.7rem; color: var(--ash); }
+  .limite-nums strong { color: var(--stone); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="perfil-layout">
+
+  <!-- Panel izquierdo: info -->
+  <div style="display:flex;flex-direction:column;gap:1.2rem;">
+
+    <!-- Tarjeta de identidad -->
+    <div class="card">
+      <div class="perfil-avatar-wrap">
+        <div class="perfil-avatar">{{ request.user.first_name|slice:":1"|upper }}{{ request.user.last_name|slice:":1"|upper }}</div>
+        <div class="perfil-name">{{ request.user.get_full_name|default:request.user.username }}</div>
+        <div class="perfil-role">Estudiante &middot; Grado {{ estudiante.grado }}</div>
+      </div>
+      <div class="perfil-info-list">
+        <div class="perfil-info-item">
+          <div class="perfil-info-icon green"><i class="bi bi-person-badge"></i></div>
+          <div>
+            <div class="perfil-info-label">Codigo estudiantil</div>
+            <div class="perfil-info-val">{{ estudiante.codigo }}</div>
+          </div>
+        </div>
+        <div class="perfil-info-item">
+          <div class="perfil-info-icon blue"><i class="bi bi-mortarboard"></i></div>
+          <div>
+            <div class="perfil-info-label">Grado</div>
+            <div class="perfil-info-val">{{ estudiante.grado }}</div>
+          </div>
+        </div>
+        <div class="perfil-info-item">
+          <div class="perfil-info-icon amber"><i class="bi bi-at"></i></div>
+          <div>
+            <div class="perfil-info-label">Usuario</div>
+            <div class="perfil-info-val">{{ request.user.username }}</div>
+          </div>
+        </div>
+        {% if request.user.email %}
+        <div class="perfil-info-item">
+          <div class="perfil-info-icon violet"><i class="bi bi-envelope"></i></div>
+          <div>
+            <div class="perfil-info-label">Correo</div>
+            <div class="perfil-info-val">{{ request.user.email }}</div>
+          </div>
+        </div>
+        {% endif %}
+        {% if request.user.perfil.telefono %}
+        <div class="perfil-info-item">
+          <div class="perfil-info-icon green"><i class="bi bi-telephone"></i></div>
+          <div>
+            <div class="perfil-info-label">Telefono</div>
+            <div class="perfil-info-val">{{ request.user.perfil.telefono }}</div>
+          </div>
+        </div>
+        {% endif %}
+        {% if estudiante.padre %}
+        <div class="perfil-info-item">
+          <div class="perfil-info-icon blue"><i class="bi bi-person-heart"></i></div>
+          <div>
+            <div class="perfil-info-label">Acudiente</div>
+            <div class="perfil-info-val">{{ estudiante.padre.perfil.user.get_full_name }}</div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Saldo -->
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title" style="font-size:0.9rem;">Mi saldo</span>
+      </div>
+      <div style="padding:1.2rem 1.4rem;">
+        <div class="saldo-card-inner">
+          <div>
+            <div class="saldo-card-lbl">Saldo disponible</div>
+            <div class="saldo-card-val">${{ estudiante.saldo|miles }}</div>
+            <div class="saldo-card-note">Recargado por tu acudiente</div>
+          </div>
+          <i class="bi bi-wallet2" style="font-size:2rem;color:rgba(34,197,94,0.25);"></i>
+        </div>
+        {% if estudiante.saldo < 5000 %}
+        <div style="display:flex;align-items:center;gap:0.6rem;font-size:0.78rem;color:var(--red);padding:0.65rem 0.85rem;background:var(--red-pale);border-radius:8px;font-weight:600;">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          Saldo bajo. Pide a tu acudiente que recargue tu cuenta.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Limites del padre -->
+    {% if limites_data %}
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title" style="font-size:0.9rem;">
+          <i class="bi bi-shield-check" style="color:var(--amber);margin-right:0.3rem;font-size:0.85rem;"></i>
+          Limites de gasto
+        </span>
+      </div>
+      {% for l in limites_data %}
+      <div class="limite-item">
+        <div class="limite-head">
+          <span class="limite-tipo">{{ l.limite.get_tipo_display }}</span>
+          <span class="limite-nums">
+            <strong>${{ l.gasto|miles }}</strong> / ${{ l.limite.monto|miles }}
+          </span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill {% if l.pct >= 90 %}red{% elif l.pct >= 70 %}amber{% else %}green{% endif %}"
+               style="width:{{ l.pct }}%;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:0.3rem;font-size:0.66rem;color:var(--ash);">
+          <span>{{ l.pct }}% utilizado</span>
+          <span>Disponible: ${{ l.disponible|miles }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  </div>
+
+  <!-- Formulario de edicion -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Editar perfil</span>
+    </div>
+    <div class="card-body">
+      <form method="post" class="form-page" style="max-width:100%;">
+        {% csrf_token %}
+        <div class="form-grid">
+          <div class="field">
+            <label for="first_name">Nombre</label>
+            <input type="text" id="first_name" name="first_name"
+                   value="{{ request.user.first_name }}" maxlength="50" required>
+          </div>
+          <div class="field">
+            <label for="last_name">Apellido</label>
+            <input type="text" id="last_name" name="last_name"
+                   value="{{ request.user.last_name }}" maxlength="50" required>
+          </div>
+          <div class="field">
+            <label for="email">Correo electronico</label>
+            <input type="email" id="email" name="email"
+                   value="{{ request.user.email }}" maxlength="100">
+          </div>
+          <div class="field">
+            <label for="telefono">Telefono</label>
+            <input type="text" id="telefono" name="telefono"
+                   value="{{ request.user.perfil.telefono }}" maxlength="20">
+          </div>
+        </div>
+
+        <hr style="border:none;border-top:1px solid var(--mist);margin:1.4rem 0;">
+
+        <div style="margin-bottom:0.85rem;">
+          <div style="font-size:0.7rem;font-weight:700;color:var(--stone);letter-spacing:0.07em;text-transform:uppercase;margin-bottom:0.4rem;">
+            Cambiar contrasena
+          </div>
+          <p style="font-size:0.75rem;color:var(--ash);">Deja en blanco si no deseas cambiarla. Minimo 8 caracteres.</p>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="password1">Nueva contrasena</label>
+            <input type="password" id="password1" name="password1" autocomplete="new-password">
+          </div>
+          <div class="field">
+            <label for="password2">Confirmar contrasena</label>
+            <input type="password" id="password2" name="password2" autocomplete="new-password">
+          </div>
+        </div>
+
+        <div class="form-footer">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg"></i> Guardar cambios
+          </button>
+          <a href="{% url 'app_estudiante:dashboard' %}" class="btn btn-ghost">Cancelar</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}

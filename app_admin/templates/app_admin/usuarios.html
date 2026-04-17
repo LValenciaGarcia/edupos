@@ -3,54 +3,380 @@
 {% block page_title %}Usuarios{% endblock %}
 {% block nav_usuarios %}active{% endblock %}
 
+{% block topbar_actions %}
+  <span id="bulk-bar" style="display:none;align-items:center;gap:0.5rem;">
+    <span id="bulk-count" style="font-size:0.78rem;color:var(--stone);font-weight:500;"></span>
+    <form method="post" action="{% url 'app_admin:usuario_bulk' %}" id="form-bulk-act" style="display:flex;gap:0.4rem;">
+      {% csrf_token %}
+      <div id="bulk-pks-container"></div>
+      <input type="hidden" name="accion" id="bulk-accion-input" value="">
+      <button type="button" class="btn btn-ghost btn-sm" onclick="bulkAccion('activar')">
+        <i class="bi bi-play-circle"></i> Activar
+      </button>
+      <button type="button" class="btn btn-amber btn-sm" onclick="bulkAccion('desactivar')">
+        <i class="bi bi-pause-circle"></i> Desactivar
+      </button>
+      <button type="button" class="btn btn-danger btn-sm" onclick="bulkAccion('eliminar')">
+        <i class="bi bi-trash3"></i> Eliminar
+      </button>
+    </form>
+    <button class="btn btn-ghost btn-sm" onclick="limpiarSeleccion()">
+      <i class="bi bi-x-lg"></i>
+    </button>
+  </span>
+{% endblock %}
+
 {% block content %}
-<form method="get" class="filter-bar">
-  <select name="rol" onchange="this.form.submit()">
+<style>
+  /* ── KPI strip ──────────────────────────────────────────────────────────── */
+  .usr-kpi {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+  @media (max-width: 900px) { .usr-kpi { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 600px) { .usr-kpi { grid-template-columns: 1fr 1fr; } }
+
+  .usr-kpi-card {
+    background: var(--ivory);
+    border: 1px solid var(--mist);
+    border-radius: 10px;
+    padding: 0.95rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    position: relative;
+    overflow: hidden;
+    transition: box-shadow 0.18s, border-color 0.18s;
+    cursor: default;
+  }
+  .usr-kpi-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.06); border-color: var(--fog); }
+  .usr-kpi-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0; width: 3px;
+    border-radius: 99px 0 0 99px;
+  }
+  .usr-kpi-card.total::before   { background: var(--ash); }
+  .usr-kpi-card.green::before   { background: var(--leaf); }
+  .usr-kpi-card.red::before     { background: var(--red); }
+  .usr-kpi-card.violet::before  { background: var(--violet); }
+  .usr-kpi-card.amber::before   { background: var(--amber); }
+  .usr-kpi-label { font-size: 0.59rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ash); }
+  .usr-kpi-val   { font-family: var(--serif); font-size: 1.7rem; line-height: 1; }
+  .usr-kpi-card.total .usr-kpi-val  { color: var(--ink); }
+  .usr-kpi-card.green .usr-kpi-val  { color: var(--leaf); }
+  .usr-kpi-card.red   .usr-kpi-val  { color: var(--red); }
+  .usr-kpi-card.violet .usr-kpi-val { color: var(--violet); }
+  .usr-kpi-card.amber .usr-kpi-val  { color: var(--amber); }
+  .usr-kpi-sub { font-size: 0.66rem; color: var(--ash); }
+
+  /* ── Filter / Search bar ────────────────────────────────────────────────── */
+  .usr-filterbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.1rem;
+    flex-wrap: wrap;
+  }
+  .usr-search {
+    position: relative;
+    flex: 1;
+    min-width: 200px;
+    max-width: 320px;
+  }
+  .usr-search i {
+    position: absolute; left: 0.65rem; top: 50%;
+    transform: translateY(-50%);
+    color: var(--ash); font-size: 0.8rem; pointer-events: none;
+  }
+  .usr-search input {
+    width: 100%;
+    padding: 0.42rem 0.8rem 0.42rem 2rem;
+    border: 1px solid var(--fog); border-radius: 7px;
+    background: var(--ivory); font-family: var(--sans);
+    font-size: 0.81rem; color: var(--ink); outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .usr-search input:focus { border-color: var(--violet); box-shadow: 0 0 0 3px var(--violet-pale); }
+  .usr-select {
+    height: 2.1rem;
+    padding: 0 1.8rem 0 0.75rem;
+    border: 1px solid var(--fog); border-radius: 7px;
+    background: var(--ivory);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23a4a39b'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.55rem center;
+    font-family: var(--sans); font-size: 0.78rem; color: var(--ink);
+    appearance: none; cursor: pointer; outline: none;
+    transition: border-color 0.14s;
+  }
+  .usr-select:focus { border-color: var(--violet); }
+  .usr-count { margin-left: auto; font-size: 0.75rem; color: var(--ash); font-weight: 500; }
+
+  /* ── Card / Tabla ───────────────────────────────────────────────────────── */
+  .card { background: var(--ivory); border: 1px solid var(--mist); border-radius: 12px; overflow: hidden; }
+  .tbl { width: 100%; border-collapse: collapse; }
+  .tbl thead { border-bottom: 1px solid var(--mist); }
+  .tbl thead th {
+    padding: 0.6rem 0.9rem;
+    text-align: left; font-size: 0.67rem; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ash); background: var(--cream); white-space: nowrap;
+  }
+  .tbl tbody tr { border-bottom: 1px solid var(--mist); transition: background 0.1s; }
+  .tbl tbody tr:last-child { border-bottom: none; }
+  .tbl tbody tr:hover { background: #f6f5f1; }
+  .tbl tbody tr.selected-row { background: var(--violet-pale) !important; }
+  .tbl td { padding: 0.68rem 0.9rem; vertical-align: middle; font-size: 0.82rem; }
+
+  /* Checkbox column */
+  .th-check, .td-check { width: 2.5rem; text-align: center; }
+  .row-check {
+    width: 1rem; height: 1rem; cursor: pointer; accent-color: var(--violet);
+    flex-shrink: 0;
+  }
+
+  /* Avatar */
+  .u-avatar {
+    width: 2.15rem; height: 2.15rem; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.67rem; font-weight: 700; letter-spacing: 0.02em; flex-shrink: 0;
+  }
+  .u-avatar.av-admin   { background: var(--violet-pale); color: var(--violet); }
+  .u-avatar.av-padre   { background: var(--amber-tint);  color: #92400e; }
+  .u-avatar.av-student { background: var(--leaf-tint);   color: var(--leaf-dark); }
+  .u-avatar.av-default { background: var(--mist);        color: var(--stone); }
+  .u-cell { display: flex; align-items: center; gap: 0.6rem; }
+  .u-name { font-weight: 600; color: var(--ink); font-size: 0.83rem; }
+  .u-email { font-size: 0.69rem; color: var(--ash); margin-top: 1px; }
+  .u-username { font-size: 0.71rem; color: var(--ash); font-family: monospace; margin-top: 1px; }
+
+  /* Badges */
+  .badge {
+    display: inline-flex; align-items: center; gap: 0.28rem;
+    padding: 0.2rem 0.58rem; border-radius: 99px;
+    font-size: 0.67rem; font-weight: 600; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .badge-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+  .b-admin   { background: var(--violet-pale); color: var(--violet); }
+  .b-padre   { background: var(--amber-tint);  color: #92400e; }
+  .b-student { background: var(--leaf-tint);   color: var(--leaf-dark); }
+  .b-other   { background: var(--mist);        color: var(--stone); }
+  .b-active   { background: var(--leaf-tint);  color: var(--leaf-dark); }
+  .b-active .badge-dot  { background: var(--leaf); }
+  .b-inactive { background: var(--red-tint);   color: #991b1b; }
+  .b-inactive .badge-dot { background: var(--red); }
+
+  /* Action buttons */
+  .action-cell { display: flex; align-items: center; gap: 0.3rem; justify-content: flex-end; }
+  .btn-xs {
+    display: inline-flex; align-items: center; gap: 0.26rem;
+    height: 1.75rem; padding: 0 0.65rem; border-radius: 6px;
+    border: 1px solid var(--mist); background: var(--ivory);
+    font-family: var(--sans); font-size: 0.71rem; font-weight: 500;
+    color: var(--stone); cursor: pointer; text-decoration: none;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+  }
+  .btn-xs:hover { background: var(--cream); border-color: var(--fog); color: var(--ink); }
+  .btn-xs.btn-danger { background: var(--red-pale); border-color: #fecaca; color: var(--red); }
+  .btn-xs.btn-danger:hover { background: var(--red-tint); border-color: #fca5a5; color: #991b1b; }
+  .btn-xs.btn-enable { background: var(--leaf-pale); border-color: var(--leaf-tint); color: var(--leaf-dark); }
+  .btn-xs.btn-enable:hover { background: var(--leaf-tint); }
+  .btn-xs.btn-info { background: var(--violet-pale); border-color: #e9d5ff; color: var(--violet); }
+  .btn-xs.btn-info:hover { background: #ede9fe; }
+
+  /* Empty state */
+  .empty-state { padding: 3rem 1rem; text-align: center; color: var(--ash); font-size: 0.82rem; }
+  .empty-state i { font-size: 2.2rem; display: block; margin-bottom: 0.6rem; color: var(--fog); }
+
+  /* Modal */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(15,15,14,0.55); z-index: 300;
+    align-items: center; justify-content: center;
+    backdrop-filter: blur(2px);
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-box {
+    background: var(--ivory); border-radius: 14px; padding: 1.8rem;
+    width: 100%; max-width: 400px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.22); border: 1px solid var(--mist);
+  }
+  .modal-icon {
+    width: 2.8rem; height: 2.8rem; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem; margin-bottom: 1rem;
+  }
+  .modal-icon.red    { background: var(--red-pale);    color: var(--red); }
+  .modal-icon.violet { background: var(--violet-pale); color: var(--violet); }
+  .modal-title { font-family: var(--serif); font-size: 1.1rem; margin-bottom: 0.3rem; }
+  .modal-desc  { font-size: 0.82rem; color: var(--stone); margin-bottom: 1.4rem; line-height: 1.55; }
+  .modal-actions { display: flex; gap: 0.65rem; }
+
+  /* Row animation */
+  @keyframes fadeInRow { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+  .tbl tbody tr { animation: fadeInRow 0.16s var(--ease) both; }
+</style>
+
+{# ── KPI Strip ── #}
+<div class="usr-kpi">
+  <div class="usr-kpi-card total">
+    <div class="usr-kpi-label">Total</div>
+    <div class="usr-kpi-val">{{ perfiles_activos|add:perfiles_inactivos }}</div>
+    <div class="usr-kpi-sub">usuarios registrados</div>
+  </div>
+  <div class="usr-kpi-card green">
+    <div class="usr-kpi-label">Activos</div>
+    <div class="usr-kpi-val">{{ perfiles_activos }}</div>
+    <div class="usr-kpi-sub">con acceso habilitado</div>
+  </div>
+  <div class="usr-kpi-card red">
+    <div class="usr-kpi-label">Inactivos</div>
+    <div class="usr-kpi-val">{{ perfiles_inactivos }}</div>
+    <div class="usr-kpi-sub">sin acceso</div>
+  </div>
+  <div class="usr-kpi-card violet">
+    <div class="usr-kpi-label">Admins</div>
+    <div class="usr-kpi-val">{{ perfiles_admin }}</div>
+    <div class="usr-kpi-sub">administradores</div>
+  </div>
+  <div class="usr-kpi-card amber">
+    <div class="usr-kpi-label">Padres</div>
+    <div class="usr-kpi-val">{{ perfiles_padre }}</div>
+    <div class="usr-kpi-sub">padres de familia</div>
+  </div>
+</div>
+
+{# ── Filter Bar ── #}
+<form method="get" id="filter-form" class="usr-filterbar">
+  <div class="usr-search">
+    <i class="bi bi-search"></i>
+    <input type="text" name="q" id="usr-q" value="{{ q }}" placeholder="Buscar por nombre, usuario o email…"
+           autocomplete="off">
+  </div>
+
+  <select name="rol" class="usr-select" onchange="this.form.submit()">
     <option value="">Todos los roles</option>
     {% for val, label in roles %}
     <option value="{{ val }}" {% if val == rol_f %}selected{% endif %}>{{ label }}</option>
     {% endfor %}
   </select>
-  {% if rol_f %}<a href="{% url 'app_admin:usuarios' %}" class="btn btn-ghost btn-sm"><i class="bi bi-x-lg"></i> Limpiar</a>{% endif %}
+
+  <select name="estado" class="usr-select" onchange="this.form.submit()">
+    <option value="">Todos los estados</option>
+    <option value="activo"   {% if estado_f == 'activo' %}selected{% endif %}>Activos</option>
+    <option value="inactivo" {% if estado_f == 'inactivo' %}selected{% endif %}>Inactivos</option>
+  </select>
+
+  {% if q or rol_f or estado_f %}
+  <a href="{% url 'app_admin:usuarios' %}" class="btn btn-ghost btn-sm" title="Limpiar filtros">
+    <i class="bi bi-x-lg"></i> Limpiar
+  </a>
+  {% endif %}
+
+  <span class="usr-count">{{ perfiles.count }} usuario{{ perfiles.count|pluralize }}</span>
 </form>
 
+{# ── Tabla ── #}
 <div class="card">
-  <div class="card-head">
-    <span class="card-title">{{ perfiles.count }} usuario{{ perfiles.count|pluralize }}</span>
-  </div>
   {% if perfiles %}
-  <table class="tbl">
+  <div style="overflow-x:auto;">
+  <table class="tbl" id="tbl-usuarios">
     <thead>
-      <tr><th>Usuario</th><th>Nombre completo</th><th>Rol</th><th>Estado</th><th>Registro</th><th>Acciones</th></tr>
+      <tr>
+        <th class="th-check">
+          <input type="checkbox" class="row-check" id="check-all" title="Seleccionar todos">
+        </th>
+        <th>Usuario</th>
+        <th>Rol</th>
+        <th>Estado</th>
+        <th>Teléfono</th>
+        <th>Registro</th>
+        <th style="text-align:right;">Acciones</th>
+      </tr>
     </thead>
     <tbody>
     {% for perfil in perfiles %}
-    <tr>
-      <td style="font-family:monospace;font-size:0.85rem;font-weight:600;">{{ perfil.user.username }}</td>
-      <td style="font-weight:500;">{{ perfil.user.get_full_name|default:"—" }}</td>
-      <td>
-        {% if perfil.rol == 'admin' %}<span class="badge badge-elaborado">Administrador</span>
-        {% elif perfil.rol == 'padre' %}<span class="badge badge-preparando">Padre</span>
-        {% elif perfil.rol == 'estudiante' %}<span class="badge badge-ok">Estudiante</span>
-        {% else %}<span class="badge badge-entregado">{{ perfil.get_rol_display }}</span>{% endif %}
+    <tr data-pk="{{ perfil.pk }}">
+      <td class="td-check">
+        {% if perfil.rol != 'admin' %}
+        <input type="checkbox" class="row-check usr-check" value="{{ perfil.pk }}" title="Seleccionar">
+        {% endif %}
       </td>
+
+      {# Usuario con avatar #}
       <td>
-        <span class="badge {% if perfil.activo %}badge-activo{% else %}badge-inactivo{% endif %}">
+        <div class="u-cell">
+          <div class="u-avatar
+            {% if perfil.rol == 'admin' %}av-admin
+            {% elif perfil.rol == 'padre' %}av-padre
+            {% elif perfil.rol == 'estudiante' %}av-student
+            {% else %}av-default{% endif %}">
+            {{ perfil.user.get_full_name|default:perfil.user.username|slice:":2"|upper }}
+          </div>
+          <div>
+            <div class="u-name">{{ perfil.user.get_full_name|default:"Sin nombre" }}</div>
+            <div class="u-username">@{{ perfil.user.username }}</div>
+            {% if perfil.user.email %}
+            <div class="u-email">{{ perfil.user.email }}</div>
+            {% endif %}
+          </div>
+        </div>
+      </td>
+
+      {# Rol #}
+      <td>
+        {% if perfil.rol == 'admin' %}
+          <span class="badge b-admin"><i class="bi bi-shield-check" style="font-size:0.6rem;"></i> Administrador</span>
+        {% elif perfil.rol == 'padre' %}
+          <span class="badge b-padre"><i class="bi bi-person-heart" style="font-size:0.6rem;"></i> Padre</span>
+        {% elif perfil.rol == 'estudiante' %}
+          <span class="badge b-student"><i class="bi bi-mortarboard" style="font-size:0.6rem;"></i> Estudiante</span>
+        {% else %}
+          <span class="badge b-other">{{ perfil.get_rol_display }}</span>
+        {% endif %}
+      </td>
+
+      {# Estado #}
+      <td>
+        <span class="badge {% if perfil.activo %}b-active{% else %}b-inactive{% endif %}">
+          <span class="badge-dot"></span>
           {% if perfil.activo %}Activo{% else %}Inactivo{% endif %}
         </span>
       </td>
-      <td style="font-size:0.8rem;color:var(--gray-400);">{{ perfil.created_at|date:"d/m/Y" }}</td>
+
+      {# Teléfono #}
+      <td style="color:var(--ash);font-size:0.77rem;">
+        {{ perfil.telefono|default:"—" }}
+      </td>
+
+      {# Fecha #}
+      <td style="color:var(--ash);font-size:0.75rem;white-space:nowrap;">
+        {{ perfil.created_at|date:"d/m/Y" }}
+      </td>
+
+      {# Acciones #}
       <td>
-        <div style="display:flex;gap:0.4rem;">
-          <a href="{% url 'app_admin:usuario_detalle' perfil.pk %}" class="btn btn-ghost btn-xs">Ver</a>
+        <div class="action-cell">
+          <a href="{% url 'app_admin:usuario_detalle' perfil.pk %}" class="btn-xs btn-info" title="Ver detalle">
+            <i class="bi bi-eye" style="font-size:0.78rem;"></i> Ver
+          </a>
           {% if perfil.rol != 'admin' %}
-          <form method="post" action="{% url 'app_admin:usuario_toggle' perfil.pk %}">
+          <form method="post" action="{% url 'app_admin:usuario_toggle' perfil.pk %}" style="margin:0;">
             {% csrf_token %}
-            <button type="submit" class="btn btn-xs {% if perfil.activo %}btn-danger{% else %}btn-primary{% endif %}"
-                    onclick="return confirm('¿{% if perfil.activo %}Desactivar{% else %}Activar{% endif %} a {{ perfil.user.username }}?')">
+            <button type="submit" class="btn-xs {% if perfil.activo %}btn-danger{% else %}btn-enable{% endif %}"
+              title="{% if perfil.activo %}Desactivar{% else %}Activar{% endif %}"
+              onclick="return confirm('¿{% if perfil.activo %}Desactivar{% else %}Activar{% endif %} a @{{ perfil.user.username }}?')">
+              <i class="bi bi-{% if perfil.activo %}pause-circle{% else %}play-circle{% endif %}" style="font-size:0.78rem;"></i>
               {% if perfil.activo %}Desactivar{% else %}Activar{% endif %}
             </button>
           </form>
+          <button class="btn-xs btn-danger" title="Eliminar usuario"
+                  onclick="confirmarEliminarUsuario('{{ perfil.user.username|escapejs }}', '{% url 'app_admin:usuario_eliminar' perfil.pk %}')">
+            <i class="bi bi-trash3" style="font-size:0.78rem;"></i>
+          </button>
           {% endif %}
         </div>
       </td>
@@ -58,8 +384,159 @@
     {% endfor %}
     </tbody>
   </table>
+  </div>
   {% else %}
-  <div class="empty-state"><i class="bi bi-people" style="font-size:2.5rem;color:var(--gray-200);display:block;margin-bottom:0.5rem;"></i><p>No hay usuarios con esos filtros.</p></div>
+  <div class="empty-state">
+    <i class="bi bi-people"></i>
+    <p>No hay usuarios{% if q or rol_f or estado_f %} con esos filtros{% endif %}.</p>
+    {% if q or rol_f or estado_f %}
+    <a href="{% url 'app_admin:usuarios' %}" class="btn btn-ghost btn-sm" style="margin-top:0.65rem;">
+      <i class="bi bi-x-lg"></i> Limpiar filtros
+    </a>
+    {% endif %}
+  </div>
   {% endif %}
 </div>
+
+{# ── Modal confirmar eliminación ── #}
+<div id="modal-eliminar-usr" class="modal-overlay" onclick="if(event.target===this)cerrarModalUsr()">
+  <div class="modal-box">
+    <div class="modal-icon red"><i class="bi bi-person-x-fill"></i></div>
+    <div class="modal-title">¿Eliminar usuario?</div>
+    <p class="modal-desc" id="modal-desc-usr">Esta acción desactivará la cuenta permanentemente.</p>
+    <form id="form-eliminar-usr" method="post">
+      {% csrf_token %}
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" style="flex:1;" onclick="cerrarModalUsr()">Cancelar</button>
+        <button type="submit" class="btn btn-danger" style="flex:1;">
+          <i class="bi bi-trash3"></i> Eliminar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Modal confirmar acción masiva ── #}
+<div id="modal-bulk-usr" class="modal-overlay" onclick="if(event.target===this)cerrarBulkModal()">
+  <div class="modal-box">
+    <div class="modal-icon" id="bulk-modal-icon" style="background:var(--amber-pale);color:var(--amber);"><i class="bi bi-people"></i></div>
+    <div class="modal-title" id="bulk-modal-title">¿Confirmar acción masiva?</div>
+    <p class="modal-desc" id="bulk-modal-desc">Esta acción afectará a los usuarios seleccionados.</p>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" style="flex:1;" onclick="cerrarBulkModal()">Cancelar</button>
+      <button type="button" class="btn btn-primary" style="flex:1;" id="bulk-confirm-btn" onclick="ejecutarBulk()">
+        Confirmar
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Selección múltiple ────────────────────────────────────────────────────
+const checkAll = document.getElementById('check-all');
+let pendingBulkAccion = '';
+
+function actualizarBulkBar() {
+  const checks = document.querySelectorAll('.usr-check:checked');
+  const bar = document.getElementById('bulk-bar');
+  const countEl = document.getElementById('bulk-count');
+  if (checks.length > 0) {
+    bar.style.display = 'flex';
+    countEl.textContent = checks.length + ' seleccionado' + (checks.length > 1 ? 's' : '');
+    document.querySelectorAll('.tbl tbody tr').forEach(tr => {
+      const chk = tr.querySelector('.usr-check');
+      if (chk) tr.classList.toggle('selected-row', chk.checked);
+    });
+  } else {
+    bar.style.display = 'none';
+    document.querySelectorAll('.tbl tbody tr').forEach(tr => tr.classList.remove('selected-row'));
+  }
+  checkAll.indeterminate = checks.length > 0 && checks.length < document.querySelectorAll('.usr-check').length;
+  checkAll.checked = checks.length > 0 && checks.length === document.querySelectorAll('.usr-check').length;
+}
+
+checkAll.addEventListener('change', function () {
+  document.querySelectorAll('.usr-check').forEach(c => c.checked = this.checked);
+  actualizarBulkBar();
+});
+
+document.querySelectorAll('.usr-check').forEach(c => c.addEventListener('change', actualizarBulkBar));
+
+function limpiarSeleccion() {
+  document.querySelectorAll('.usr-check').forEach(c => c.checked = false);
+  checkAll.checked = false;
+  actualizarBulkBar();
+}
+
+function bulkAccion(accion) {
+  const checks = document.querySelectorAll('.usr-check:checked');
+  if (!checks.length) return;
+  pendingBulkAccion = accion;
+  const n = checks.length;
+  const icono = document.getElementById('bulk-modal-icon');
+  const title = document.getElementById('bulk-modal-title');
+  const desc  = document.getElementById('bulk-modal-desc');
+  const btn   = document.getElementById('bulk-confirm-btn');
+
+  if (accion === 'activar') {
+    icono.style.background = 'var(--leaf-pale)'; icono.style.color = 'var(--leaf)';
+    icono.innerHTML = '<i class="bi bi-play-circle-fill"></i>';
+    title.textContent = '¿Activar ' + n + ' usuario(s)?';
+    desc.textContent = 'Se habilitará el acceso a las cuentas seleccionadas.';
+    btn.className = 'btn btn-primary'; btn.style.flex = '1';
+  } else if (accion === 'desactivar') {
+    icono.style.background = 'var(--amber-pale)'; icono.style.color = 'var(--amber)';
+    icono.innerHTML = '<i class="bi bi-pause-circle-fill"></i>';
+    title.textContent = '¿Desactivar ' + n + ' usuario(s)?';
+    desc.textContent = 'Se bloqueará el acceso a las cuentas seleccionadas.';
+    btn.className = 'btn btn-amber'; btn.style.flex = '1';
+  } else if (accion === 'eliminar') {
+    icono.style.background = 'var(--red-pale)'; icono.style.color = 'var(--red)';
+    icono.innerHTML = '<i class="bi bi-person-x-fill"></i>';
+    title.textContent = '¿Eliminar ' + n + ' usuario(s)?';
+    desc.textContent = 'Esta acción desactivará las cuentas seleccionadas permanentemente.';
+    btn.className = 'btn btn-danger'; btn.style.flex = '1';
+  }
+  document.getElementById('modal-bulk-usr').classList.add('open');
+}
+
+function ejecutarBulk() {
+  document.getElementById('bulk-accion-input').value = pendingBulkAccion;
+  const container = document.getElementById('bulk-pks-container');
+  container.innerHTML = '';
+  document.querySelectorAll('.usr-check:checked').forEach(c => {
+    const inp = document.createElement('input');
+    inp.type = 'hidden'; inp.name = 'pks'; inp.value = c.value;
+    container.appendChild(inp);
+  });
+  cerrarBulkModal();
+  document.getElementById('form-bulk-act').submit();
+}
+
+function cerrarBulkModal() {
+  document.getElementById('modal-bulk-usr').classList.remove('open');
+}
+
+// ── Modal eliminar individual ─────────────────────────────────────────────
+function confirmarEliminarUsuario(username, url) {
+  document.getElementById('modal-desc-usr').innerHTML =
+    'Vas a eliminar la cuenta de <strong>@' + username + '</strong>. Esta acción la desactivará permanentemente.';
+  document.getElementById('form-eliminar-usr').action = url;
+  document.getElementById('modal-eliminar-usr').classList.add('open');
+}
+function cerrarModalUsr() {
+  document.getElementById('modal-eliminar-usr').classList.remove('open');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { cerrarModalUsr(); cerrarBulkModal(); }
+});
+
+// ── Búsqueda con Enter ────────────────────────────────────────────────────
+document.getElementById('usr-q').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') { e.preventDefault(); document.getElementById('filter-form').submit(); }
+});
+</script>
 {% endblock %}

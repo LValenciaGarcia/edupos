@@ -1,10 +1,334 @@
-<!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8"><title>Estudiante — Próximamente</title>
-<style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f8f8f6;}</style>
-</head><body>
-<div style="text-align:center;">
-  <h1 style="font-size:2rem;">Módulo Estudiante</h1>
-  <p style="color:#8a8a82;margin-top:0.5rem;">Próximamente disponible.</p>
-  <a href="/login/" style="color:#2d6a4f;font-weight:600;">← Volver al login</a>
+{% extends 'app_estudiante/base_estudiante.html' %}
+{% load filtros %}
+{% block title %}Inicio{% endblock %}
+{% block page_title %}Inicio{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'app_estudiante:menu' %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-cart-plus"></i> Hacer pedido
+  </a>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── Saldo hero ──────────────────────────────────────────────────────────── */
+  .saldo-hero {
+    background: var(--ink);
+    border-radius: 14px;
+    padding: 1.8rem 2rem;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1.5rem; margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    position: relative; overflow: hidden;
+  }
+  .saldo-hero::before {
+    content: '';
+    position: absolute; right: -2rem; top: -2rem;
+    width: 12rem; height: 12rem; border-radius: 50%;
+    background: rgba(34,197,94,0.06); pointer-events: none;
+  }
+  .saldo-hero-label {
+    font-size: 0.6rem; font-weight: 700; letter-spacing: 0.14em;
+    text-transform: uppercase; color: rgba(255,255,255,0.3);
+    margin-bottom: 0.5rem;
+  }
+  .saldo-hero-val {
+    font-family: var(--serif); font-size: 3.2rem; font-weight: 300;
+    color: var(--leaf-bright); line-height: 1; letter-spacing: -0.02em;
+  }
+  .saldo-hero-sub { font-size: 0.72rem; color: rgba(255,255,255,0.35); margin-top: 0.5rem; }
+  .saldo-hero-right { display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; }
+  .saldo-hero-meta {
+    display: flex; align-items: center; gap: 0.5rem;
+    font-size: 0.76rem; color: rgba(255,255,255,0.5);
+  }
+  .saldo-hero-meta strong { color: rgba(255,255,255,0.85); font-family: var(--serif); font-size: 1rem; }
+  .saldo-alert {
+    display: flex; align-items: center; gap: 0.65rem;
+    background: rgba(220,38,38,0.12); border: 1px solid rgba(220,38,38,0.2);
+    border-radius: 8px; padding: 0.6rem 1rem;
+    font-size: 0.78rem; color: #fca5a5; margin-top: 0.75rem;
+  }
+
+  /* ── Pedido activo ───────────────────────────────────────────────────────── */
+  .pedido-activo-banner {
+    display: flex; align-items: center; gap: 1rem;
+    background: var(--sky-pale); border: 1px solid var(--sky-tint);
+    border-radius: 10px; padding: 1rem 1.3rem; margin-bottom: 1.5rem;
+  }
+  .pedido-activo-pulse {
+    width: 0.75rem; height: 0.75rem; border-radius: 50%;
+    background: var(--sky); flex-shrink: 0;
+    animation: pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.55; transform: scale(0.82); }
+  }
+
+  /* ── Layout ──────────────────────────────────────────────────────────────── */
+  .dash-layout {
+    display: grid; grid-template-columns: 1fr 300px;
+    gap: 1.2rem; align-items: start;
+  }
+  @media (max-width: 1000px) { .dash-layout { grid-template-columns: 1fr; } }
+
+  /* ── Pedidos recientes ───────────────────────────────────────────────────── */
+  .pedido-item {
+    display: flex; align-items: center; gap: 0.9rem;
+    padding: 0.85rem 1.4rem; border-bottom: 1px solid var(--mist);
+    transition: background 0.12s;
+  }
+  .pedido-item:last-child { border-bottom: none; }
+  .pedido-item:hover { background: var(--cream); }
+  .pedido-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; flex-shrink: 0; }
+  .pedido-dot.pendiente  { background: var(--amber); }
+  .pedido-dot.preparando { background: var(--sky); }
+  .pedido-dot.listo      { background: var(--leaf); }
+  .pedido-dot.entregado  { background: var(--ash); }
+  .pedido-dot.cancelado  { background: var(--red); }
+  .pedido-info { flex: 1; min-width: 0; }
+  .pedido-ticket { font-size: 0.8rem; font-weight: 700; color: var(--ink); }
+  .pedido-meta   { font-size: 0.68rem; color: var(--ash); margin-top: 0.06rem; }
+  .pedido-monto  { font-family: var(--serif); font-size: 0.95rem; color: var(--ink); flex-shrink: 0; }
+
+  /* ── Limites ─────────────────────────────────────────────────────────────── */
+  .limite-item { padding: 0.85rem 1.4rem; border-bottom: 1px solid var(--mist); }
+  .limite-item:last-child { border-bottom: none; }
+  .limite-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.5rem; }
+  .limite-tipo { font-size: 0.74rem; font-weight: 600; color: var(--ink); }
+  .limite-nums { font-size: 0.68rem; color: var(--ash); }
+  .limite-nums strong { color: var(--stone); }
+
+  /* ── Quick actions ───────────────────────────────────────────────────────── */
+  .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; }
+  .quick-btn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 0.45rem; padding: 1rem 0.5rem; border-radius: 10px;
+    border: 1px solid var(--mist); background: var(--ivory);
+    text-decoration: none; color: var(--stone);
+    transition: all 0.16s; font-size: 0.72rem; font-weight: 600;
+    text-align: center;
+  }
+  .quick-btn i { font-size: 1.25rem; }
+  .quick-btn:hover { border-color: var(--leaf); background: var(--leaf-pale); color: var(--leaf-dark); }
+  .quick-btn:hover i { color: var(--leaf); }
+  .quick-btn.highlight { border-color: var(--leaf-tint); background: var(--leaf-pale); color: var(--leaf-dark); }
+  .quick-btn.highlight i { color: var(--leaf); }
+
+  /* ── Favoritos ───────────────────────────────────────────────────────────── */
+  .fav-item {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.6rem 1.2rem; border-bottom: 1px solid var(--mist);
+    transition: background 0.12s;
+  }
+  .fav-item:last-child { border-bottom: none; }
+  .fav-item:hover { background: var(--cream); }
+  .fav-icon {
+    width: 2rem; height: 2rem; border-radius: 7px; flex-shrink: 0;
+    background: var(--leaf-pale); border: 1px solid var(--leaf-tint);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem; color: var(--leaf);
+  }
+  .fav-nombre { font-size: 0.8rem; font-weight: 600; color: var(--ink); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fav-veces  { font-size: 0.67rem; color: var(--ash); }
+  .fav-precio { font-family: var(--serif); font-size: 0.88rem; color: var(--leaf); flex-shrink: 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Saldo hero -->
+<div class="saldo-hero">
+  <div>
+    <div class="saldo-hero-label">Saldo disponible</div>
+    <div class="saldo-hero-val">${{ estudiante.saldo|miles }}</div>
+    <div class="saldo-hero-sub">Codigo {{ estudiante.codigo }} &middot; Grado {{ estudiante.grado }}</div>
+    {% if estudiante.saldo < 5000 %}
+    <div class="saldo-alert">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      Saldo bajo. Pide a tu acudiente que recargue tu cuenta.
+    </div>
+    {% endif %}
+  </div>
+  <div class="saldo-hero-right">
+    <div class="saldo-hero-meta">
+      <i class="bi bi-calendar-day" style="color:rgba(255,255,255,0.3);"></i>
+      Hoy: <strong>${{ gasto_hoy|miles }}</strong>
+    </div>
+    <div class="saldo-hero-meta">
+      <i class="bi bi-calendar-month" style="color:rgba(255,255,255,0.3);"></i>
+      Este mes: <strong>${{ gasto_mes|miles }}</strong>
+    </div>
+    <a href="{% url 'app_estudiante:menu' %}" class="btn btn-primary btn-sm" style="margin-top:0.5rem;">
+      <i class="bi bi-shop"></i> Ir al menu
+    </a>
+  </div>
 </div>
-</body></html>
+
+<!-- Pedido en curso -->
+{% if pedido_activo %}
+<div class="pedido-activo-banner">
+  <div class="pedido-activo-pulse"></div>
+  <div style="flex:1;">
+    <div style="font-weight:700;font-size:0.85rem;color:var(--sky);">Pedido en proceso</div>
+    <div style="font-size:0.74rem;color:var(--stone);margin-top:0.1rem;">
+      {{ pedido_activo.ticket }} &middot; {{ pedido_activo.get_estado_display }} &middot; ${{ pedido_activo.total|miles }}
+    </div>
+  </div>
+  <a href="{% url 'app_estudiante:historial' %}" class="btn btn-ghost btn-sm">Ver</a>
+</div>
+{% endif %}
+
+<!-- KPIs -->
+<div class="stats-row" style="margin-bottom:1.5rem;">
+  <div class="stat-card green">
+    <div class="stat-label">Saldo</div>
+    <div class="stat-val">${{ estudiante.saldo|miles }}</div>
+    <div class="stat-sub">disponible</div>
+  </div>
+  <div class="stat-card amber">
+    <div class="stat-label">Gastado hoy</div>
+    <div class="stat-val">${{ gasto_hoy|miles }}</div>
+    <div class="stat-sub">pedidos entregados</div>
+  </div>
+  <div class="stat-card blue">
+    <div class="stat-label">Este mes</div>
+    <div class="stat-val">${{ gasto_mes|miles }}</div>
+    <div class="stat-sub">gasto acumulado</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Total pedidos</div>
+    <div class="stat-val">{{ n_pedidos }}</div>
+    <div class="stat-sub">realizados</div>
+  </div>
+</div>
+
+<div class="dash-layout">
+
+  <!-- Pedidos recientes -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title" style="display:flex;align-items:center;gap:0.5rem;">
+        <i class="bi bi-receipt" style="color:var(--leaf);font-size:1rem;"></i>
+        Pedidos recientes
+      </span>
+      <a href="{% url 'app_estudiante:historial' %}" class="btn btn-ghost btn-sm">
+        Ver todo <i class="bi bi-arrow-right"></i>
+      </a>
+    </div>
+    {% if pedidos_recientes %}
+    {% for p in pedidos_recientes %}
+    <div class="pedido-item">
+      <span class="pedido-dot {{ p.estado }}"></span>
+      <div class="pedido-info">
+        <div class="pedido-ticket">{{ p.ticket }}</div>
+        <div class="pedido-meta">
+          {{ p.get_estado_display }} &middot; {{ p.fecha_pedido|date:"d/m/Y H:i" }}
+          &middot; {{ p.detalles.count }} producto{{ p.detalles.count|pluralize }}
+        </div>
+      </div>
+      <div class="pedido-monto">${{ p.total|miles }}</div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state">
+      <i class="bi bi-receipt es-icon"></i>
+      <p>No tienes pedidos todavia.</p>
+      <a href="{% url 'app_estudiante:menu' %}" class="btn btn-primary btn-sm" style="margin-top:0.75rem;">
+        <i class="bi bi-shop"></i> Ver el menu
+      </a>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Panel derecho -->
+  <div style="display:flex;flex-direction:column;gap:1.2rem;">
+
+    <!-- Accesos rapidos -->
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title" style="font-size:0.9rem;">Accesos rapidos</span>
+      </div>
+      <div style="padding:1rem;">
+        <div class="quick-grid">
+          <a href="{% url 'app_estudiante:menu' %}" class="quick-btn highlight">
+            <i class="bi bi-cart-plus"></i>
+            Pedir ahora
+          </a>
+          <a href="{% url 'app_estudiante:historial' %}" class="quick-btn">
+            <i class="bi bi-clock-history"></i>
+            Mis pedidos
+          </a>
+          <a href="{% url 'app_estudiante:estadisticas' %}" class="quick-btn">
+            <i class="bi bi-bar-chart-line"></i>
+            Estadisticas
+          </a>
+          <a href="{% url 'app_estudiante:perfil' %}" class="quick-btn">
+            <i class="bi bi-person-circle"></i>
+            Mi perfil
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mis favoritos -->
+    {% if top_prods %}
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title" style="font-size:0.9rem;">
+          <i class="bi bi-star-fill" style="color:var(--amber);margin-right:0.3rem;font-size:0.8rem;"></i>
+          Mis favoritos
+        </span>
+        <a href="{% url 'app_estudiante:menu' %}" class="btn btn-ghost btn-xs">Pedir</a>
+      </div>
+      {% for p in top_prods %}
+      <div class="fav-item">
+        <div class="fav-icon">
+          <i class="bi bi-{% if p.producto__categoria__nombre == 'desayuno' %}cup-hot{% elif p.producto__categoria__nombre == 'almuerzo' %}egg-fried{% elif p.producto__categoria__nombre == 'bebidas' %}cup-straw{% else %}bag{% endif %}"></i>
+        </div>
+        <div class="fav-nombre" title="{{ p.producto__nombre }}">{{ p.producto__nombre }}</div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div class="fav-precio">${{ p.producto__precio_venta|floatformat:0 }}</div>
+          <div class="fav-veces">x{{ p.veces }} pedido{{ p.veces|pluralize }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Limites de gasto -->
+    {% if limites_data %}
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title" style="font-size:0.9rem;">
+          <i class="bi bi-shield-check" style="color:var(--amber);margin-right:0.3rem;font-size:0.85rem;"></i>
+          Limites de gasto
+        </span>
+      </div>
+      {% for l in limites_data %}
+      <div class="limite-item">
+        <div class="limite-head">
+          <span class="limite-tipo">{{ l.limite.get_tipo_display }}</span>
+          <span class="limite-nums">
+            <strong>${{ l.gasto|miles }}</strong> / ${{ l.limite.monto|miles }}
+          </span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill {% if l.pct >= 90 %}red{% elif l.pct >= 70 %}amber{% else %}green{% endif %}"
+               style="width:{{ l.pct }}%;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:0.3rem;font-size:0.66rem;color:var(--ash);">
+          <span>{{ l.pct }}% utilizado</span>
+          <span>Disponible: ${{ l.disponible|miles }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+{% endblock %}

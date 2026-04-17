@@ -1,0 +1,178 @@
+{% extends 'app_padre/base_padre.html' %}
+{% load filtros %}
+{% block title %}Horarios de Compra{% endblock %}
+{% block page_title %}Horarios de Compra{% endblock %}
+{% block nav_hijos %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+  .page-layout { display: grid; grid-template-columns: 1fr 340px; gap: 1.4rem; align-items: start; }
+  @media (max-width: 960px) { .page-layout { grid-template-columns: 1fr; } }
+
+  .hijo-chip {
+    display: flex; align-items: center; gap: 0.85rem;
+    background: var(--ink); border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.4rem;
+  }
+  .hijo-chip-ava {
+    width: 2.5rem; height: 2.5rem; border-radius: 50%;
+    background: rgba(2,132,199,0.2); border: 1px solid rgba(2,132,199,0.3);
+    display: flex; align-items: center; justify-content: center; color: #38bdf8; flex-shrink: 0;
+  }
+  .hijo-chip-name { font-family: var(--serif); font-size: 1.1rem; color: #fff; }
+  .hijo-chip-meta { font-size: 0.71rem; color: rgba(255,255,255,0.45); margin-top: 0.07rem; }
+
+  .horario-card {
+    background: var(--ivory); border: 1px solid var(--mist); border-radius: 10px;
+    padding: 1.1rem 1.3rem; margin-bottom: 0.75rem;
+    display: flex; align-items: center; gap: 1rem;
+  }
+  .horario-card.inactivo { opacity: 0.5; }
+  .horario-tiempo {
+    background: var(--sky-tint); border: 1px solid var(--sky-pale);
+    border-radius: 9px; padding: 0.75rem 1rem; text-align: center; flex-shrink: 0; min-width: 7rem;
+  }
+  .horario-rango { font-family: var(--serif); font-size: 1.05rem; color: var(--sky); line-height: 1.2; }
+  .horario-nombre { font-size: 0.88rem; font-weight: 600; }
+  .horario-meta { font-size: 0.72rem; color: var(--ash); margin-top: 0.07rem; }
+  .horario-actions { margin-left: auto; display: flex; gap: 0.35rem; flex-shrink: 0; }
+
+  .info-box {
+    background: var(--sky-pale); border: 1px solid var(--sky-tint); border-radius: 9px;
+    padding: 0.85rem 1rem; font-size: 0.8rem; color: var(--sky); margin-bottom: 1rem;
+    display: flex; gap: 0.5rem; align-items: flex-start;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="hijo-chip">
+  <div class="hijo-chip-ava"><i class="bi bi-clock"></i></div>
+  <div>
+    <div class="hijo-chip-name">Horarios de {{ estudiante.perfil.user.get_full_name }}</div>
+    <div class="hijo-chip-meta">Grado {{ estudiante.grado }} · Define ventanas de tiempo en las que se permiten compras</div>
+  </div>
+</div>
+
+<div class="page-layout">
+
+  <!-- Lista de horarios -->
+  <div>
+    <div class="info-box">
+      <i class="bi bi-info-circle-fill" style="flex-shrink:0;margin-top:0.05rem;"></i>
+      <span>Si configuras horarios activos, el estudiante <strong>solo podrá comprar durante esos períodos</strong>. Si no hay horarios activos, puede comprar en cualquier momento.</span>
+    </div>
+
+    <h2 style="font-family:var(--serif);font-size:1.2rem;font-weight:500;margin-bottom:0.85rem;">
+      Horarios configurados ({{ horarios.count }})
+    </h2>
+
+    {% if horarios %}
+      {% for h in horarios %}
+      <div class="horario-card {% if not h.activo %}inactivo{% endif %}">
+        <div class="horario-tiempo">
+          <div class="horario-rango">{{ h.hora_inicio|time:"H:i" }}</div>
+          <div style="font-size:0.65rem;color:var(--ash);margin:0.1rem 0;">hasta</div>
+          <div class="horario-rango">{{ h.hora_fin|time:"H:i" }}</div>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div class="horario-nombre">{{ h.nombre }}</div>
+          <div class="horario-meta">
+            <span class="badge {% if h.activo %}badge-activo{% else %}badge-inactivo{% endif %}">
+              {% if h.activo %}Activo{% else %}Inactivo{% endif %}
+            </span>
+          </div>
+        </div>
+        <div class="horario-actions">
+          <form method="post" style="display:inline;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="toggle">
+            <input type="hidden" name="horario_id" value="{{ h.pk }}">
+            <button type="submit" class="btn btn-ghost btn-xs">
+              <i class="bi bi-{% if h.activo %}pause-circle{% else %}play-circle{% endif %}"></i>
+            </button>
+          </form>
+          <form method="post" style="display:inline;" onsubmit="return confirm('¿Eliminar este horario?')">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="horario_id" value="{{ h.pk }}">
+            <button type="submit" class="btn btn-danger btn-xs"><i class="bi bi-trash"></i></button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="card">
+        <div class="empty-state">
+          <i class="bi bi-clock es-icon"></i>
+          <p>No hay horarios configurados.</p>
+          <p style="margin-top:0.35rem;font-size:0.78rem;">El estudiante puede comprar en cualquier momento.</p>
+        </div>
+      </div>
+    {% endif %}
+
+    <a href="{% url 'app_padre:hijos' %}" class="btn btn-ghost btn-sm" style="margin-top:0.75rem;">
+      <i class="bi bi-arrow-left"></i> Volver
+    </a>
+  </div>
+
+  <!-- Formulario nuevo horario -->
+  <div class="card">
+    <div class="card-head"><span class="card-title">Nuevo horario</span></div>
+    <div class="card-body">
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save">
+
+        <div class="field" style="margin-bottom:0.9rem;">
+          <label for="nombre_h">Nombre del período *</label>
+          <input type="text" id="nombre_h" name="nombre" placeholder="Ej: Recreo, Almuerzo…" maxlength="80">
+        </div>
+
+        <!-- Sugerencias de nombre -->
+        <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.9rem;">
+          <button type="button" onclick="setNombre('Recreo')" class="btn btn-ghost btn-xs">Recreo</button>
+          <button type="button" onclick="setNombre('Almuerzo')" class="btn btn-ghost btn-xs">Almuerzo</button>
+          <button type="button" onclick="setNombre('Descanso')" class="btn btn-ghost btn-xs">Descanso</button>
+        </div>
+
+        <div class="form-grid" style="margin-bottom:1rem;">
+          <div class="field">
+            <label for="hora_inicio_h">Hora inicio *</label>
+            <input type="time" id="hora_inicio_h" name="hora_inicio" required>
+          </div>
+          <div class="field">
+            <label for="hora_fin_h">Hora fin *</label>
+            <input type="time" id="hora_fin_h" name="hora_fin" required>
+          </div>
+        </div>
+
+        <!-- Horarios sugeridos para colegio -->
+        <div style="margin-bottom:1.1rem;">
+          <div style="font-size:0.67rem;font-weight:700;color:var(--stone);letter-spacing:0.07em;text-transform:uppercase;margin-bottom:0.4rem;">Sugerencias</div>
+          <div style="display:flex;flex-direction:column;gap:0.35rem;">
+            <button type="button" class="btn btn-ghost btn-xs" onclick="setHorario('09:30','09:50')">Recreo 9:30 – 9:50</button>
+            <button type="button" class="btn btn-ghost btn-xs" onclick="setHorario('11:00','11:15')">Descanso 11:00 – 11:15</button>
+            <button type="button" class="btn btn-ghost btn-xs" onclick="setHorario('12:00','13:00')">Almuerzo 12:00 – 13:00</button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-sky btn-full">
+          <i class="bi bi-clock-history"></i> Guardar horario
+        </button>
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function setNombre(n) { document.getElementById('nombre_h').value = n; }
+  function setHorario(i, f) {
+    document.getElementById('hora_inicio_h').value = i;
+    document.getElementById('hora_fin_h').value = f;
+  }
+</script>
+{% endblock %}

@@ -102,11 +102,18 @@
     {% endfor %}
   </select>
 
-  {% if hijo_activo or estado_activo %}
+  <input type="date" name="desde" value="{{ fecha_desde }}" title="Desde" onchange="this.form.submit()">
+  <input type="date" name="hasta" value="{{ fecha_hasta }}" title="Hasta" onchange="this.form.submit()">
+
+  {% if hijo_activo or estado_activo or fecha_desde or fecha_hasta %}
   <a href="{% url 'app_padre:historial' %}" class="active-filter-tag">
     <i class="bi bi-x"></i> Limpiar
   </a>
   {% endif %}
+
+  <a href="{% url 'app_padre:exportar_csv' %}?hijo={{ hijo_activo }}&dias=90" class="btn btn-ghost btn-sm" style="margin-left:auto;">
+    <i class="bi bi-download"></i> Exportar CSV
+  </a>
 </form>
 
 <!-- Tabla -->
@@ -128,6 +135,7 @@
 
       <div class="ped-estado">
         <span class="badge badge-{{ pedido.estado }}">{{ pedido.get_estado_display }}</span>
+        {% if pedido.pedido_padre %}<span class="badge badge-padre" style="margin-top:2px;display:block;">Por padre</span>{% endif %}
       </div>
 
       <div class="ped-total">${{ pedido.total|miles }}</div>

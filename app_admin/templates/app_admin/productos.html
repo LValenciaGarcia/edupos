@@ -5,6 +5,12 @@
 {% block nav_productos %}active{% endblock %}
 
 {% block topbar_actions %}
+  <a href="{% url 'app_admin:exportar_excel' %}" class="btn btn-ghost btn-sm" title="Exportar a Excel">
+    <i class="bi bi-file-earmark-excel"></i> Excel
+  </a>
+  <a href="{% url 'app_admin:exportar_pdf' %}" class="btn btn-ghost btn-sm" title="Exportar a PDF">
+    <i class="bi bi-file-earmark-pdf"></i> PDF
+  </a>
   <a href="{% url 'app_admin:entrada_stock' %}" class="btn btn-ghost btn-sm">
     <i class="bi bi-box-arrow-in-down"></i> Entrada stock
   </a>
@@ -247,9 +253,33 @@
     background: var(--ivory); border-radius: 16px;
     width: 100%; max-width: 500px;
     box-shadow: 0 24px 64px rgba(0,0,0,0.22);
-    border: 1px solid var(--mist); overflow: hidden;
-    max-height: 90vh; overflow-y: auto;
+    border: 1px solid var(--mist);
+    max-height: 90vh;
+    display: flex; flex-direction: column;
+    overflow: hidden;
   }
+  /* Cabecera fija — no participa en el scroll */
+  .info-modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.75rem 1rem 0.75rem 1.4rem;
+    border-bottom: 1px solid var(--mist);
+    flex-shrink: 0; background: var(--ivory);
+    position: relative; z-index: 10;
+  }
+  .info-modal-header .info-category {
+    font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--leaf); margin: 0;
+  }
+  .info-close {
+    width: 1.8rem; height: 1.8rem; border-radius: 50%;
+    background: var(--cream); border: 1px solid var(--mist); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--stone); font-size: 0.85rem; transition: all 0.15s;
+    flex-shrink: 0; pointer-events: all; position: relative; z-index: 11;
+  }
+  .info-close:hover { background: var(--red-pale); color: var(--red); border-color: var(--red-tint); }
+  /* Área desplazable */
+  .info-modal-scroll { overflow-y: auto; flex: 1; }
   .info-img-wrap {
     width: 100%; aspect-ratio: 16/8; overflow: hidden;
     background: var(--cream); position: relative;
@@ -262,8 +292,7 @@
     align-items: center; justify-content: center;
     background: var(--cream); color: var(--fog); font-size: 3rem;
   }
-  .info-body { padding: 1.4rem 1.6rem 1.6rem; }
-  .info-category { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--leaf); margin-bottom: 0.3rem; }
+  .info-body { padding: 1.2rem 1.6rem 1.6rem; }
   .info-name { font-family: var(--serif); font-size: 1.35rem; line-height: 1.2; margin-bottom: 0.5rem; }
   .info-desc { font-size: 0.8rem; color: var(--stone); line-height: 1.6; margin-bottom: 1rem; }
   .info-badges { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-bottom: 1rem; }
@@ -283,14 +312,6 @@
     padding: 0.3rem 0; border-bottom: 1px solid var(--cream); font-size: 0.8rem;
   }
   .info-recipe-row:last-child { border-bottom: none; }
-  .info-close {
-    position: absolute; top: 0.75rem; right: 0.75rem;
-    width: 1.8rem; height: 1.8rem; border-radius: 50%;
-    background: rgba(15,15,14,0.45); border: none; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    color: #fff; font-size: 0.85rem; transition: background 0.15s;
-  }
-  .info-close:hover { background: rgba(15,15,14,0.7); }
 </style>
 
 <!-- ── KPI strip ──────────────────────────────────────────────────────────── -->
@@ -360,10 +381,39 @@
     </div>
 
     {% if productos %}
+
+    {# ── Barra de acciones masivas ── #}
+    <div id="prod-bulk-bar" style="display:none;align-items:center;gap:0.65rem;padding:0.65rem 1rem;background:var(--violet-pale);border-bottom:1px solid #ddd6fe;flex-wrap:wrap;">
+      <span style="font-size:0.78rem;font-weight:600;color:var(--violet);">
+        <i class="bi bi-check2-square"></i>
+        <span id="prod-bulk-count">0</span> producto(s) seleccionado(s)
+      </span>
+      <form method="post" action="{% url 'app_admin:producto_bulk' %}" id="form-prod-bulk" style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+        {% csrf_token %}
+        <div id="prod-bulk-pks"></div>
+        <input type="hidden" name="accion" id="prod-bulk-accion" value="">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="prodBulkAccion('mostrar')" title="Mostrar en menú">
+          <i class="bi bi-eye"></i> Mostrar en menú
+        </button>
+        <button type="button" class="btn btn-amber btn-sm" onclick="prodBulkAccion('ocultar')" title="Ocultar del menú">
+          <i class="bi bi-eye-slash"></i> Ocultar del menú
+        </button>
+        <button type="button" class="btn btn-danger btn-sm" onclick="prodBulkAccion('eliminar')" title="Eliminar seleccionados">
+          <i class="bi bi-trash3"></i> Eliminar
+        </button>
+      </form>
+      <button class="btn btn-ghost btn-sm" onclick="limpiarSeleccionProd()" style="margin-left:auto;" title="Cancelar selección">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+
     <div style="overflow-x:auto;">
     <table class="tbl" id="tbl-productos">
       <thead>
         <tr>
+          <th style="width:2.5rem;text-align:center;">
+            <input type="checkbox" id="prod-check-all" title="Seleccionar todos" style="accent-color:var(--violet);cursor:pointer;">
+          </th>
           <th>Producto</th>
           <th>Categoría</th>
           <th>Stock</th>
@@ -374,17 +424,33 @@
       </thead>
       <tbody>
       {% for p in productos %}
-      <tr>
+      <tr data-pk="{{ p.pk }}" id="prod-row-{{ p.pk }}">
+        <td style="width:2.5rem;text-align:center;padding:0.5rem;">
+          <input type="checkbox" class="prod-check" value="{{ p.pk }}"
+                 style="accent-color:var(--violet);cursor:pointer;width:1rem;height:1rem;">
+        </td>
         <!-- Nombre + badges -->
         <td style="min-width:200px;">
-          <div style="font-weight:600;font-size:0.85rem;">{{ p.nombre }}</div>
-          <div style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-top:0.25rem;">
-            <span class="badge-tipo {% if p.tipo == 'simple' %}badge-simple{% else %}badge-elaborado{% endif %}">
-              {{ p.get_tipo_display }}
-            </span>
-            {% if not p.disponible %}
-            <span class="badge-tipo badge-oculto"><i class="bi bi-eye-slash" style="font-size:0.55rem;"></i> Oculto</span>
+          <div style="display:flex;align-items:center;gap:0.55rem;">
+            {% if p.imagen %}
+            <img src="{{ p.imagen.url }}" alt="{{ p.nombre }}"
+                 style="width:2.2rem;height:2.2rem;object-fit:cover;border-radius:5px;flex-shrink:0;border:1px solid var(--mist);">
+            {% else %}
+            <div style="width:2.2rem;height:2.2rem;border-radius:5px;background:var(--cream);border:1px solid var(--mist);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <i class="bi bi-box-seam" style="font-size:0.68rem;color:var(--fog);"></i>
+            </div>
             {% endif %}
+            <div>
+              <div style="font-weight:600;font-size:0.85rem;">{{ p.nombre }}</div>
+              <div style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-top:0.25rem;">
+                <span class="badge-tipo {% if p.tipo == 'simple' %}badge-simple{% else %}badge-elaborado{% endif %}">
+                  {{ p.get_tipo_display }}
+                </span>
+                {% if not p.disponible %}
+                <span class="badge-tipo badge-oculto"><i class="bi bi-eye-slash" style="font-size:0.55rem;"></i> Oculto</span>
+                {% endif %}
+              </div>
+            </div>
           </div>
         </td>
 
@@ -559,28 +625,32 @@
 </div>
 
 <!-- ── Modal info producto ───────────────────────────────────────────────── -->
-<div id="modal-info" class="modal-overlay" onclick="if(event.target===this)cerrarModalInfo()">
+<div id="modal-info" class="modal-overlay">
   <div class="info-modal-box">
-    <div style="position:relative;">
+    <!-- Cabecera fija con cierre -->
+    <div class="info-modal-header">
+      <span class="info-category" id="info-category"></span>
+      <button type="button" class="info-close" id="btn-cerrar-info" title="Cerrar" onclick="cerrarModalInfoProducto()">
+  <i class="bi bi-x-lg"></i>
+</button>
+    </div>
+    <!-- Contenido desplazable -->
+    <div class="info-modal-scroll">
       <div class="info-img-wrap" id="info-img-wrap">
         <div class="info-img-placeholder" id="info-img-placeholder">
           <i class="bi bi-bag"></i>
         </div>
       </div>
-      <button class="info-close" onclick="cerrarModalInfo()"><i class="bi bi-x-lg"></i></button>
-    </div>
-    <div class="info-body">
-      <div class="info-category" id="info-category"></div>
-      <div class="info-name" id="info-name"></div>
-      <div class="info-badges" id="info-badges"></div>
-      <div class="info-desc" id="info-desc"></div>
-
-      <div class="info-grid" id="info-grid"></div>
-
-      <div id="info-recipe-wrap" style="display:none;">
-        <hr class="info-divider">
-        <div class="info-recipe-title"><i class="bi bi-journal-richtext"></i> Receta</div>
-        <div id="info-recipe-list"></div>
+      <div class="info-body">
+        <div class="info-name" id="info-name"></div>
+        <div class="info-badges" id="info-badges"></div>
+        <div class="info-desc" id="info-desc"></div>
+        <div class="info-grid" id="info-grid"></div>
+        <div id="info-recipe-wrap" style="display:none;">
+          <hr class="info-divider">
+          <div class="info-recipe-title"><i class="bi bi-journal-richtext"></i> Receta</div>
+          <div id="info-recipe-list"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -607,6 +677,8 @@ function abrirInfoProducto(pk) {
   if (!raw) return;
   const d = JSON.parse(raw.textContent);
 
+  document.getElementById('info-category').textContent = d.categoria;
+
   // Imagen
   const imgWrap = document.getElementById('info-img-wrap');
   const placeholder = document.getElementById('info-img-placeholder');
@@ -617,7 +689,7 @@ function abrirInfoProducto(pk) {
     const img = document.createElement('img');
     img.src = d.imagen_url;
     img.alt = d.nombre;
-    imgWrap.insertBefore(img, imgWrap.querySelector('button'));
+    imgWrap.appendChild(img);
   } else {
     placeholder.style.display = 'flex';
     const iconClass = d.categoria.toLowerCase().includes('bebida') ? 'bi-cup-straw'
@@ -627,20 +699,16 @@ function abrirInfoProducto(pk) {
     placeholder.innerHTML = `<i class="bi ${iconClass}"></i>`;
   }
 
-  // Cabecera
-  document.getElementById('info-category').textContent = d.categoria;
   document.getElementById('info-name').textContent = d.nombre;
   document.getElementById('info-desc').textContent = d.descripcion || '';
   document.getElementById('info-desc').style.display = d.descripcion ? '' : 'none';
 
-  // Badges
   const badgesEl = document.getElementById('info-badges');
   badgesEl.innerHTML = `
     <span class="badge-tipo ${d.tipo_key === 'simple' ? 'badge-simple' : 'badge-elaborado'}">${d.tipo}</span>
     ${!d.disponible ? '<span class="badge-tipo badge-oculto"><i class="bi bi-eye-slash" style="font-size:0.55rem;"></i> Oculto</span>' : ''}
   `;
 
-  // Grid de datos
   const gridEl = document.getElementById('info-grid');
   const fields = [
     { label: 'Precio venta', value: d.precio_venta, cls: 'price' },
@@ -659,7 +727,6 @@ function abrirInfoProducto(pk) {
     </div>
   `).join('');
 
-  // Receta
   const recipeWrap = document.getElementById('info-recipe-wrap');
   const recipeList = document.getElementById('info-recipe-list');
   if (d.receta && d.receta.length > 0) {
@@ -674,25 +741,109 @@ function abrirInfoProducto(pk) {
     recipeWrap.style.display = 'none';
   }
 
-  document.getElementById('modal-info').classList.add('open');
-}
-function cerrarModalInfo() {
-  document.getElementById('modal-info').classList.remove('open');
+  const modal = document.getElementById('modal-info');
+  modal.classList.add('open');
+  modal.style.display = 'flex';   // respaldo
 }
 
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') {
-    cerrarModalEliminar();
-    cerrarModalInfo();
+function cerrarModalInfoProducto() {
+  const modal = document.getElementById('modal-info');
+  if (modal) {
+    modal.classList.remove('open');
+    modal.style.display = 'none';
+  }
+}
+
+// Cerrar al hacer clic en el fondo oscuro
+document.addEventListener('DOMContentLoaded', function () {
+  const modalInfo = document.getElementById('modal-info');
+  if (modalInfo) {
+    modalInfo.addEventListener('click', function (e) {
+      if (e.target === modalInfo) cerrarModalInfoProducto();
+    });
   }
 });
 
-// ── Búsqueda client-side ───────────────────────────────────────────────────
+// Cerrar con tecla ESC
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    cerrarModalEliminar();
+    cerrarModalInfoProducto();
+  }
+});
+
+// Búsqueda client-side
 document.getElementById('prod-buscar').addEventListener('input', function () {
   const q = this.value.toLowerCase();
   document.querySelectorAll('#tbl-productos tbody tr').forEach(row => {
     row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
   });
 });
+
+// ── Selección múltiple de productos ──────────────────────────────────────
+const prodCheckAll = document.getElementById('prod-check-all');
+let pendingProdAccion = '';
+
+function actualizarBulkProd() {
+  const checks = document.querySelectorAll('.prod-check:checked');
+  const bar = document.getElementById('prod-bulk-bar');
+  document.getElementById('prod-bulk-count').textContent = checks.length;
+  if (checks.length > 0) {
+    bar.style.display = 'flex';
+    document.querySelectorAll('#tbl-productos tbody tr').forEach(tr => {
+      const chk = tr.querySelector('.prod-check');
+      if (chk) tr.style.background = chk.checked ? 'var(--violet-pale)' : '';
+    });
+  } else {
+    bar.style.display = 'none';
+    document.querySelectorAll('#tbl-productos tbody tr').forEach(tr => tr.style.background = '');
+  }
+  const total = document.querySelectorAll('.prod-check').length;
+  prodCheckAll.indeterminate = checks.length > 0 && checks.length < total;
+  prodCheckAll.checked = checks.length > 0 && checks.length === total;
+}
+
+prodCheckAll.addEventListener('change', function () {
+  document.querySelectorAll('.prod-check').forEach(c => {
+    const row = c.closest('tr');
+    if (!row || row.style.display === 'none') return;
+    c.checked = this.checked;
+  });
+  actualizarBulkProd();
+});
+
+document.querySelectorAll('.prod-check').forEach(c =>
+  c.addEventListener('change', actualizarBulkProd)
+);
+
+function limpiarSeleccionProd() {
+  document.querySelectorAll('.prod-check').forEach(c => c.checked = false);
+  prodCheckAll.checked = false;
+  actualizarBulkProd();
+}
+
+function prodBulkAccion(accion) {
+  const checks = document.querySelectorAll('.prod-check:checked');
+  if (!checks.length) return;
+  pendingProdAccion = accion;
+  let msg = '';
+  if (accion === 'mostrar')   msg = '¿Mostrar ' + checks.length + ' producto(s) en el menú?';
+  if (accion === 'ocultar')   msg = '¿Ocultar ' + checks.length + ' producto(s) del menú?';
+  if (accion === 'eliminar')  msg = '¿Eliminar permanentemente ' + checks.length + ' producto(s)?';
+  if (!confirm(msg)) return;
+  ejecutarBulkProd();
+}
+
+function ejecutarBulkProd() {
+  document.getElementById('prod-bulk-accion').value = pendingProdAccion;
+  const container = document.getElementById('prod-bulk-pks');
+  container.innerHTML = '';
+  document.querySelectorAll('.prod-check:checked').forEach(c => {
+    const inp = document.createElement('input');
+    inp.type = 'hidden'; inp.name = 'pks'; inp.value = c.value;
+    container.appendChild(inp);
+  });
+  document.getElementById('form-prod-bulk').submit();
+}
 </script>
 {% endblock %}

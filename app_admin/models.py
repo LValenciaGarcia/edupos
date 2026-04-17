@@ -349,8 +349,9 @@ class Pedido(models.Model):
         super().save(*args, **kwargs)
 
     def recalcular_totales(self):
-        self.total       = sum(d.subtotal for d in self.detalles.all())
-        self.costo_total = sum(d.costo_linea for d in self.detalles.all())
+        detalles = self.detalles.all()
+        self.total = sum(float(d.subtotal) for d in detalles) if detalles else 0
+        self.costo_total = sum(float(d.costo_linea) for d in detalles) if detalles else 0
         self.save(update_fields=['total', 'costo_total'])
 
     @property
@@ -388,7 +389,8 @@ class DetallePedido(models.Model):
     def save(self, *args, **kwargs):
         if not self.precio_unitario:
             self.precio_unitario = self.producto.precio_venta
-        if not self.costo_unitario:
+        # Siempre actualizar costo_unitario con el valor actual del producto (para que sea exacto en el momento de la venta)
+        if not self.costo_unitario or self.costo_unitario == 0:
             self.costo_unitario = self.producto.costo_calculado
         super().save(*args, **kwargs)
 
@@ -398,6 +400,86 @@ class DetallePedido(models.Model):
     class Meta:
         verbose_name = 'Detalle de Pedido'
         verbose_name_plural = 'Detalles de Pedido'
+
+
+# ─── INSUMO ───────────────────────────────────────────────────────────────────
+
+class Insumo(models.Model):
+    """Materiales de uso operacional (servilletas, cucharas, vasos, etc.).
+    No forman parte de recetas ni afectan el costo de productos."""
+
+    CATEGORIA_CHOICES = [
+        ('desechables',  'Desechables'),
+        ('limpieza',     'Limpieza'),
+        ('empaque',      'Empaque'),
+        ('utensilio',    'Utensilio'),
+        ('otro',         'Otro'),
+    ]
+    UNIDAD_CHOICES = [
+        ('und',    'Unidades'),
+        ('paquete','Paquetes'),
+        ('caja',   'Cajas'),
+        ('rollo',  'Rollos'),
+        ('kg',     'Kilogramos'),
+        ('l',      'Litros'),
+    ]
+
+    nombre          = models.CharField(max_length=100)
+    categoria       = models.CharField(max_length=15, choices=CATEGORIA_CHOICES, default='otro')
+    unidad          = models.CharField(max_length=10, choices=UNIDAD_CHOICES, default='und')
+    imagen          = models.ImageField(upload_to='insumos/', blank=True, null=True)
+    descripcion     = models.TextField(blank=True)
+    stock           = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    stock_minimo    = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    precio_unitario = models.DecimalField(
+        max_digits=10, decimal_places=4, default=0,
+        help_text='Precio de referencia por unidad'
+    )
+    proveedor       = models.ForeignKey(
+        Proveedor, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='insumos'
+    )
+    activo          = models.BooleanField(default=True)
+    created_at      = models.DateTimeField(auto_now_add=True)
+    updated_at      = models.DateTimeField(auto_now=True)
+
+    @property
+    def stock_bajo(self):
+        return float(self.stock) <= float(self.stock_minimo)
+
+    @property
+    def sin_stock(self):
+        return float(self.stock) <= 0
+
+    def __str__(self):
+        return f'{self.nombre} ({self.get_unidad_display()})'
+
+    class Meta:
+        verbose_name = 'Insumo'
+        verbose_name_plural = 'Insumos'
+        ordering = ['categoria', 'nombre']
+
+
+class MovimientoInsumo(models.Model):
+    TIPO_CHOICES = [
+        ('entrada', 'Entrada'),
+        ('salida',  'Consumo'),
+        ('ajuste',  'Ajuste manual'),
+        ('merma',   'Merma / Pérdida'),
+    ]
+    insumo   = models.ForeignKey(Insumo, on_delete=models.CASCADE, related_name='movimientos')
+    tipo     = models.CharField(max_length=10, choices=TIPO_CHOICES)
+    cantidad = models.DecimalField(max_digits=10, decimal_places=2)
+    nota     = models.CharField(max_length=200, blank=True)
+    fecha    = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.get_tipo_display()} {self.cantidad} {self.insumo.unidad} — {self.insumo.nombre}'
+
+    class Meta:
+        verbose_name = 'Movimiento de Insumo'
+        verbose_name_plural = 'Movimientos de Insumos'
+        ordering = ['-fecha']
 
 
 # ─── PERFIL ADMIN ─────────────────────────────────────────────────────────────

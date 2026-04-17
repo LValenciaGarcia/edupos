@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.db import transaction
 from django.http import JsonResponse, HttpResponse
 from django.db.models import Sum, Count, F, Q
 from django.utils import timezone
@@ -13,6 +14,7 @@ from .models import (
     Proveedor, CompraProveedor, DetalleCompra,
     Pedido, DetallePedido,
     MovimientoInventario, MovimientoIngrediente,
+    Insumo, MovimientoInsumo,
     PerfilAdmin,
 )
 
@@ -81,11 +83,14 @@ def _ctx(extra=None):
 @admin_required
 def dashboard(request):
     hoy = date.today()
-    pedidos_hoy  = Pedido.objects.filter(fecha_pedido__date=hoy)
-    ventas_hoy   = pedidos_hoy.aggregate(t=Sum('total'))['t'] or 0
-    ganancia_hoy = float(ventas_hoy) - float(
-        pedidos_hoy.aggregate(t=Sum('costo_total'))['t'] or 0
-    )
+    # Solo contar pedidos entregados para ingresos reales
+    pedidos_hoy  = Pedido.objects.filter(fecha_pedido__date=hoy, estado='entregado')
+
+    # Un solo agregado para ambos valores
+    agg = pedidos_hoy.aggregate(ingresos=Sum('total'), costos=Sum('costo_total'))
+    ventas_hoy   = float(agg['ingresos'] or 0)
+    costos_hoy   = float(agg['costos'] or 0)
+    ganancia_hoy = ventas_hoy - costos_hoy
     pendientes  = pedidos_hoy.filter(estado__in=['pendiente', 'preparando']).count()
     entregados  = pedidos_hoy.filter(estado='entregado').count()
 
@@ -281,6 +286,69 @@ def producto_toggle(request, pk):
     return redirect('app_admin:productos')
 
 
+@admin_required
+def producto_bulk(request):
+    """Acciones masivas sobre productos: ocultar, mostrar o eliminar."""
+    if request.method == 'POST':
+        pks    = request.POST.getlist('pks')
+        accion = request.POST.get('accion', '')
+        if not pks:
+            messages.warning(request, 'No se seleccionó ningún producto.')
+            return redirect('app_admin:productos')
+        productos_qs = Producto.objects.filter(pk__in=pks)
+        count = productos_qs.count()
+        if accion == 'ocultar':
+            productos_qs.update(disponible=False)
+            messages.success(request, f'{count} producto(s) ocultado(s) del menú.')
+        elif accion == 'mostrar':
+            productos_qs.update(disponible=True)
+            messages.success(request, f'{count} producto(s) visible(s) en el menú.')
+        elif accion == 'eliminar':
+            productos_qs.delete()
+            messages.success(request, f'{count} producto(s) eliminado(s).')
+        else:
+            messages.error(request, 'Acción inválida.')
+    return redirect('app_admin:productos')
+
+
+@admin_required
+def ingrediente_bulk(request):
+    """Acciones masivas sobre ingredientes: desactivar."""
+    if request.method == 'POST':
+        pks    = request.POST.getlist('pks')
+        accion = request.POST.get('accion', '')
+        if not pks:
+            messages.warning(request, 'No se seleccionó ningún ingrediente.')
+            return redirect('app_admin:ingredientes')
+        qs = Ingrediente.objects.filter(pk__in=pks)
+        count = qs.count()
+        if accion == 'eliminar':
+            qs.update(activo=False)
+            messages.success(request, f'{count} ingrediente(s) desactivado(s).')
+        else:
+            messages.error(request, 'Acción inválida.')
+    return redirect('app_admin:ingredientes')
+
+
+@admin_required
+def insumo_bulk(request):
+    """Acciones masivas sobre insumos: desactivar."""
+    if request.method == 'POST':
+        pks    = request.POST.getlist('pks')
+        accion = request.POST.get('accion', '')
+        if not pks:
+            messages.warning(request, 'No se seleccionó ningún insumo.')
+            return redirect('app_admin:insumos')
+        qs = Insumo.objects.filter(pk__in=pks)
+        count = qs.count()
+        if accion == 'eliminar':
+            qs.update(activo=False)
+            messages.success(request, f'{count} insumo(s) desactivado(s).')
+        else:
+            messages.error(request, 'Acción inválida.')
+    return redirect('app_admin:insumos')
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # INVENTARIO
 # ══════════════════════════════════════════════════════════════════════════════
@@ -382,51 +450,69 @@ def entrada_stock(request, pk=None):
                 'ingrediente_sel': ingrediente_sel,
             }))
 
-        # Crear compra
-        compra = CompraProveedor.objects.create(
-            proveedor_id=prov_id, fecha=fecha, nota=nota
-        )
-
-        item_tipos  = request.POST.getlist('item_tipo')
-        item_ids    = request.POST.getlist('item_id')
-        item_cants  = request.POST.getlist('item_cantidad')
+        item_tipos   = request.POST.getlist('item_tipo')
+        item_ids     = request.POST.getlist('item_id')
+        item_cants   = request.POST.getlist('item_cantidad')
         item_precios = request.POST.getlist('item_precio')
 
-        total = 0
+        # Pre-validar todos los ítems antes de tocar la BD
+        lineas_validas = []
         for tipo, id_, cant, precio in zip(item_tipos, item_ids, item_cants, item_precios):
             if not (id_ and cant and precio):
                 continue
-            cant_f   = float(cant)
-            precio_f = float(precio)
-            det = DetalleCompra(compra=compra, cantidad=cant_f, precio_unitario=precio_f)
+            if tipo not in ('producto', 'ingrediente'):
+                messages.error(request, 'Tipo de ítem inválido.')
+                return redirect('app_admin:entrada_stock')
+            try:
+                cant_f   = float(cant)
+                precio_f = float(precio)
+                if cant_f <= 0 or precio_f < 0:
+                    raise ValueError
+            except (ValueError, TypeError):
+                messages.error(request, 'Cantidad y precio deben ser números positivos.')
+                return redirect('app_admin:entrada_stock')
+            lineas_validas.append((tipo, id_, cant_f, precio_f))
 
-            if tipo == 'producto':
-                det.producto_id = id_
-                prod = Producto.objects.get(pk=id_)
-                prod.stock += int(cant_f)
-                prod.save(update_fields=['stock'])
-                MovimientoInventario.objects.create(
-                    producto=prod, tipo='entrada',
-                    cantidad=int(cant_f),
-                    nota=nota or f'Compra #{compra.pk}',
-                    compra=compra
-                )
-            else:
-                det.ingrediente_id = id_
-                ing = Ingrediente.objects.get(pk=id_)
-                ing.stock = float(ing.stock) + cant_f
-                ing.save(update_fields=['stock'])
-                MovimientoIngrediente.objects.create(
-                    ingrediente=ing, tipo='entrada',
-                    cantidad=cant_f,
-                    nota=nota or f'Compra #{compra.pk}',
-                    compra=compra
-                )
-            det.save()
-            total += cant_f * precio_f
+        if not lineas_validas:
+            messages.error(request, 'No hay ítems válidos en la entrada.')
+            return redirect('app_admin:entrada_stock')
 
-        compra.total = total
-        compra.save(update_fields=['total'])
+        # Todo en una sola transacción atómica
+        with transaction.atomic():
+            compra = CompraProveedor.objects.create(
+                proveedor_id=prov_id, fecha=fecha, nota=nota
+            )
+            total = 0
+            for tipo, id_, cant_f, precio_f in lineas_validas:
+                det = DetalleCompra(compra=compra, cantidad=cant_f, precio_unitario=precio_f)
+                if tipo == 'producto':
+                    prod = get_object_or_404(Producto, pk=id_)
+                    det.producto_id = prod.pk
+                    prod.stock += int(cant_f)
+                    prod.save(update_fields=['stock'])
+                    MovimientoInventario.objects.create(
+                        producto=prod, tipo='entrada',
+                        cantidad=int(cant_f),
+                        nota=nota or f'Compra #{compra.pk}',
+                        compra=compra
+                    )
+                else:
+                    ing = get_object_or_404(Ingrediente, pk=id_)
+                    det.ingrediente_id = ing.pk
+                    ing.stock = float(ing.stock) + cant_f
+                    ing.save(update_fields=['stock'])
+                    MovimientoIngrediente.objects.create(
+                        ingrediente=ing, tipo='entrada',
+                        cantidad=cant_f,
+                        nota=nota or f'Compra #{compra.pk}',
+                        compra=compra
+                    )
+                det.save()
+                total += cant_f * precio_f
+
+            compra.total = total
+            compra.save(update_fields=['total'])
+
         messages.success(request, f'Entrada registrada. Compra #{compra.pk} — Total: ${total:,.0f}')
         return redirect('app_admin:proveedor_compras', pk=prov_id)
 
@@ -638,6 +724,111 @@ def ingrediente_historial(request, pk):
     }))
 
 
+@admin_required
+def exportar_ingredientes_excel(request):
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment
+    except ImportError:
+        messages.error(request, 'openpyxl no está instalado.')
+        return redirect('app_admin:ingredientes')
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Ingredientes'
+
+    header_fill = PatternFill(start_color='1a3d2b', end_color='1a3d2b', fill_type='solid')
+    header_font = Font(color='FFFFFF', bold=True)
+
+    headers = ['Nombre', 'Unidad', 'Stock', 'Stock mínimo', 'Precio unitario', 'Proveedor', 'Vencimiento']
+    ws.append(headers)
+    for col_num, _ in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_num)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center')
+
+    for ing in Ingrediente.objects.select_related('proveedor').filter(activo=True).order_by('nombre'):
+        ws.append([
+            ing.nombre,
+            ing.get_unidad_display(),
+            float(ing.stock),
+            float(ing.stock_minimo),
+            float(ing.precio_unitario),
+            ing.proveedor or '—',
+            ing.fecha_vencimiento.strftime('%d/%m/%Y') if ing.fecha_vencimiento else '—',
+        ])
+
+    for col in ws.columns:
+        max_len = max(len(str(c.value or '')) for c in col)
+        ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 35)
+
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="ingredientes_punto_asis.xlsx"'
+    wb.save(response)
+    return response
+
+
+@admin_required
+def exportar_ingredientes_pdf(request):
+    try:
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib import colors
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.units import cm
+        import io
+    except ImportError:
+        messages.error(request, 'reportlab no está instalado.')
+        return redirect('app_admin:ingredientes')
+
+    buffer = io.BytesIO()
+    doc    = SimpleDocTemplate(buffer, pagesize=landscape(A4), leftMargin=1*cm, rightMargin=1*cm)
+    styles = getSampleStyleSheet()
+    elements = []
+
+    elements.append(Paragraph('Ingredientes — Punto Asis', styles['Title']))
+    elements.append(Paragraph(f'Generado: {date.today().strftime("%d/%m/%Y")}', styles['Normal']))
+    elements.append(Spacer(1, 0.5*cm))
+
+    headers = ['Nombre', 'Unidad', 'Stock', 'Mínimo', 'Precio/u', 'Proveedor', 'Vencimiento']
+    data = [headers]
+    for ing in Ingrediente.objects.select_related('proveedor').filter(activo=True).order_by('nombre'):
+        data.append([
+            ing.nombre[:30],
+            ing.get_unidad_display(),
+            str(float(ing.stock)),
+            str(float(ing.stock_minimo)),
+            f'${float(ing.precio_unitario):,.2f}',
+            str(ing.proveedor)[:18] if ing.proveedor else '—',
+            ing.fecha_vencimiento.strftime('%d/%m/%Y') if ing.fecha_vencimiento else '—',
+        ])
+
+    verde_oscuro = colors.HexColor('#1a3d2b')
+    tabla = Table(data, repeatRows=1)
+    tabla.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), verde_oscuro),
+        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
+        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE',   (0, 0), (-1, -1), 8),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0fdf4')]),
+        ('GRID',       (0, 0), (-1, -1), 0.4, colors.HexColor('#e2e2dd')),
+        ('ALIGN',      (2, 0), (4, -1), 'RIGHT'),
+        ('VALIGN',     (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    elements.append(tabla)
+    doc.build(elements)
+
+    buffer.seek(0)
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="ingredientes_punto_asis.pdf"'
+    return response
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # HISTORIAL UNIFICADO
 # ══════════════════════════════════════════════════════════════════════════════
@@ -647,9 +838,10 @@ def historial(request):
     return render(request, 'app_admin/historial.html', _ctx())
 
 
-@admin_required
 def historial_api(request):
-    """API JSON para el historial unificado con filtros."""
+    """API JSON para el historial unificado con filtros.
+       Convierte las fechas UTC a hora local de Colombia (America/Bogota).
+    """
     tipo_f  = request.GET.get('tipo', '')     # 'producto' | 'ingrediente'
     mov_f   = request.GET.get('mov', '')      # entrada | salida | ajuste | merma
     desde   = request.GET.get('desde', '')
@@ -675,6 +867,8 @@ def historial_api(request):
                 prov = m.producto.proveedor.nombre
             else:
                 prov = '—'
+            # Convertir UTC a hora local
+            local_fecha = timezone.localtime(m.fecha)
             resultados.append({
                 'categoria': 'Producto',
                 'nombre':    m.producto.nombre,
@@ -683,8 +877,9 @@ def historial_api(request):
                 'cantidad':  float(m.cantidad),
                 'proveedor': prov,
                 'nota':      m.nota,
-                'fecha':     m.fecha.strftime('%d/%m/%Y %H:%M'),
-                'fecha_iso': m.fecha.isoformat(),
+                'fecha':     local_fecha.strftime('%d/%m/%Y %H:%M'),
+                'fecha_iso': local_fecha.isoformat(),
+                'fecha_timestamp': int(local_fecha.timestamp() * 1000),  # ← Nuevo campo
             })
 
     # Movimientos de ingredientes
@@ -704,6 +899,8 @@ def historial_api(request):
                 prov = m.ingrediente.proveedor.nombre
             else:
                 prov = '—'
+            # Convertir UTC a hora local
+            local_fecha = timezone.localtime(m.fecha)
             resultados.append({
                 'categoria': 'Ingrediente',
                 'nombre':    m.ingrediente.nombre,
@@ -712,14 +909,14 @@ def historial_api(request):
                 'cantidad':  float(m.cantidad),
                 'proveedor': prov,
                 'nota':      m.nota,
-                'fecha':     m.fecha.strftime('%d/%m/%Y %H:%M'),
-                'fecha_iso': m.fecha.isoformat(),
+                'fecha':     local_fecha.strftime('%d/%m/%Y %H:%M'),
+                'fecha_iso': local_fecha.isoformat(),
+                'fecha_timestamp': int(local_fecha.timestamp() * 1000),  # ← Nuevo campo
             })
 
-    # Ordenar por fecha ISO (formato sortable); la cadena dd/mm/YYYY no lo es
+    # Ordenar por fecha ISO (ahora local, pero sigue siendo ordenable)
     resultados.sort(key=lambda x: x['fecha_iso'], reverse=True)
     return JsonResponse({'data': resultados[:300]})
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # CALENDARIO DE MOVIMIENTOS
@@ -732,7 +929,9 @@ def calendario(request):
 
 @admin_required
 def calendario_api(request):
-    """Devuelve movimientos agrupados por fecha para FullCalendar."""
+    """Devuelve movimientos agrupados por fecha para FullCalendar.
+       Convierte fechas UTC a hora local de Colombia (America/Bogota).
+    """
     desde = request.GET.get('start', str(date.today().replace(day=1)))[:10]
     hasta = request.GET.get('end',   str(date.today()))[:10]
 
@@ -742,9 +941,10 @@ def calendario_api(request):
     for m in MovimientoInventario.objects.filter(
         fecha__date__gte=desde, fecha__date__lte=hasta, tipo='entrada'
     ).select_related('producto'):
+        fecha_local = timezone.localtime(m.fecha).date()
         eventos.append({
             'title':           f'+{int(m.cantidad)} {m.producto.nombre}',
-            'start':           m.fecha.strftime('%Y-%m-%d'),
+            'start':           fecha_local.isoformat(),
             'backgroundColor': '#2d6a4f',
             'borderColor':     '#2d6a4f',
             'textColor':       '#fff',
@@ -755,9 +955,10 @@ def calendario_api(request):
     for m in MovimientoInventario.objects.filter(
         fecha__date__gte=desde, fecha__date__lte=hasta, tipo__in=['salida', 'merma']
     ).select_related('producto'):
+        fecha_local = timezone.localtime(m.fecha).date()
         eventos.append({
             'title':           f'-{int(m.cantidad)} {m.producto.nombre}',
-            'start':           m.fecha.strftime('%Y-%m-%d'),
+            'start':           fecha_local.isoformat(),
             'backgroundColor': '#d94f3d',
             'borderColor':     '#d94f3d',
             'textColor':       '#fff',
@@ -769,9 +970,10 @@ def calendario_api(request):
         fecha__date__gte=desde, fecha__date__lte=hasta
     ).select_related('ingrediente'):
         color = '#1a56db' if m.tipo == 'entrada' else '#e07b2a'
+        fecha_local = timezone.localtime(m.fecha).date()
         eventos.append({
             'title':           f'Ing: {m.ingrediente.nombre}',
-            'start':           m.fecha.strftime('%Y-%m-%d'),
+            'start':           fecha_local.isoformat(),
             'backgroundColor': color,
             'borderColor':     color,
             'textColor':       '#fff',
@@ -782,9 +984,10 @@ def calendario_api(request):
     for p in Pedido.objects.filter(
         fecha_pedido__date__gte=desde, fecha_pedido__date__lte=hasta, estado='entregado'
     ):
+        fecha_local = timezone.localtime(p.fecha_pedido).date()
         eventos.append({
             'title':           f'Pedido {p.ticket}',
-            'start':           p.fecha_pedido.strftime('%Y-%m-%d'),
+            'start':           fecha_local.isoformat(),
             'backgroundColor': '#7c3aed',
             'borderColor':     '#7c3aed',
             'textColor':       '#fff',
@@ -803,11 +1006,30 @@ def proveedores(request):
     q  = request.GET.get('q', '').strip()
     qs = Proveedor.objects.annotate(
         num_productos=Count('productos', distinct=True),
+        num_ingredientes=Count('ingredientes', distinct=True),
+        num_insumos=Count('insumos', distinct=True),
         num_compras=Count('compras', distinct=True),
     ).order_by('nombre')
     if q:
         qs = qs.filter(Q(nombre__icontains=q) | Q(nit__icontains=q) | Q(contacto__icontains=q))
-    return render(request, 'app_admin/proveedores.html', _ctx({'proveedores': qs, 'q': q}))
+
+    # Build items JSON for each proveedor (for modal)
+    proveedores_data = []
+    for prov in qs:
+        items = []
+        for p in Producto.objects.filter(proveedor=prov, tipo='simple'):
+            items.append({'tipo': 'Producto', 'nombre': p.nombre, 'stock': str(p.stock), 'unidad': 'und'})
+        for ing in Ingrediente.objects.filter(proveedor=prov, activo=True):
+            items.append({'tipo': 'Ingrediente', 'nombre': ing.nombre, 'stock': str(ing.stock), 'unidad': ing.get_unidad_display()})
+        for ins in Insumo.objects.filter(proveedor=prov, activo=True):
+            items.append({'tipo': 'Insumo', 'nombre': ins.nombre, 'stock': str(ins.stock), 'unidad': ins.get_unidad_display()})
+        proveedores_data.append({'prov': prov, 'items_json': json.dumps(items)})
+
+    return render(request, 'app_admin/proveedores.html', _ctx({
+        'proveedores': qs,
+        'proveedores_data': proveedores_data,
+        'q': q,
+    }))
 
 
 @admin_required
@@ -858,6 +1080,17 @@ def proveedor_compras(request, pk):
     return render(request, 'app_admin/proveedor_compras.html', _ctx({
         'proveedor': prov, 'compras': compras,
     }))
+
+
+@admin_required
+def proveedor_eliminar(request, pk):
+    prov = get_object_or_404(Proveedor, pk=pk)
+    if request.method == 'POST':
+        nombre = prov.nombre
+        prov.activo = False
+        prov.save(update_fields=['activo'])
+        messages.success(request, f'Proveedor "{nombre}" desactivado.')
+    return redirect('app_admin:proveedores')
 
 
 @admin_required
@@ -940,41 +1173,526 @@ def pedido_detalle(request, pk):
     return render(request, 'app_admin/pedido_detalle.html', _ctx({'pedido': pedido}))
 
 
+TRANSICIONES_VALIDAS = {
+    'pendiente':  ['preparando', 'cancelado'],
+    'preparando': ['listo', 'pendiente', 'cancelado'],
+    'listo':      ['entregado', 'pendiente'],
+    'entregado':  [],
+    'cancelado':  [],
+}
+
+
 @admin_required
 def pedido_estado(request, pk):
     pedido = get_object_or_404(Pedido, pk=pk)
+    next_url = request.POST.get('next', 'app_admin:pedidos')
     if request.method == 'POST':
         nuevo = request.POST.get('estado')
-        if nuevo not in [e[0] for e in Pedido.ESTADO_CHOICES]:
+        estados_validos = [e[0] for e in Pedido.ESTADO_CHOICES]
+        if nuevo not in estados_validos:
             messages.error(request, 'Estado no válido.')
-            return redirect(request.POST.get('next', 'app_admin:pedidos'))
+            return redirect(next_url)
 
-        pedido.estado = nuevo
-        if nuevo == 'entregado':
-            pedido.fecha_entrega = timezone.now()
-            # Descontar stock
-            for detalle in pedido.detalles.select_related('producto').all():
-                if detalle.producto.tipo == 'elaborado':
-                    for r in detalle.producto.receta.all():
-                        r.ingrediente.stock = max(
-                            0, float(r.ingrediente.stock) - float(r.cantidad) * detalle.cantidad
+        if nuevo not in TRANSICIONES_VALIDAS.get(pedido.estado, []):
+            messages.error(
+                request,
+                f'No se puede cambiar de "{pedido.get_estado_display()}" a "{dict(Pedido.ESTADO_CHOICES).get(nuevo)}".'
+            )
+            return redirect(next_url)
+
+        with transaction.atomic():
+            pedido_locked = Pedido.objects.select_for_update().get(pk=pk)
+
+            # Re-validar transición con datos frescos
+            if nuevo not in TRANSICIONES_VALIDAS.get(pedido_locked.estado, []):
+                messages.error(request, 'Transición de estado inválida.')
+                return redirect(next_url)
+
+            pedido_locked.estado = nuevo
+            if nuevo == 'entregado':
+                pedido_locked.fecha_entrega = timezone.now()
+                # Descontar stock con select_for_update para evitar race conditions
+                for detalle in pedido_locked.detalles.select_related('producto').all():
+                    if detalle.producto.tipo == 'elaborado':
+                        for r in detalle.producto.receta.select_related('ingrediente').all():
+                            ing = Ingrediente.objects.select_for_update().get(pk=r.ingrediente.pk)
+                            consumo = float(r.cantidad) * detalle.cantidad
+                            ing.stock = max(0, float(ing.stock) - consumo)
+                            ing.save(update_fields=['stock'])
+                            MovimientoIngrediente.objects.create(
+                                ingrediente=ing, tipo='salida',
+                                cantidad=consumo,
+                                nota=f'Pedido {pedido_locked.ticket}'
+                            )
+                    else:
+                        prod = Producto.objects.select_for_update().get(pk=detalle.producto.pk)
+                        prod.stock = max(0, prod.stock - detalle.cantidad)
+                        prod.save(update_fields=['stock'])
+                        MovimientoInventario.objects.create(
+                            producto=prod, tipo='salida',
+                            cantidad=detalle.cantidad, nota=f'Pedido {pedido_locked.ticket}'
                         )
-                        r.ingrediente.save(update_fields=['stock'])
-                        MovimientoIngrediente.objects.create(
-                            ingrediente=r.ingrediente, tipo='salida',
-                            cantidad=float(r.cantidad) * detalle.cantidad,
-                            nota=f'Pedido {pedido.ticket}'
-                        )
-                else:
-                    detalle.producto.stock = max(0, detalle.producto.stock - detalle.cantidad)
-                    detalle.producto.save(update_fields=['stock'])
-                    MovimientoInventario.objects.create(
-                        producto=detalle.producto, tipo='salida',
-                        cantidad=detalle.cantidad, nota=f'Pedido {pedido.ticket}'
-                    )
-        pedido.save(update_fields=['estado', 'fecha_entrega'])
-        messages.success(request, f'Pedido {pedido.ticket} → {pedido.get_estado_display()}')
-    return redirect(request.POST.get('next', 'app_admin:pedidos'))
+
+            pedido_locked.save(update_fields=['estado', 'fecha_entrega'])
+
+        messages.success(request, f'Pedido {pedido.ticket} → {dict(Pedido.ESTADO_CHOICES).get(nuevo)}')
+    return redirect(next_url)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FACTURA
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Datos de la cafetería — actualizar según la institución real
+CAFETERIA_CONFIG = {
+    'nombre':       'Cafetería Punto Asis',
+    'nit':          '900.000.000-0',               # Actualizar con NIT real
+    'direccion':    'Colegio San Francisco de Asis', # Actualizar
+    'ciudad':       'Cali',                  # Actualizar
+    'departamento': 'Valle del cauca',                 # Actualizar
+    'telefono':     '+57 317 3055541',             # Actualizar
+    'email':        'cafeteria@asis.edu.co',        # Actualizar
+    'regimen':      'Régimen Simplificado',
+    'ciiu':         '5629',
+    'actividad':    'Otros servicios de expendio de alimentos',
+    'resolucion':   'Habilitación mediante acto administrativo institucional',
+}
+
+
+@admin_required
+def factura_vista(request, pk):
+    pedido = get_object_or_404(
+        Pedido.objects.select_related(
+            'estudiante__perfil__user',
+            'estudiante__padre__perfil__user',
+        ).prefetch_related('detalles__producto__categoria'),
+        pk=pk
+    )
+
+    nombre_estudiante = pedido.estudiante.perfil.user.get_full_name() or pedido.estudiante.perfil.user.username
+    nombre_padre, telefono_padre = '', ''
+    if pedido.estudiante.padre:
+        nombre_padre = pedido.estudiante.padre.perfil.user.get_full_name() or pedido.estudiante.padre.perfil.user.username
+        telefono_padre = pedido.estudiante.padre.perfil.telefono
+
+    # Datos del responsable (admin logueado actualmente)
+    responsable = None
+    try:
+        pa = request.user.perfil.perfil_admin
+        responsable = {
+            'nombre':    request.user.get_full_name() or request.user.username,
+            'documento': pa.documento or '—',
+            'cargo':     pa.cargo or 'Administrador de Cafetería',
+        }
+    except Exception:
+        pass
+
+    return render(request, 'app_admin/factura.html', _ctx({
+        'pedido':            pedido,
+        'config':            CAFETERIA_CONFIG,
+        'nombre_estudiante': nombre_estudiante,
+        'nombre_padre':      nombre_padre,
+        'telefono_padre':    telefono_padre,
+        'responsable':       responsable,
+    }))
+
+
+@admin_required
+def factura_pdf(request, pk):
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib import colors
+        from reportlab.platypus import (
+            SimpleDocTemplate, Table, TableStyle,
+            Paragraph, Spacer, HRFlowable
+        )
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.lib.enums import TA_RIGHT, TA_CENTER, TA_LEFT
+        import io
+    except ImportError:
+        messages.error(request, 'reportlab no está instalado.')
+        return redirect('app_admin:pedido_detalle', pk=pk)
+
+    pedido = get_object_or_404(
+        Pedido.objects.select_related(
+            'estudiante__perfil__user',
+            'estudiante__padre__perfil__user',
+        ).prefetch_related('detalles__producto__categoria'),
+        pk=pk
+    )
+
+    cfg = CAFETERIA_CONFIG
+    nombre_estudiante = pedido.estudiante.perfil.user.get_full_name() or pedido.estudiante.perfil.user.username
+    nombre_padre = ''
+    telefono_padre = ''
+    if pedido.estudiante.padre:
+        nombre_padre   = pedido.estudiante.padre.perfil.user.get_full_name() or pedido.estudiante.padre.perfil.user.username
+        telefono_padre = pedido.estudiante.padre.perfil.telefono
+
+    responsable_nombre = ''
+    responsable_doc = ''
+    try:
+        pa = request.user.perfil.perfil_admin
+        responsable_nombre = request.user.get_full_name() or request.user.username
+        responsable_doc    = pa.documento or '—'
+    except Exception:
+        pass
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        leftMargin=1.8*cm, rightMargin=1.8*cm,
+        topMargin=1.5*cm, bottomMargin=1.5*cm,
+    )
+
+    # ── Colores de la marca
+    VERDE_OSC = colors.HexColor('#0f2d1e')
+    VERDE_MED = colors.HexColor('#16a34a')
+    VERDE_PAL = colors.HexColor('#f0fdf4')
+    GRIS_OSC  = colors.HexColor('#374151')
+    GRIS_MED  = colors.HexColor('#6b7280')
+    GRIS_PAL  = colors.HexColor('#f9fafb')
+    BORDE     = colors.HexColor('#e5e7eb')
+
+    # ── Estilos de párrafo
+    styles = getSampleStyleSheet()
+    def st(name, **kw):
+        s = ParagraphStyle(name, **kw)
+        return s
+
+    bold_sm  = st('bsm',  fontName='Helvetica-Bold',   fontSize=7,  textColor=GRIS_OSC,  leading=10)
+    norm_sm  = st('nsm',  fontName='Helvetica',         fontSize=7,  textColor=GRIS_MED,  leading=10)
+    norm_xs  = st('nxs',  fontName='Helvetica',         fontSize=6,  textColor=GRIS_MED,  leading=9)
+    head_lg  = st('hlg',  fontName='Helvetica-Bold',    fontSize=16, textColor=colors.white, leading=18)
+    head_sm  = st('hsm',  fontName='Helvetica-Bold',    fontSize=8,  textColor=colors.white, leading=10)
+    head_xs  = st('hxs',  fontName='Helvetica',         fontSize=6.5,textColor=colors.HexColor('#a3e8b8'), leading=9)
+    num_lg   = st('nlg',  fontName='Helvetica-Bold',    fontSize=18, textColor=colors.HexColor('#7fffa0'), leading=20, alignment=TA_RIGHT)
+    num_lbl  = st('nll',  fontName='Helvetica',         fontSize=6,  textColor=colors.HexColor('#a3e8b8'), leading=8,  alignment=TA_RIGHT)
+    sec_lbl  = st('slab', fontName='Helvetica-Bold',    fontSize=6,  textColor=GRIS_MED,  leading=8, spaceAfter=2)
+    sec_val  = st('sval', fontName='Helvetica-Bold',    fontSize=8.5,textColor=GRIS_OSC,  leading=11)
+    tbl_hdr  = st('thdr', fontName='Helvetica-Bold',    fontSize=6.5,textColor=colors.white, leading=9, alignment=TA_CENTER)
+    tbl_lft  = st('tlft', fontName='Helvetica',         fontSize=7.5,textColor=GRIS_OSC,  leading=10)
+    tbl_rt   = st('trt',  fontName='Helvetica',         fontSize=7.5,textColor=GRIS_OSC,  leading=10, alignment=TA_RIGHT)
+    tbl_bold = st('tbld', fontName='Helvetica-Bold',    fontSize=7.5,textColor=GRIS_OSC,  leading=10, alignment=TA_RIGHT)
+    total_lbl= st('tolab',fontName='Helvetica-Bold',    fontSize=8,  textColor=GRIS_OSC,  leading=10)
+    total_gr = st('togr', fontName='Helvetica-Bold',    fontSize=11, textColor=VERDE_OSC, leading=13, alignment=TA_RIGHT)
+    foot_txt = st('ftxt', fontName='Helvetica',         fontSize=6,  textColor=GRIS_MED,  leading=8)
+    leyenda  = st('ley',  fontName='Helvetica-Oblique', fontSize=5.5,textColor=GRIS_MED,  leading=8)
+
+    W = doc.width  # ancho útil
+
+    elements = []
+
+    # ══════════════════════════════════════════════════════════════════
+    # CABECERA — tabla de dos columnas con fondo verde oscuro
+    # ══════════════════════════════════════════════════════════════════
+    cab_emisor = [
+        [Paragraph('CAFETERÍA ESCOLAR', head_xs)],
+        [Paragraph('Punto Asis', head_lg)],
+        [Paragraph(f"NIT: {cfg['nit']}", head_xs)],
+        [Paragraph(cfg['direccion'],     head_xs)],
+        [Paragraph(f"{cfg['ciudad']} · {cfg['departamento']}", head_xs)],
+        [Paragraph(cfg['telefono'],      head_xs)],
+        [Paragraph(cfg['email'],         head_xs)],
+        [Paragraph(cfg['regimen'],       head_sm)],
+    ]
+    cab_doc = [
+        [Paragraph('FACTURA DE VENTA', head_xs)],
+        [Paragraph(pedido.ticket,       num_lg)],
+        [Paragraph('N° de documento',   num_lbl)],
+        [Spacer(1, 0.3*cm)],
+        [Paragraph(f"Fecha: {pedido.fecha_pedido.strftime('%d/%m/%Y')}", head_xs)],
+        [Paragraph(f"Hora:  {pedido.fecha_pedido.strftime('%H:%M')} hrs", head_xs)],
+    ]
+
+    cab_data = [[
+        Table(cab_emisor, colWidths=[W*0.55], style=TableStyle([
+            ('TOPPADDING',    (0,0),(-1,-1), 1.5),
+            ('BOTTOMPADDING', (0,0),(-1,-1), 1.5),
+            ('LEFTPADDING',   (0,0),(-1,-1), 0),
+            ('RIGHTPADDING',  (0,0),(-1,-1), 0),
+        ])),
+        Table(cab_doc, colWidths=[W*0.4], style=TableStyle([
+            ('TOPPADDING',    (0,0),(-1,-1), 1.5),
+            ('BOTTOMPADDING', (0,0),(-1,-1), 1.5),
+            ('LEFTPADDING',   (0,0),(-1,-1), 0),
+            ('RIGHTPADDING',  (0,0),(-1,-1), 0),
+            ('ALIGN',         (0,0),(-1,-1), 'RIGHT'),
+        ])),
+    ]]
+    cab_table = Table(cab_data, colWidths=[W*0.6, W*0.4])
+    cab_table.setStyle(TableStyle([
+        ('BACKGROUND',    (0,0),(-1,-1), VERDE_OSC),
+        ('TOPPADDING',    (0,0),(-1,-1), 14),
+        ('BOTTOMPADDING', (0,0),(-1,-1), 14),
+        ('LEFTPADDING',   (0,0),(-1,-1), 14),
+        ('RIGHTPADDING',  (0,0),(-1,-1), 14),
+        ('VALIGN',        (0,0),(-1,-1), 'TOP'),
+        ('ROUNDEDCORNERS',(0,0),(-1,-1), [6,6,0,0]),
+    ]))
+    elements.append(cab_table)
+
+    # ── Barra resolución DIAN
+    res_data = [[Paragraph(
+        f"Habilitación: {cfg['resolucion']} · CIIU {cfg['ciiu']} — {cfg['actividad']}",
+        st('rb', fontName='Helvetica', fontSize=5.5, textColor=colors.HexColor('#a3e8b8'), leading=8)
+    )]]
+    res_table = Table(res_data, colWidths=[W])
+    res_table.setStyle(TableStyle([
+        ('BACKGROUND',    (0,0),(-1,-1), colors.HexColor('#193d2a')),
+        ('TOPPADDING',    (0,0),(-1,-1), 4),
+        ('BOTTOMPADDING', (0,0),(-1,-1), 4),
+        ('LEFTPADDING',   (0,0),(-1,-1), 14),
+        ('RIGHTPADDING',  (0,0),(-1,-1), 14),
+    ]))
+    elements.append(res_table)
+
+    # ── Cinta de fechas
+    ribbon_data = [[
+        Table([[Paragraph('FECHA EXPEDICIÓN', sec_lbl)],[Paragraph(pedido.fecha_pedido.strftime('%d/%m/%Y'), sec_val)]], colWidths=[W/3]),
+        Table([[Paragraph('FORMA DE PAGO',    sec_lbl)],[Paragraph('Saldo prepagado escolar',               sec_val)]], colWidths=[W/3]),
+        Table([[Paragraph('ESTADO',           sec_lbl)],[Paragraph(pedido.get_estado_display(),              sec_val)]], colWidths=[W/3]),
+    ]]
+    ribbon_table = Table(ribbon_data, colWidths=[W/3, W/3, W/3])
+    ribbon_table.setStyle(TableStyle([
+        ('BACKGROUND',    (0,0),(-1,-1), GRIS_PAL),
+        ('TOPPADDING',    (0,0),(-1,-1), 8),
+        ('BOTTOMPADDING', (0,0),(-1,-1), 8),
+        ('LEFTPADDING',   (0,0),(-1,-1), 12),
+        ('RIGHTPADDING',  (0,0),(-1,-1), 12),
+        ('LINEAFTER',     (0,0),(1,-1),  0.5, BORDE),
+        ('LINEBELOW',     (0,0),(-1,-1), 0.5, BORDE),
+    ]))
+    elements.append(ribbon_table)
+
+    # ══════════════════════════════════════════════════════════════════
+    # PARTES — VENDEDOR / ADQUIRENTE
+    # ══════════════════════════════════════════════════════════════════
+    def parte_cell(titulo, rows):
+        inner = [[Paragraph(titulo.upper(), st('ptag', fontName='Helvetica-Bold', fontSize=6, textColor=GRIS_MED, leading=8))]]
+        for lbl, val in rows:
+            if val:
+                inner.append([Paragraph(f'<b>{lbl}:</b> {val}', norm_sm)])
+        return Table(inner, colWidths=[(W/2 - 1*cm)], style=TableStyle([
+            ('TOPPADDING',    (0,0),(-1,-1), 1.5),
+            ('BOTTOMPADDING', (0,0),(-1,-1), 1.5),
+            ('LEFTPADDING',   (0,0),(-1,-1), 0),
+            ('RIGHTPADDING',  (0,0),(-1,-1), 0),
+        ]))
+
+    vendedor_rows = [
+        ('NIT',        cfg['nit']),
+        ('Dirección',  cfg['direccion']),
+        ('Ciudad',     cfg['ciudad']),
+        ('Régimen',    cfg['regimen']),
+        ('Teléfono',   cfg['telefono']),
+        ('Responsable',f"{responsable_nombre} — CC {responsable_doc}" if responsable_nombre else ''),
+    ]
+    adquirente_rows = [
+        ('Nombre',        nombre_estudiante),
+        ('Tipo doc.',     'Tarjeta de Identidad / Código estudiantil'),
+        ('N° documento',  pedido.estudiante.codigo),
+        ('Grado',         pedido.estudiante.grado),
+        ('Acudiente',     nombre_padre),
+        ('Tel. acudiente',telefono_padre),
+        ('Ciudad',        cfg['ciudad']),
+    ]
+
+    partes_data = [[
+        parte_cell('Vendedor / Emisor',     vendedor_rows),
+        parte_cell('Adquirente / Comprador', adquirente_rows),
+    ]]
+    partes_table = Table(partes_data, colWidths=[W/2, W/2])
+    partes_table.setStyle(TableStyle([
+        ('TOPPADDING',    (0,0),(-1,-1), 10),
+        ('BOTTOMPADDING', (0,0),(-1,-1), 10),
+        ('LEFTPADDING',   (0,0),(-1,-1), 14),
+        ('RIGHTPADDING',  (0,0),(-1,-1), 14),
+        ('LINEAFTER',     (0,0),(0,-1),  0.5, BORDE),
+        ('LINEBELOW',     (0,0),(-1,-1), 0.5, BORDE),
+        ('VALIGN',        (0,0),(-1,-1), 'TOP'),
+    ]))
+    elements.append(partes_table)
+
+    # ══════════════════════════════════════════════════════════════════
+    # TABLA DE PRODUCTOS
+    # ══════════════════════════════════════════════════════════════════
+    prod_header = [
+        Paragraph('DESCRIPCIÓN', tbl_hdr),
+        Paragraph('CANT.', tbl_hdr),
+        Paragraph('VLR. UNIT.', tbl_hdr),
+        Paragraph('DESCUENTO', tbl_hdr),
+        Paragraph('IVA', tbl_hdr),
+        Paragraph('VLR. TOTAL', tbl_hdr),
+    ]
+    prod_rows = [prod_header]
+    for d in pedido.detalles.all():
+        prod_rows.append([
+            Paragraph(f'<b>{d.producto.nombre}</b><br/><font size="6" color="#9ca3af">{d.producto.categoria} · {d.producto.get_tipo_display()}</font>', tbl_lft),
+            Paragraph(str(d.cantidad),                 tbl_rt),
+            Paragraph(f'${float(d.precio_unitario):,.0f}', tbl_rt),
+            Paragraph('$0',                            tbl_rt),
+            Paragraph('0% Excl.',                      tbl_rt),
+            Paragraph(f'<b>${d.subtotal:,.0f}</b>',    tbl_bold),
+        ])
+
+    col_w = [W*0.38, W*0.08, W*0.14, W*0.12, W*0.12, W*0.16]
+    prod_table = Table(prod_rows, colWidths=col_w, repeatRows=1)
+    prod_table.setStyle(TableStyle([
+        # Cabecera
+        ('BACKGROUND',    (0,0),(-1,0),  VERDE_OSC),
+        ('TEXTCOLOR',     (0,0),(-1,0),  colors.white),
+        ('FONTNAME',      (0,0),(-1,0),  'Helvetica-Bold'),
+        ('FONTSIZE',      (0,0),(-1,0),  6.5),
+        ('TOPPADDING',    (0,0),(-1,0),  6),
+        ('BOTTOMPADDING', (0,0),(-1,0),  6),
+        ('LEFTPADDING',   (0,0),(-1,-1), 8),
+        ('RIGHTPADDING',  (0,0),(-1,-1), 8),
+        # Filas alternas
+        ('ROWBACKGROUNDS', (0,1),(-1,-1), [colors.white, GRIS_PAL]),
+        ('TOPPADDING',    (0,1),(-1,-1),  5),
+        ('BOTTOMPADDING', (0,1),(-1,-1),  5),
+        ('GRID',          (0,0),(-1,-1),  0.3, BORDE),
+        ('VALIGN',        (0,0),(-1,-1),  'MIDDLE'),
+        ('ALIGN',         (1,0),(-1,-1),  'RIGHT'),
+        ('LINEBELOW',     (0,0),(-1,-1),  0.3, BORDE),
+    ]))
+    elements.append(prod_table)
+    elements.append(Spacer(1, 0.4*cm))
+
+    # ══════════════════════════════════════════════════════════════════
+    # TOTALES + LEYENDA
+    # ══════════════════════════════════════════════════════════════════
+    total = float(pedido.total)
+
+    def tot_row(lbl, val, bold=False):
+        ls = st('trl', fontName='Helvetica-Bold' if bold else 'Helvetica', fontSize=8 if bold else 7.5, textColor=GRIS_OSC, leading=10)
+        rs = st('trr', fontName='Helvetica-Bold' if bold else 'Helvetica', fontSize=8 if bold else 7.5, textColor=GRIS_OSC, leading=10, alignment=TA_RIGHT)
+        return [Paragraph(lbl, ls), Paragraph(val, rs)]
+
+    totales_data = [
+        tot_row('Subtotal bruto',             f'${total:,.0f}'),
+        tot_row('Descuentos',                 '$0'),
+        tot_row('Base gravable',              f'${total:,.0f}'),
+        tot_row('IVA (0% — Excluido)',        '$0'),
+        tot_row('Retención en la fuente',     '$0'),
+    ]
+
+    # Fila TOTAL
+    totales_data.append([
+        Paragraph('TOTAL A PAGAR (COP)', st('trgd', fontName='Helvetica-Bold', fontSize=10, textColor=VERDE_OSC, leading=12)),
+        Paragraph(f'${total:,.0f}',      st('trgv', fontName='Helvetica-Bold', fontSize=12, textColor=VERDE_OSC, leading=14, alignment=TA_RIGHT)),
+    ])
+
+    totales_table = Table(totales_data, colWidths=[W*0.5, W*0.22])
+    totales_table.setStyle(TableStyle([
+        ('TOPPADDING',    (0,0),(-1,-1), 3),
+        ('BOTTOMPADDING', (0,0),(-1,-1), 3),
+        ('LEFTPADDING',   (0,0),(-1,-1), 0),
+        ('RIGHTPADDING',  (0,0),(-1,-1), 0),
+        ('LINEBELOW',     (0,-2),(-1,-2), 0.5, BORDE),
+        ('LINEABOVE',     (0,-1),(-1,-1), 1.5, VERDE_OSC),
+        ('TOPPADDING',    (0,-1),(-1,-1), 6),
+    ]))
+
+    leyenda_data = [[Paragraph(
+        'Los bienes y servicios de alimentación escolar están excluidos de IVA según el Art. 424 del '
+        'Estatuto Tributario y el Decreto 1625 de 2016. No somos responsables del IVA (Régimen Simplificado). '
+        'Este documento es válido como comprobante de pago para uso interno escolar.',
+        leyenda
+    )]]
+    leyenda_table = Table(leyenda_data, colWidths=[W*0.5])
+    leyenda_table.setStyle(TableStyle([
+        ('TOPPADDING',    (0,0),(-1,-1), 6),
+        ('BOTTOMPADDING', (0,0),(-1,-1), 4),
+        ('LEFTPADDING',   (0,0),(-1,-1), 0),
+        ('RIGHTPADDING',  (0,0),(-1,-1), 0),
+    ]))
+
+    pagado_data = [[Paragraph(
+        '✓ PAGADO — Saldo prepagado descontado exitosamente',
+        st('pg', fontName='Helvetica-Bold', fontSize=8, textColor=VERDE_MED, leading=10)
+    )]]
+    pagado_table = Table(pagado_data, colWidths=[W*0.5])
+    pagado_table.setStyle(TableStyle([
+        ('BACKGROUND',    (0,0),(-1,-1), VERDE_PAL),
+        ('TOPPADDING',    (0,0),(-1,-1), 6),
+        ('BOTTOMPADDING', (0,0),(-1,-1), 6),
+        ('LEFTPADDING',   (0,0),(-1,-1), 8),
+        ('RIGHTPADDING',  (0,0),(-1,-1), 8),
+        ('ROUNDEDCORNERS',(0,0),(-1,-1), [4,4,4,4]),
+    ]))
+
+    # Observaciones del pedido (si las hay)
+    if pedido.nota:
+        obs_data = [[Paragraph(f'<b>Observaciones:</b> {pedido.nota}', norm_sm)]]
+        obs_table = Table(obs_data, colWidths=[W*0.5])
+        obs_table.setStyle(TableStyle([
+            ('TOPPADDING',    (0,0),(-1,-1), 4),
+            ('BOTTOMPADDING', (0,0),(-1,-1), 4),
+            ('LEFTPADDING',   (0,0),(-1,-1), 0),
+            ('RIGHTPADDING',  (0,0),(-1,-1), 0),
+        ]))
+    else:
+        obs_table = Spacer(1, 0.2*cm)
+
+    bottom_data = [[
+        Table([
+            [leyenda_table],
+            [Spacer(1, 0.2*cm)],
+            [obs_table],
+            [Spacer(1, 0.2*cm)],
+            [pagado_table],
+        ], colWidths=[W*0.52]),
+        Table([
+            [totales_table],
+        ], colWidths=[W*0.44]),
+    ]]
+    bottom = Table(bottom_data, colWidths=[W*0.54, W*0.46])
+    bottom.setStyle(TableStyle([
+        ('VALIGN',        (0,0),(-1,-1), 'BOTTOM'),
+        ('TOPPADDING',    (0,0),(-1,-1), 0),
+        ('BOTTOMPADDING', (0,0),(-1,-1), 0),
+        ('LEFTPADDING',   (0,0),(-1,-1), 0),
+        ('RIGHTPADDING',  (0,0),(-1,-1), 0),
+    ]))
+    elements.append(bottom)
+    elements.append(Spacer(1, 0.4*cm))
+
+    # ══════════════════════════════════════════════════════════════════
+    # FOOTER
+    # ══════════════════════════════════════════════════════════════════
+    elements.append(HRFlowable(width=W, thickness=0.5, color=BORDE))
+    elements.append(Spacer(1, 0.2*cm))
+
+    foot_data = [[
+        Paragraph(
+            f'Punto Asis · {cfg["direccion"]}, {cfg["ciudad"]} · {cfg["telefono"]} · {cfg["email"]}',
+            foot_txt
+        ),
+        Paragraph(
+            f'<b>{pedido.ticket}</b> · {pedido.fecha_pedido.strftime("%d/%m/%Y %H:%M")}',
+            st('ftr', fontName='Helvetica', fontSize=6, textColor=GRIS_MED, leading=8, alignment=TA_RIGHT)
+        ),
+    ]]
+    foot_table = Table(foot_data, colWidths=[W*0.6, W*0.4])
+    foot_table.setStyle(TableStyle([
+        ('TOPPADDING',    (0,0),(-1,-1), 0),
+        ('BOTTOMPADDING', (0,0),(-1,-1), 0),
+        ('LEFTPADDING',   (0,0),(-1,-1), 0),
+        ('RIGHTPADDING',  (0,0),(-1,-1), 0),
+        ('VALIGN',        (0,0),(-1,-1), 'MIDDLE'),
+    ]))
+    elements.append(foot_table)
+
+    doc.build(elements)
+    buffer.seek(0)
+
+    nombre_archivo = f'factura_{pedido.ticket}.pdf'
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
+    return response
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -985,9 +1703,32 @@ def pedido_estado(request, pk):
 def usuarios(request):
     perfiles = Perfil.objects.select_related('user').order_by('rol', 'user__last_name')
     rol_f    = request.GET.get('rol', '')
-    if rol_f: perfiles = perfiles.filter(rol=rol_f)
+    estado_f = request.GET.get('estado', '')
+    q        = request.GET.get('q', '').strip()
+
+    if rol_f:     perfiles = perfiles.filter(rol=rol_f)
+    if estado_f == 'activo':   perfiles = perfiles.filter(activo=True)
+    if estado_f == 'inactivo': perfiles = perfiles.filter(activo=False)
+    if q:
+        perfiles = perfiles.filter(
+            Q(user__first_name__icontains=q) |
+            Q(user__last_name__icontains=q)  |
+            Q(user__username__icontains=q)   |
+            Q(user__email__icontains=q)
+        )
+
+    todos   = Perfil.objects.select_related('user')
     return render(request, 'app_admin/usuarios.html', _ctx({
-        'perfiles': perfiles, 'rol_f': rol_f, 'roles': Perfil.ROL_CHOICES,
+        'perfiles':          perfiles,
+        'rol_f':             rol_f,
+        'estado_f':          estado_f,
+        'q':                 q,
+        'roles':             Perfil.ROL_CHOICES,
+        'perfiles_activos':  todos.filter(activo=True).count(),
+        'perfiles_inactivos':todos.filter(activo=False).count(),
+        'perfiles_admin':    todos.filter(rol='admin').count(),
+        'perfiles_padre':    todos.filter(rol='padre').count(),
+        'perfiles_estudiante':todos.filter(rol='estudiante').count(),
     }))
 
 
@@ -1018,6 +1759,52 @@ def usuario_detalle(request, pk):
     return render(request, 'app_admin/usuario_detalle.html', context)
 
 
+@admin_required
+def usuario_eliminar(request, pk):
+    """Soft-delete: desactiva la cuenta de Django y el perfil."""
+    perfil = get_object_or_404(Perfil, pk=pk)
+    if request.method == 'POST':
+        if perfil.rol == 'admin':
+            messages.error(request, 'No puedes eliminar cuentas de administrador.')
+            return redirect('app_admin:usuarios')
+        username = perfil.user.username
+        perfil.user.is_active = False
+        perfil.user.save(update_fields=['is_active'])
+        perfil.activo = False
+        perfil.save(update_fields=['activo'])
+        messages.success(request, f'Cuenta @{username} eliminada.')
+    return redirect('app_admin:usuarios')
+
+
+@admin_required
+def usuario_bulk(request):
+    """Acciones masivas sobre usuarios: activar, desactivar o eliminar."""
+    if request.method == 'POST':
+        pks    = request.POST.getlist('pks')
+        accion = request.POST.get('accion', '')
+        if not pks:
+            messages.warning(request, 'No se seleccionó ningún usuario.')
+            return redirect('app_admin:usuarios')
+        # Solo afectar no-admins por seguridad
+        perfiles = Perfil.objects.filter(pk__in=pks).exclude(rol='admin').select_related('user')
+        count = perfiles.count()
+        if accion == 'activar':
+            perfiles.update(activo=True)
+            messages.success(request, f'{count} usuario(s) activado(s).')
+        elif accion == 'desactivar':
+            perfiles.update(activo=False)
+            messages.success(request, f'{count} usuario(s) desactivado(s).')
+        elif accion == 'eliminar':
+            for p in perfiles:
+                p.user.is_active = False
+                p.user.save(update_fields=['is_active'])
+            perfiles.update(activo=False)
+            messages.success(request, f'{count} usuario(s) eliminado(s).')
+        else:
+            messages.error(request, 'Acción inválida.')
+    return redirect('app_admin:usuarios')
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # ESTADÍSTICAS
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1028,11 +1815,17 @@ def estadisticas(request):
     hoy   = date.today()
     desde = hoy - timedelta(days=int(rango))
 
+    # Filtrar solo pedidos entregados para ingresos reales
     pedidos = Pedido.objects.filter(fecha_pedido__date__gte=desde, estado='entregado')
-    ingresos  = float(pedidos.aggregate(t=Sum('total'))['t'] or 0)
-    costos    = float(pedidos.aggregate(t=Sum('costo_total'))['t'] or 0)
+
+    # Asegurar que se calcula con los valores completos del pedido
+    ingresos_agg = pedidos.aggregate(t=Sum('total'))['t']
+    costos_agg = pedidos.aggregate(t=Sum('costo_total'))['t']
+
+    ingresos = float(ingresos_agg) if ingresos_agg else 0
+    costos   = float(costos_agg) if costos_agg else 0
     ganancia  = ingresos - costos
-    margen    = round((ganancia / ingresos) * 100, 1) if ingresos else 0
+    margen    = round((ganancia / ingresos) * 100, 1) if ingresos > 0 else 0
     n_pedidos = pedidos.count()
 
     top_productos = DetallePedido.objects.filter(pedido__in=pedidos).values(
@@ -1044,7 +1837,9 @@ def estadisticas(request):
     ).order_by('-unidades')[:10]
 
     for p in top_productos:
-        p['ganancia'] = float(p['ingresos'] or 0) - float(p['costos'] or 0)
+        ingresos_val = float(p['ingresos'] or 0)
+        costos_val = float(p['costos'] or 0)
+        p['ganancia'] = round(ingresos_val - costos_val, 2)
 
     return render(request, 'app_admin/estadisticas.html', _ctx({
         'ingresos': ingresos, 'costos': costos, 'ganancia': ganancia,
@@ -1055,14 +1850,24 @@ def estadisticas(request):
 
 @admin_required
 def api_ventas(request):
-    dias  = int(request.GET.get('dias', 7))
+    try:
+        dias = int(request.GET.get('dias', 7))
+        if dias < 1 or dias > 365:
+            dias = 7
+    except (ValueError, TypeError):
+        dias = 7
+
     hoy   = date.today()
     labels, ingresos_data, ganancia_data = [], [], []
     for i in range(dias - 1, -1, -1):
         d   = hoy - timedelta(days=i)
         ped = Pedido.objects.filter(fecha_pedido__date=d, estado='entregado')
-        ing = float(ped.aggregate(t=Sum('total'))['t'] or 0)
-        cos = float(ped.aggregate(t=Sum('costo_total'))['t'] or 0)
+
+        # Agregar con un solo query
+        agg = ped.aggregate(ingresos=Sum('total'), costos=Sum('costo_total'))
+        ing = float(agg['ingresos'] or 0)
+        cos = float(agg['costos'] or 0)
+
         labels.append(d.strftime('%d/%m'))
         ingresos_data.append(ing)
         ganancia_data.append(round(ing - cos, 2))
@@ -1310,3 +2115,354 @@ def api_alertas(request):
 
     alertas['detalle'] = detalle
     return JsonResponse(alertas)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GESTIÓN DE RECARGAS (validación de comprobantes)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@admin_required
+def recargas(request):
+    from app_padre.models import RecargaSaldo
+    estado = request.GET.get('estado', 'pendiente')
+    recargas_qs = RecargaSaldo.objects.select_related(
+        'estudiante__perfil__user', 'padre__perfil__user'
+    ).order_by('-fecha')
+    if estado:
+        recargas_qs = recargas_qs.filter(estado=estado)
+
+    n_pendientes = RecargaSaldo.objects.filter(estado='pendiente').count()
+    return render(request, 'app_admin/recargas.html', _ctx({
+        'recargas': recargas_qs,
+        'estado_activo': estado,
+        'n_pendientes': n_pendientes,
+        'ESTADO_CHOICES': RecargaSaldo.ESTADO_CHOICES,
+    }))
+
+
+@admin_required
+def recarga_resolver(request, pk):
+    from app_padre.models import RecargaSaldo
+    recarga = get_object_or_404(RecargaSaldo, pk=pk, estado='pendiente')
+    if request.method == 'POST':
+        accion     = request.POST.get('accion', '')
+        nota_admin = request.POST.get('nota_admin', '').strip()
+        if accion == 'aprobar':
+            recarga.aprobar()
+            messages.success(request, f'Recarga #{recarga.pk} de ${recarga.monto:,.0f} aprobada. Saldo acreditado a {recarga.estudiante.perfil.user.get_full_name()}.')
+        elif accion == 'rechazar':
+            recarga.rechazar(nota=nota_admin)
+            messages.warning(request, f'Recarga #{recarga.pk} rechazada.')
+        else:
+            messages.error(request, 'Acción inválida.')
+    return redirect('app_admin:recargas')
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INSUMOS
+# ══════════════════════════════════════════════════════════════════════════════
+
+@admin_required
+def insumos(request):
+    cat_f  = request.GET.get('cat', '')
+    q      = request.GET.get('q', '').strip()
+    qs     = Insumo.objects.select_related('proveedor').order_by('categoria', 'nombre')
+    if cat_f:
+        qs = qs.filter(categoria=cat_f)
+    if q:
+        qs = qs.filter(nombre__icontains=q)
+
+    n_stock_bajo   = Insumo.objects.filter(activo=True, stock__lte=F('stock_minimo')).count()
+    n_sin_stock    = Insumo.objects.filter(activo=True, stock__lte=0).count()
+    n_con_proveedor = Insumo.objects.filter(activo=True, proveedor__isnull=False).count()
+    movimientos    = MovimientoInsumo.objects.select_related('insumo').order_by('-fecha')[:20]
+
+    return render(request, 'app_admin/insumos.html', _ctx({
+        'insumos': qs,
+        'cat_f': cat_f,
+        'q': q,
+        'CATEGORIA_CHOICES': Insumo.CATEGORIA_CHOICES,
+        'n_stock_bajo': n_stock_bajo,
+        'n_sin_stock': n_sin_stock,
+        'n_con_proveedor': n_con_proveedor,
+        'movimientos': movimientos,
+    }))
+
+
+@admin_required
+def insumo_nuevo(request):
+    if request.method == 'POST':
+        nombre   = request.POST.get('nombre', '').strip()
+        categoria = request.POST.get('categoria', 'otro')
+        unidad   = request.POST.get('unidad', 'und')
+        stock    = request.POST.get('stock', '0').strip()
+        stock_min = request.POST.get('stock_minimo', '0').strip()
+        precio   = request.POST.get('precio_unitario', '0').strip()
+        prov_id  = request.POST.get('proveedor', '') or None
+        desc     = request.POST.get('descripcion', '').strip()
+
+        if not nombre:
+            messages.error(request, 'El nombre es obligatorio.')
+            return redirect('app_admin:insumo_nuevo')
+
+        try:
+            stock_f    = float(stock)
+            stock_min_f = float(stock_min)
+            precio_f   = float(precio)
+            if stock_f < 0 or stock_min_f < 0 or precio_f < 0:
+                raise ValueError
+        except (ValueError, TypeError):
+            messages.error(request, 'Stock y precio deben ser números positivos.')
+            return redirect('app_admin:insumo_nuevo')
+
+        imagen = request.FILES.get('imagen')
+        insumo = Insumo.objects.create(
+            nombre=nombre, categoria=categoria, unidad=unidad,
+            stock=stock_f, stock_minimo=stock_min_f,
+            precio_unitario=precio_f, proveedor_id=prov_id,
+            descripcion=desc, imagen=imagen,
+        )
+        if stock_f > 0:
+            MovimientoInsumo.objects.create(
+                insumo=insumo, tipo='entrada',
+                cantidad=stock_f, nota='Stock inicial'
+            )
+        messages.success(request, f'Insumo "{insumo.nombre}" creado exitosamente.')
+        return redirect('app_admin:insumos')
+
+    proveedores = Proveedor.objects.filter(activo=True)
+    return render(request, 'app_admin/insumo_form.html', _ctx({
+        'accion': 'Nuevo',
+        'proveedores': proveedores,
+        'CATEGORIA_CHOICES': Insumo.CATEGORIA_CHOICES,
+        'UNIDAD_CHOICES': Insumo.UNIDAD_CHOICES,
+    }))
+
+
+@admin_required
+def insumo_editar(request, pk):
+    insumo = get_object_or_404(Insumo, pk=pk)
+    if request.method == 'POST':
+        insumo.nombre      = request.POST.get('nombre', '').strip() or insumo.nombre
+        insumo.categoria   = request.POST.get('categoria', insumo.categoria)
+        insumo.unidad      = request.POST.get('unidad', insumo.unidad)
+        insumo.descripcion = request.POST.get('descripcion', '').strip()
+        prov_id            = request.POST.get('proveedor', '') or None
+        insumo.proveedor_id = prov_id
+
+        try:
+            insumo.stock_minimo    = float(request.POST.get('stock_minimo', insumo.stock_minimo))
+            insumo.precio_unitario = float(request.POST.get('precio_unitario', insumo.precio_unitario))
+        except (ValueError, TypeError):
+            messages.error(request, 'Valores numéricos inválidos.')
+            return redirect('app_admin:insumo_editar', pk=pk)
+
+        if request.FILES.get('imagen'):
+            insumo.imagen = request.FILES['imagen']
+        insumo.save()
+        messages.success(request, f'Insumo "{insumo.nombre}" actualizado.')
+        return redirect('app_admin:insumos')
+
+    proveedores = Proveedor.objects.filter(activo=True)
+    return render(request, 'app_admin/insumo_form.html', _ctx({
+        'accion': 'Editar',
+        'insumo': insumo,
+        'proveedores': proveedores,
+        'CATEGORIA_CHOICES': Insumo.CATEGORIA_CHOICES,
+        'UNIDAD_CHOICES': Insumo.UNIDAD_CHOICES,
+    }))
+
+
+@admin_required
+def insumo_ajuste(request, pk):
+    insumo = get_object_or_404(Insumo, pk=pk)
+    if request.method == 'POST':
+        tipo     = request.POST.get('tipo', 'entrada')
+        nota     = request.POST.get('nota', '').strip()
+
+        if tipo not in ('entrada', 'salida', 'ajuste', 'merma'):
+            messages.error(request, 'Tipo de movimiento inválido.')
+            return redirect('app_admin:insumos')
+
+        try:
+            cantidad = float(request.POST.get('cantidad', 0))
+            if cantidad <= 0:
+                raise ValueError
+        except (ValueError, TypeError):
+            messages.error(request, 'La cantidad debe ser mayor a 0.')
+            return redirect('app_admin:insumos')
+
+        with transaction.atomic():
+            ins = Insumo.objects.select_for_update().get(pk=insumo.pk)
+            if tipo in ('salida', 'merma'):
+                ins.stock = max(0, float(ins.stock) - cantidad)
+            elif tipo == 'ajuste':
+                ins.stock = cantidad
+            else:
+                ins.stock = float(ins.stock) + cantidad
+            ins.save(update_fields=['stock'])
+
+            MovimientoInsumo.objects.create(
+                insumo=ins, tipo=tipo, cantidad=cantidad, nota=nota
+            )
+
+        messages.success(request, f'Movimiento registrado para "{insumo.nombre}".')
+        return redirect('app_admin:insumos')
+
+    tipo_inicial = request.GET.get('tipo', 'entrada')
+    return render(request, 'app_admin/insumo_ajuste.html', _ctx({
+        'insumo':       insumo,
+        'TIPO_CHOICES': MovimientoInsumo.TIPO_CHOICES,
+        'tipo_inicial': tipo_inicial,
+    }))
+
+
+@admin_required
+def insumo_toggle(request, pk):
+    insumo = get_object_or_404(Insumo, pk=pk)
+    if request.method == 'POST':
+        insumo.activo = not insumo.activo
+        insumo.save(update_fields=['activo'])
+        estado = 'activado' if insumo.activo else 'desactivado'
+        messages.success(request, f'Insumo "{insumo.nombre}" {estado}.')
+    return redirect('app_admin:insumos')
+
+
+@admin_required
+def insumo_historial(request, pk):
+    insumo      = get_object_or_404(Insumo, pk=pk)
+    movimientos = insumo.movimientos.order_by('-fecha')
+    totales = {
+        'entrada': sum(float(m.cantidad) for m in movimientos if m.tipo == 'entrada'),
+        'salida':  sum(float(m.cantidad) for m in movimientos if m.tipo == 'salida'),
+        'merma':   sum(float(m.cantidad) for m in movimientos if m.tipo == 'merma'),
+        'ajuste':  movimientos.filter(tipo='ajuste').count(),
+    }
+    return render(request, 'app_admin/insumo_historial.html', _ctx({
+        'insumo':      insumo,
+        'movimientos': movimientos,
+        'totales':     totales,
+    }))
+
+
+@admin_required
+def insumo_eliminar(request, pk):
+    """Soft-delete de insumo."""
+    insumo = get_object_or_404(Insumo, pk=pk)
+    if request.method == 'POST':
+        nombre = insumo.nombre
+        insumo.activo = False
+        insumo.save(update_fields=['activo'])
+        messages.success(request, f'Insumo "{nombre}" eliminado del sistema.')
+    return redirect('app_admin:insumos')
+
+
+@admin_required
+def exportar_insumos_excel(request):
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment
+    except ImportError:
+        messages.error(request, 'openpyxl no está instalado.')
+        return redirect('app_admin:insumos')
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Insumos'
+
+    header_fill = PatternFill(start_color='0a3055', end_color='0a3055', fill_type='solid')
+    header_font = Font(color='FFFFFF', bold=True)
+
+    headers = ['Nombre', 'Categoría', 'Unidad', 'Stock actual', 'Stock mínimo',
+               'Precio unitario', 'Proveedor', 'Descripción', 'Activo']
+    ws.append(headers)
+    for col_num, _ in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_num)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center')
+
+    for ins in Insumo.objects.select_related('proveedor').order_by('categoria', 'nombre'):
+        ws.append([
+            ins.nombre,
+            ins.get_categoria_display(),
+            ins.get_unidad_display(),
+            float(ins.stock),
+            float(ins.stock_minimo),
+            float(ins.precio_unitario),
+            ins.proveedor.nombre if ins.proveedor else '—',
+            ins.descripcion or '',
+            'Sí' if ins.activo else 'No',
+        ])
+
+    for col in ws.columns:
+        max_len = max(len(str(c.value or '')) for c in col)
+        ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 35)
+
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="insumos_punto_asis.xlsx"'
+    wb.save(response)
+    return response
+
+
+@admin_required
+def exportar_insumos_pdf(request):
+    try:
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib import colors
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.units import cm
+        import io
+    except ImportError:
+        messages.error(request, 'reportlab no está instalado.')
+        return redirect('app_admin:insumos')
+
+    buffer = io.BytesIO()
+    doc    = SimpleDocTemplate(buffer, pagesize=landscape(A4), leftMargin=1*cm, rightMargin=1*cm)
+    styles = getSampleStyleSheet()
+    elements = []
+
+    elements.append(Paragraph('Insumos — Punto Asis', styles['Title']))
+    elements.append(Paragraph(f'Generado: {date.today().strftime("%d/%m/%Y")}', styles['Normal']))
+    elements.append(Spacer(1, 0.5*cm))
+
+    headers = ['Nombre', 'Categoría', 'Unidad', 'Stock', 'Mínimo', 'Precio/u', 'Proveedor', 'Estado']
+    data = [headers]
+    for ins in Insumo.objects.select_related('proveedor').order_by('categoria', 'nombre'):
+        data.append([
+            ins.nombre[:30],
+            ins.get_categoria_display(),
+            ins.get_unidad_display(),
+            str(float(ins.stock)),
+            str(float(ins.stock_minimo)),
+            f'${float(ins.precio_unitario):,.2f}',
+            ins.proveedor.nombre[:18] if ins.proveedor else '—',
+            'Activo' if ins.activo else 'Inactivo',
+        ])
+
+    azul_oscuro = colors.HexColor('#0a3055')
+    tabla = Table(data, repeatRows=1)
+    tabla.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), azul_oscuro),
+        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
+        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE',   (0, 0), (-1, -1), 8),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0f8ff')]),
+        ('GRID',       (0, 0), (-1, -1), 0.4, colors.HexColor('#e2e2dd')),
+        ('ALIGN',      (3, 0), (5, -1), 'RIGHT'),
+        ('VALIGN',     (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    elements.append(tabla)
+    doc.build(elements)
+
+    buffer.seek(0)
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="insumos_punto_asis.pdf"'
+    return response
+
+

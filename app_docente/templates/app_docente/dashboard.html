@@ -1,0 +1,187 @@
+{% extends 'app_docente/base_docente.html' %}
+{% block title %}Inicio{% endblock %}
+{% block topbar_title %}Bienvenido, {{ request.user.first_name }}{% endblock %}
+
+{% block content %}
+
+<!-- Hero Banner -->
+<div class="page-hero">
+  <div class="page-hero-inner">
+    <div class="page-hero-eyebrow">Portal Docente</div>
+    <div class="page-hero-name">Hola, {{ request.user.first_name }}</div>
+    <div class="page-hero-chips">
+      {% if docente.materia %}
+      <span class="page-hero-chip"><i class="bi bi-mortarboard"></i> {{ docente.materia }}</span>
+      {% endif %}
+      <span class="page-hero-chip"><i class="bi bi-wallet2"></i> Saldo: ${{ docente.saldo|floatformat:0 }}</span>
+      {% if docente.credito_disponible %}
+      <span class="page-hero-chip"><i class="bi bi-credit-card"></i> +${{ docente.credito_disponible|floatformat:0 }} crédito</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- KPIs -->
+<div class="kpi-grid" style="margin-bottom:1.5rem;">
+  <div class="kpi kpi-green">
+    <div class="kpi-icon"><i class="bi bi-wallet2"></i></div>
+    <div class="kpi-label">Saldo disponible</div>
+    <div class="kpi-value">${{ docente.saldo|floatformat:0 }}</div>
+    {% if docente.credito_disponible %}
+    <div class="kpi-sub">+ ${{ docente.credito_disponible|floatformat:0 }} crédito</div>
+    {% endif %}
+  </div>
+  <div class="kpi kpi-amber">
+    <div class="kpi-icon"><i class="bi bi-calendar-day"></i></div>
+    <div class="kpi-label">Gasto hoy</div>
+    <div class="kpi-value">${{ gasto_hoy|floatformat:0 }}</div>
+  </div>
+  <div class="kpi kpi-sky">
+    <div class="kpi-icon"><i class="bi bi-bar-chart-line"></i></div>
+    <div class="kpi-label">Gasto este mes</div>
+    <div class="kpi-value">${{ gasto_mes|floatformat:0 }}</div>
+  </div>
+  <div class="kpi kpi-violet">
+    <div class="kpi-icon"><i class="bi bi-bag-check"></i></div>
+    <div class="kpi-label">Total pedidos</div>
+    <div class="kpi-value">{{ total_pedidos }}</div>
+  </div>
+</div>
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; margin-bottom:1.25rem;">
+
+  <!-- Pedidos activos -->
+  <div class="card">
+    <div class="section-title">Pedidos activos</div>
+    {% if pedidos_activos %}
+      {% for p in pedidos_activos %}
+      <div class="tl-row" style="padding:.6rem 0; border-bottom:1px solid var(--mist);">
+        <div class="tl-dot {% if p.estado == 'preparando' %}dot-sky{% elif p.estado == 'pendiente' %}dot-amber{% else %}dot-green{% endif %}" style="margin-top:.45rem;"></div>
+        <div style="flex:1; min-width:0;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:.5rem;">
+            <span style="font-weight:700; font-size:.8rem; font-family:monospace; color:var(--ink);">{{ p.ticket }}</span>
+            <span class="badge badge-{{ p.estado }}">{{ p.get_estado_display }}</span>
+          </div>
+          <div style="font-size:.68rem; color:var(--stone); margin-top:.15rem;">{{ p.fecha_pedido|date:"d M, H:i" }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div style="text-align:center; padding:1.5rem 0.5rem; color:var(--ash);">
+        <i class="bi bi-bag" style="font-size:1.75rem; opacity:.3; display:block; margin-bottom:.5rem; color:var(--leaf);"></i>
+        <p style="font-size:.78rem; margin-bottom:.75rem;">No tienes pedidos activos.</p>
+        <a href="{% url 'app_docente:menu' %}" class="btn btn-primary btn-sm">
+          <i class="bi bi-bag-plus"></i> Pedir ahora
+        </a>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Favoritos rápidos -->
+  <div class="card">
+    <div class="section-title">Mis favoritos</div>
+    {% if favoritos %}
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:.5rem;">
+      {% for fav in favoritos %}
+      <div style="background:var(--leaf-pale); border:1px solid var(--leaf-tint); border-radius:8px; padding:.55rem .7rem; display:flex; align-items:center; gap:.5rem; transition:box-shadow .15s;" onmouseenter="this.style.boxShadow='0 2px 8px rgba(22,163,74,.1)'" onmouseleave="this.style.boxShadow='none'">
+        <div style="width:1.6rem; height:1.6rem; background:var(--leaf-tint); border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+          <i class="bi bi-heart-fill" style="color:var(--leaf); font-size:.7rem;"></i>
+        </div>
+        <div style="min-width:0;">
+          <div style="font-size:.73rem; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ fav.producto.nombre }}</div>
+          <div style="font-size:.62rem; color:var(--stone);">${{ fav.producto.precio_venta|floatformat:0 }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <a href="{% url 'app_docente:menu' %}" class="btn btn-outline btn-sm btn-full" style="margin-top:.85rem;">Ver menú completo</a>
+    {% else %}
+    <div style="text-align:center; padding:1.25rem 0.5rem; color:var(--ash);">
+      <i class="bi bi-heart" style="font-size:1.75rem; opacity:.3; display:block; margin-bottom:.5rem; color:var(--leaf);"></i>
+      <p style="font-size:.78rem; margin-bottom:.75rem;">Aún no tienes favoritos.</p>
+      <a href="{% url 'app_docente:menu' %}" class="btn btn-outline btn-sm"><i class="bi bi-heart"></i> Explorar menú</a>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:1.25rem;">
+
+  <!-- Próximos programados -->
+  <div class="card">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:.85rem;">
+      <div class="section-title" style="margin-bottom:0;">Próximos programados</div>
+      <a href="{% url 'app_docente:programados' %}" class="btn btn-ghost btn-sm">Ver todos</a>
+    </div>
+    {% if programados %}
+      {% for prog in programados %}
+      <div style="display:flex; align-items:center; gap:.75rem; padding:.55rem 0; border-bottom:1px solid var(--mist);">
+        <div style="background:linear-gradient(135deg,var(--leaf-pale),var(--leaf-tint)); border:1px solid var(--leaf-tint); border-radius:9px; padding:.4rem .55rem; text-align:center; min-width:2.75rem; flex-shrink:0;">
+          <div style="font-size:.58rem; color:var(--leaf-dark); font-weight:800; text-transform:uppercase; letter-spacing:.06em;">{{ prog.fecha_entrega|date:"M" }}</div>
+          <div style="font-size:1.15rem; font-weight:700; color:var(--leaf); line-height:1; font-family:var(--serif);">{{ prog.fecha_entrega|date:"d" }}</div>
+        </div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:.78rem; font-weight:600;">{{ prog.detalles.count }} ítem{{ prog.detalles.count|pluralize }}</div>
+          <div style="font-size:.67rem; color:var(--stone); margin-top:.12rem;">
+            {% if prog.hora_entrega %}{{ prog.hora_entrega|time:"H:i" }} &middot; {% endif %}
+            <span class="badge badge-{{ prog.tipo_pago }}">{{ prog.get_tipo_pago_display }}</span>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div style="text-align:center; padding:1.25rem 0.5rem; color:var(--ash);">
+        <i class="bi bi-calendar-x" style="font-size:1.75rem; opacity:.3; display:block; margin-bottom:.5rem; color:var(--leaf);"></i>
+        <p style="font-size:.78rem; margin-bottom:.75rem;">Sin pedidos programados.</p>
+        <a href="{% url 'app_docente:programados' %}" class="btn btn-outline btn-sm"><i class="bi bi-calendar-plus"></i> Programar</a>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Sala de Profes -->
+  <div class="card">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:.85rem;">
+      <div class="section-title" style="margin-bottom:0;">Sala de Profes</div>
+      <a href="{% url 'app_docente:pedidos_grupales' %}" class="btn btn-ghost btn-sm">Ver todos</a>
+    </div>
+    {% if grupales_abiertos %}
+      {% for g in grupales_abiertos %}
+      <div style="background:var(--sky-pale); border:1px solid var(--sky-tint); border-radius:9px; padding:.7rem .85rem; margin-bottom:.5rem;">
+        <div style="font-size:.8rem; font-weight:700; margin-bottom:.2rem; color:var(--ink);">{{ g.titulo }}</div>
+        <div style="font-size:.68rem; color:var(--stone); margin-bottom:.45rem;">
+          <i class="bi bi-person" style="color:var(--sky);"></i> {{ g.organizador.perfil.user.get_full_name }}
+          &middot; {{ g.participantes_count }} participante{{ g.participantes_count|pluralize }}
+        </div>
+        <a href="{% url 'app_docente:detalle_grupal' g.pk %}" class="btn btn-sky btn-sm">
+          <i class="bi bi-person-plus"></i> Unirse
+        </a>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div style="text-align:center; padding:1.25rem 0.5rem; color:var(--ash);">
+        <i class="bi bi-people" style="font-size:1.75rem; opacity:.3; display:block; margin-bottom:.5rem; color:var(--sky);"></i>
+        <p style="font-size:.78rem; margin-bottom:.75rem;">No hay pedidos grupales abiertos.</p>
+        <a href="{% url 'app_docente:crear_grupal' %}" class="btn btn-primary btn-sm">
+          <i class="bi bi-people"></i> Crear pedido grupal
+        </a>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+
+{% if top_producto %}
+<div class="card" style="margin-top:1.25rem; display:flex; align-items:center; gap:1.1rem; background:linear-gradient(135deg,var(--amber-pale),#fffdf5); border-color:var(--amber-tint);">
+  <div style="width:3rem; height:3rem; background:linear-gradient(135deg,var(--amber-tint),var(--amber-pale)); border:1px solid var(--amber-tint); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.4rem; flex-shrink:0;">
+    <i class="bi bi-trophy" style="color:var(--amber);"></i>
+  </div>
+  <div>
+    <div style="font-size:.65rem; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:var(--amber);">Tu producto favorito histórico</div>
+    <div style="font-size:1.1rem; font-weight:700; font-family:var(--serif); margin:.1rem 0;">{{ top_producto.producto__nombre }}</div>
+    <div style="font-size:.72rem; color:var(--stone);">{{ top_producto.total_cant }} unidades pedidas en total</div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -22,12 +22,6 @@
   }
   .cat-tab:hover { border-color: var(--ash); color: var(--ink); background: var(--cream); }
   .cat-tab.active { background: var(--ink); color: #fff; border-color: var(--ink); }
-  .cat-tab .cat-count {
-    background: rgba(255,255,255,0.15); color: inherit;
-    font-size: 0.65rem; font-weight: 700;
-    padding: 0.06rem 0.38rem; border-radius: 99px;
-  }
-  .cat-tab:not(.active) .cat-count { background: var(--mist); color: var(--ash); }
 
   /* ── Barra búsqueda ─────────────────────────────────────────────────────── */
   .menu-topbar {
@@ -50,7 +44,7 @@
   .menu-count { font-size: 0.76rem; color: var(--ash); }
   .menu-count strong { color: var(--ink); }
 
-  /* ══ PRODUCT GRID — El showpiece ════════════════════════════════════════ */
+  /* ══ PRODUCT GRID ════════════════════════════════════════════════════════ */
   .product-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
@@ -78,7 +72,7 @@
   .prod-img-wrap {
     position: relative;
     width: 100%;
-    padding-top: 78%; /* 4:3 ratio approx */
+    padding-top: 78%;
     overflow: hidden;
     background: var(--cream);
     flex-shrink: 0;
@@ -93,7 +87,7 @@
   .prod-card:hover .prod-img-wrap img { transform: scale(1.04); }
   .prod-img-placeholder {
     display: flex; align-items: center; justify-content: center;
-    font-size: 3rem; background: var(--cream);
+    font-size: 2.4rem; background: var(--cream); color: var(--fog);
   }
 
   /* ── Overlay badges on image ── */
@@ -155,6 +149,19 @@
     color: var(--ash);
   }
 
+  /* ── Botón pedir en card ─────────────────────────────────────────────── */
+  .prod-pedir-btn {
+    display: flex; align-items: center; justify-content: center; gap: 0.35rem;
+    margin: 0 1rem 0.85rem;
+    padding: 0.38rem 0; border-radius: 7px;
+    background: var(--leaf-pale); color: var(--leaf-dark);
+    border: 1px solid var(--leaf-tint);
+    font-size: 0.73rem; font-weight: 700;
+    cursor: pointer; text-decoration: none;
+    transition: all 0.15s; letter-spacing: 0.02em;
+  }
+  .prod-pedir-btn:hover { background: var(--leaf); color: #fff; border-color: var(--leaf); }
+
   /* ── Section headers ───────────────────────────────────────────────────── */
   .cat-section { margin-bottom: 2rem; }
   .cat-section-head {
@@ -192,6 +199,58 @@
   .prod-card:nth-child(7)  { animation-delay: 0.21s; }
   .prod-card:nth-child(8)  { animation-delay: 0.24s; }
   .prod-card:nth-child(n+9){ animation-delay: 0.27s; }
+  .prod-card.restringido { border-color: var(--red-tint) !important; }
+  .prod-card.restringido::after {
+    content: 'RESTRINGIDO'; position: absolute; top: 0.5rem; right: 0.5rem;
+    background: var(--red); color: #fff; font-size: 0.55rem; font-weight: 800;
+    letter-spacing: 0.1em; padding: 0.15rem 0.45rem; border-radius: 4px; z-index: 10;
+  }
+
+  /* ── Modal selector de hijo ─────────────────────────────────────────────── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(15,15,14,0.55); z-index: 300;
+    align-items: center; justify-content: center;
+    backdrop-filter: blur(2px);
+  }
+  .modal-overlay.open { display: flex; }
+  .hijo-modal-box {
+    background: var(--ivory); border-radius: 14px;
+    width: 100%; max-width: 380px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.22);
+    border: 1px solid var(--mist); overflow: hidden;
+  }
+  .hijo-modal-head {
+    padding: 1.1rem 1.4rem; border-bottom: 1px solid var(--mist);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .hijo-modal-title { font-family: var(--serif); font-size: 1.05rem; }
+  .hijo-modal-close {
+    width: 1.8rem; height: 1.8rem; border-radius: 50%;
+    background: var(--cream); border: 1px solid var(--mist);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    color: var(--stone); font-size: 0.85rem; transition: all 0.15s;
+  }
+  .hijo-modal-close:hover { background: var(--red-pale); color: var(--red); border-color: var(--red-tint); }
+  .hijo-modal-body { padding: 1rem 1.2rem 1.4rem; }
+  .hijo-option {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.75rem 1rem; border: 1px solid var(--mist); border-radius: 9px;
+    margin-bottom: 0.55rem; text-decoration: none; color: var(--ink);
+    transition: all 0.14s; background: var(--ivory);
+  }
+  .hijo-option:hover { border-color: var(--leaf); background: var(--leaf-pale); }
+  .hijo-option:last-child { margin-bottom: 0; }
+  .hijo-opt-left { display: flex; align-items: center; gap: 0.75rem; }
+  .hijo-opt-avatar {
+    width: 2.2rem; height: 2.2rem; border-radius: 50%;
+    background: var(--leaf-pale); border: 1px solid var(--leaf-tint);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.72rem; font-weight: 700; color: var(--leaf-dark);
+  }
+  .hijo-opt-name { font-weight: 600; font-size: 0.88rem; }
+  .hijo-opt-grado { font-size: 0.68rem; color: var(--ash); margin-top: 0.08rem; }
+  .hijo-opt-saldo { font-family: var(--serif); font-size: 0.95rem; color: var(--leaf); font-weight: 500; }
 </style>
 {% endblock %}
 
@@ -206,9 +265,32 @@
              oninput="this.form.submit()">
     </div>
   </form>
+  {% if hijos %}
+  <button class="btn btn-primary btn-sm" onclick="abrirSelectorHijo()">
+    <i class="bi bi-cart-plus"></i> Hacer pedido
+  </button>
+  {% endif %}
 {% endblock %}
 
 {% block content %}
+
+<!-- Selector de hijo para ver restricciones -->
+{% if hijos %}
+<div style="display:flex;align-items:center;gap:0.65rem;margin-bottom:1rem;flex-wrap:wrap;">
+  <span style="font-size:0.72rem;font-weight:700;color:var(--ash);text-transform:uppercase;letter-spacing:0.08em;">Restricciones de:</span>
+  <a href="{% url 'app_padre:menu' %}{% if cat_activa %}?cat={{ cat_activa }}{% endif %}"
+     class="btn btn-ghost btn-xs {% if not hijo_pk %}btn-primary{% endif %}"
+     style="{% if not hijo_pk %}background:var(--leaf);color:#fff;{% endif %}">Ninguno</a>
+  {% for h in hijos %}
+  <a href="{% url 'app_padre:menu' %}?hijo={{ h.pk }}{% if cat_activa %}&cat={{ cat_activa }}{% endif %}"
+     class="btn btn-ghost btn-xs {% if hijo_pk == h.pk|stringformat:'s' %}btn-primary{% endif %}"
+     style="{% if hijo_pk == h.pk|stringformat:'s' %}background:var(--leaf);color:#fff;{% endif %}">
+    {{ h.perfil.user.first_name }}
+  </a>
+  {% endfor %}
+  {% if hijo_sel %}<span style="font-size:0.72rem;color:var(--red);"><i class="bi bi-shield-x"></i> Productos bloqueados en rojo</span>{% endif %}
+</div>
+{% endif %}
 
 <!-- Pestañas de categoría -->
 <div class="cat-tabs">
@@ -219,7 +301,8 @@
   {% for cat in categorias %}
   <a href="{% url 'app_padre:menu' %}?cat={{ cat.nombre }}{% if q %}&q={{ q }}{% endif %}"
      class="cat-tab {% if cat_activa == cat.nombre %}active{% endif %}">
-    {% if cat.icono %}{{ cat.icono }} {% endif %}{{ cat.get_nombre_display }}
+    <i class="bi bi-{% if cat.nombre == 'desayuno' %}cup-hot{% elif cat.nombre == 'almuerzo' %}egg-fried{% elif cat.nombre == 'bebidas' %}cup-straw{% else %}bag{% endif %}"></i>
+    {{ cat.get_nombre_display }}
   </a>
   {% endfor %}
 </div>
@@ -241,31 +324,23 @@
   {% if cat_activa or q %}
     <!-- Vista plana cuando hay filtro -->
     <div class="product-grid">
-      {% for prod in productos %}
-      <div class="prod-card">
+      {% for prod, restringido in productos_list %}
+      <div class="prod-card {% if restringido %}restringido{% endif %}">
         <div class="prod-img-wrap">
           {% if prod.imagen %}
             <img src="{{ prod.imagen.url }}" alt="{{ prod.nombre }}" loading="lazy">
           {% else %}
             <div class="prod-img-placeholder">
-              {% if prod.categoria.nombre == 'desayuno' %}🥐
-              {% elif prod.categoria.nombre == 'almuerzo' %}🍱
-              {% elif prod.categoria.nombre == 'bebidas' %}🥤
-              {% else %}🍿{% endif %}
+              <i class="bi bi-{% if prod.categoria.nombre == 'desayuno' %}cup-hot{% elif prod.categoria.nombre == 'almuerzo' %}egg-fried{% elif prod.categoria.nombre == 'bebidas' %}cup-straw{% else %}bag{% endif %}"></i>
             </div>
           {% endif %}
-
-          <span class="prod-cat-badge cat-{{ prod.categoria.nombre }}">
-            {{ prod.categoria.get_nombre_display }}
-          </span>
-
+          <span class="prod-cat-badge cat-{{ prod.categoria.nombre }}">{{ prod.categoria.get_nombre_display }}</span>
           {% if prod.sin_stock %}
             <span class="prod-stock-badge stock-agotado">Agotado</span>
           {% else %}
             <span class="prod-stock-badge stock-disponible">Disponible</span>
           {% endif %}
         </div>
-
         <div class="prod-body">
           <div class="prod-name">{{ prod.nombre }}</div>
           {% if prod.descripcion %}<div class="prod-desc">{{ prod.descripcion }}</div>{% endif %}
@@ -274,6 +349,11 @@
             <div class="prod-tipo">{{ prod.get_tipo_display }}</div>
           </div>
         </div>
+        {% if not restringido and not prod.sin_stock and hijos %}
+        <button class="prod-pedir-btn" onclick="abrirSelectorHijo({{ prod.pk }})">
+          <i class="bi bi-cart-plus"></i> Pedir
+        </button>
+        {% endif %}
       </div>
       {% endfor %}
     </div>
@@ -285,38 +365,29 @@
     <div class="cat-section">
       <div class="cat-section-head">
         <span class="cat-section-title">
-          {% if grupo.grouper.icono %}{{ grupo.grouper.icono }} {% endif %}{{ grupo.grouper.get_nombre_display }}
+          <i class="bi bi-{% if grupo.grouper.nombre == 'desayuno' %}cup-hot{% elif grupo.grouper.nombre == 'almuerzo' %}egg-fried{% elif grupo.grouper.nombre == 'bebidas' %}cup-straw{% else %}bag{% endif %}" style="font-size:1rem;margin-right:0.3rem;color:var(--leaf);"></i>{{ grupo.grouper.get_nombre_display }}
         </span>
         <div class="cat-section-line"></div>
         <span class="cat-section-count">{{ grupo.list|length }} producto{{ grupo.list|length|pluralize }}</span>
       </div>
-
       <div class="product-grid">
         {% for prod in grupo.list %}
-        <div class="prod-card">
+        <div class="prod-card {% if prod.id in restricciones_prod or prod.categoria_id in restricciones_cat %}restringido{% endif %}">
           <div class="prod-img-wrap">
             {% if prod.imagen %}
               <img src="{{ prod.imagen.url }}" alt="{{ prod.nombre }}" loading="lazy">
             {% else %}
               <div class="prod-img-placeholder">
-                {% if prod.categoria.nombre == 'desayuno' %}🥐
-                {% elif prod.categoria.nombre == 'almuerzo' %}🍱
-                {% elif prod.categoria.nombre == 'bebidas' %}🥤
-                {% else %}🍿{% endif %}
+                <i class="bi bi-{% if prod.categoria.nombre == 'desayuno' %}cup-hot{% elif prod.categoria.nombre == 'almuerzo' %}egg-fried{% elif prod.categoria.nombre == 'bebidas' %}cup-straw{% else %}bag{% endif %}"></i>
               </div>
             {% endif %}
-
-            <span class="prod-cat-badge cat-{{ prod.categoria.nombre }}">
-              {{ prod.categoria.get_nombre_display }}
-            </span>
-
+            <span class="prod-cat-badge cat-{{ prod.categoria.nombre }}">{{ prod.categoria.get_nombre_display }}</span>
             {% if prod.sin_stock %}
               <span class="prod-stock-badge stock-agotado">Agotado</span>
             {% else %}
               <span class="prod-stock-badge stock-disponible">Disponible</span>
             {% endif %}
           </div>
-
           <div class="prod-body">
             <div class="prod-name">{{ prod.nombre }}</div>
             {% if prod.descripcion %}<div class="prod-desc">{{ prod.descripcion }}</div>{% endif %}
@@ -325,6 +396,11 @@
               <div class="prod-tipo">{{ prod.get_tipo_display }}</div>
             </div>
           </div>
+          {% if prod.id not in restricciones_prod and prod.categoria_id not in restricciones_cat and not prod.sin_stock and hijos %}
+          <button class="prod-pedir-btn" onclick="abrirSelectorHijo({{ prod.pk }})">
+            <i class="bi bi-cart-plus"></i> Pedir
+          </button>
+          {% endif %}
         </div>
         {% endfor %}
       </div>
@@ -349,4 +425,56 @@
   </div>
 {% endif %}
 
+<!-- ── Modal selector de hijo ────────────────────────────────────────────── -->
+{% if hijos %}
+<div id="modal-selector-hijo" class="modal-overlay" onclick="if(event.target===this)cerrarSelectorHijo()">
+  <div class="hijo-modal-box">
+    <div class="hijo-modal-head">
+      <span class="hijo-modal-title">Seleccionar estudiante</span>
+      <button class="hijo-modal-close" onclick="cerrarSelectorHijo()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="hijo-modal-body">
+      <p style="font-size:0.78rem;color:var(--stone);margin-bottom:1rem;">
+        Elige el estudiante para quien deseas hacer el pedido.
+      </p>
+      {% for h in hijos %}
+      <a href="{% url 'app_padre:pedido_padre' h.pk %}" class="hijo-option" id="hijo-opt-{{ h.pk }}">
+        <div class="hijo-opt-left">
+          <div class="hijo-opt-avatar">{{ h.perfil.user.first_name|slice:":1"|upper }}</div>
+          <div>
+            <div class="hijo-opt-name">{{ h.perfil.user.get_full_name }}</div>
+            <div class="hijo-opt-grado">Grado {{ h.grado }}</div>
+          </div>
+        </div>
+        <div class="hijo-opt-saldo">${{ h.saldo|miles }}</div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function abrirSelectorHijo(prodPk) {
+  // Si hay un solo hijo, redirigir directo
+  {% if hijos|length == 1 %}
+  const pk = {{ hijos.0.pk }};
+  const url = `/padre/hijos/${pk}/pedir/`;
+  window.location.href = url;
+  return;
+  {% endif %}
+  document.getElementById('modal-selector-hijo').classList.add('open');
+}
+function cerrarSelectorHijo() {
+  document.getElementById('modal-selector-hijo')?.classList.remove('open');
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') cerrarSelectorHijo();
+});
+</script>
 {% endblock %}

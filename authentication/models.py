@@ -11,7 +11,7 @@ class Perfil(models.Model):
         ('admin',      'Administrador'),
         ('padre',      'Padre de Familia'),
         ('estudiante', 'Estudiante'),
-        # ('profesor', 'Profesor'),  # ← Descomentar cuando se implemente
+        ('docente',    'Docente'),
     ]
 
     user       = models.OneToOneField(User, on_delete=models.CASCADE, related_name='perfil')
@@ -24,6 +24,7 @@ class Perfil(models.Model):
     def es_admin(self):      return self.rol == 'admin'
     def es_padre(self):      return self.rol == 'padre'
     def es_estudiante(self): return self.rol == 'estudiante'
+    def es_docente(self):    return self.rol == 'docente'
 
     def __str__(self):
         return f'{self.user.get_full_name() or self.user.username} [{self.get_rol_display()}]'
@@ -37,6 +38,7 @@ class Padre(models.Model):
     """Perfil extendido del padre. Se registra solo."""
     perfil    = models.OneToOneField(Perfil, on_delete=models.CASCADE, related_name='padre')
     documento = models.CharField(max_length=20, blank=True, verbose_name='N° documento')
+    saldo     = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='Saldo propio')
 
     def __str__(self):
         return f'Padre: {self.perfil}'
@@ -66,3 +68,32 @@ class Estudiante(models.Model):
     class Meta:
         verbose_name = 'Estudiante'
         verbose_name_plural = 'Estudiantes'
+
+
+class Docente(models.Model):
+    """Perfil extendido del docente. Se registra solo."""
+    perfil       = models.OneToOneField(Perfil, on_delete=models.CASCADE, related_name='docente')
+    documento    = models.CharField(max_length=20, blank=True, verbose_name='N° Documento (CC)')
+    materia      = models.CharField(max_length=100, blank=True, verbose_name='Materia / Área')
+    saldo        = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    limite_fiado = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        verbose_name='Límite de crédito (fiado)',
+        help_text='Monto máximo que puede pedir sin saldo suficiente'
+    )
+    deuda_fiado  = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='Deuda de fiado')
+
+    @property
+    def credito_disponible(self):
+        return max(float(self.limite_fiado) - float(self.deuda_fiado), 0)
+
+    @property
+    def saldo_total_disponible(self):
+        return float(self.saldo) + self.credito_disponible
+
+    def __str__(self):
+        return f'Docente: {self.perfil}'
+
+    class Meta:
+        verbose_name = 'Docente'
+        verbose_name_plural = 'Docentes'

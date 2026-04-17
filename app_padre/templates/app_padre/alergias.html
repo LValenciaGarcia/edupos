@@ -1,0 +1,143 @@
+{% extends 'app_padre/base_padre.html' %}
+{% block title %}Alergias — {{ estudiante.perfil.user.get_full_name }}{% endblock %}
+{% block page_title %}Alergias de {{ estudiante.perfil.user.first_name }}{% endblock %}
+{% block nav_hijos %}active{% endblock %}
+
+{% block content %}
+<div style="max-width:52rem;margin:0 auto">
+
+  <!-- Cabecera del estudiante -->
+  <div class="card" style="margin-bottom:1.25rem">
+    <div class="card-body" style="display:flex;align-items:center;gap:1rem;padding:1rem 1.5rem">
+      <div style="width:2.8rem;height:2.8rem;border-radius:50%;background:var(--violet-pale);border:2px solid var(--violet-tint);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:1.1rem;color:var(--violet);flex-shrink:0">
+        {{ estudiante.perfil.user.first_name|slice:":1"|upper }}
+      </div>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:0.95rem">{{ estudiante.perfil.user.get_full_name }}</div>
+        <div style="font-size:0.72rem;color:var(--ash)">Grado {{ estudiante.grado }} · Código {{ estudiante.codigo }}</div>
+      </div>
+      <div style="display:flex;gap:0.5rem">
+        <a href="{% url 'app_padre:restricciones' estudiante.pk %}" class="btn btn-ghost btn-sm">
+          <i class="bi bi-slash-circle"></i> Restricciones
+        </a>
+        <a href="{% url 'app_padre:hijos' %}" class="btn btn-ghost btn-sm">
+          <i class="bi bi-arrow-left"></i> Volver
+        </a>
+      </div>
+    </div>
+  </div>
+
+  {% if alergias %}
+  <!-- Aviso si hay alergias severas -->
+  {% for a in alergias %}
+  {% if a.gravedad == 'severa' and a.activo %}
+  <div class="msg msg-error" style="margin-bottom:0.75rem">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    <strong>Alergia severa:</strong> {{ a.nombre }} — {{ a.notas|default:"Verificar protocolo de emergencia" }}
+  </div>
+  {% endif %}
+  {% endfor %}
+  {% endif %}
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;align-items:start">
+
+    <!-- Lista de alergias -->
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Alergias registradas</span>
+        <span class="badge badge-info">{{ alergias.count }}</span>
+      </div>
+      <div class="card-body" style="padding:0">
+        {% if alergias %}
+        <div style="display:flex;flex-direction:column">
+          {% for a in alergias %}
+          <div style="padding:1rem 1.5rem;border-bottom:1px solid var(--mist);{% if not a.activo %}opacity:0.5{% endif %}">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.75rem">
+              <div style="flex:1">
+                <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.3rem">
+                  <span style="font-weight:700;font-size:0.9rem">{{ a.nombre }}</span>
+                  <span class="badge {% if a.gravedad == 'severa' %}badge-cancelado{% elif a.gravedad == 'moderada' %}badge-low{% else %}badge-info{% endif %}">
+                    {{ a.get_gravedad_display }}
+                  </span>
+                  <span class="badge badge-pendiente">{{ a.get_tipo_display }}</span>
+                </div>
+                {% if a.notas %}
+                  <div style="font-size:0.77rem;color:var(--stone)">{{ a.notas }}</div>
+                {% endif %}
+              </div>
+              <div style="display:flex;gap:0.3rem;flex-shrink:0">
+                <form method="post">
+                  {% csrf_token %}
+                  <input type="hidden" name="accion" value="toggle">
+                  <input type="hidden" name="alergia_pk" value="{{ a.pk }}">
+                  <button type="submit" class="btn btn-xs btn-ghost" title="{% if a.activo %}Desactivar{% else %}Activar{% endif %}">
+                    <i class="bi bi-{% if a.activo %}pause{% else %}play{% endif %}"></i>
+                  </button>
+                </form>
+                <form method="post" onsubmit="return confirm('¿Eliminar esta alergia?')">
+                  {% csrf_token %}
+                  <input type="hidden" name="accion" value="eliminar">
+                  <input type="hidden" name="alergia_pk" value="{{ a.pk }}">
+                  <button type="submit" class="btn btn-xs btn-danger">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+          <i class="bi bi-heart-pulse es-icon"></i>
+          <p>Sin alergias registradas.</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Formulario de nueva alergia -->
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Registrar alergia</span>
+      </div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="crear">
+          <div style="display:flex;flex-direction:column;gap:1rem">
+            <div class="field">
+              <label>Alérgeno / nombre *</label>
+              <input type="text" name="nombre" placeholder="Ej: Maní, Lactosa, Gluten, Mariscos…" required>
+            </div>
+            <div class="field">
+              <label>Tipo</label>
+              <select name="tipo">
+                {% for val, lbl in TIPO_CHOICES %}
+                  <option value="{{ val }}">{{ lbl }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="field">
+              <label>Gravedad</label>
+              <select name="gravedad">
+                {% for val, lbl in GRAVEDAD_CHOICES %}
+                  <option value="{{ val }}">{{ lbl }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="field">
+              <label>Notas / síntomas</label>
+              <textarea name="notas" rows="3" placeholder="Síntomas, medicación disponible, instrucciones de emergencia…"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-full">
+              <i class="bi bi-plus-lg"></i> Registrar alergia
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

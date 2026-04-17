@@ -1,0 +1,149 @@
+{% extends 'app_admin/base_admin.html' %}
+{% block title %}Historial — {{ insumo.nombre }}{% endblock %}
+{% block page_title %}Historial de insumo{% endblock %}
+{% block nav_insumos %}active{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'app_admin:insumos' %}" class="btn btn-ghost btn-sm">
+    <i class="bi bi-arrow-left"></i> Volver
+  </a>
+  <a href="{% url 'app_admin:insumo_ajuste' insumo.pk %}?tipo=entrada" class="btn btn-primary btn-sm">
+    <i class="bi bi-box-arrow-in-down"></i> Registrar entrada
+  </a>
+  <a href="{% url 'app_admin:insumo_ajuste' insumo.pk %}?tipo=salida" class="btn btn-amber btn-sm">
+    <i class="bi bi-box-arrow-up"></i> Registrar salida
+  </a>
+{% endblock %}
+
+{% block content %}
+<style>
+  .hist-header {
+    background: var(--ivory); border: 1px solid var(--mist); border-radius: 10px;
+    padding: 1.2rem 1.5rem; margin-bottom: 1.4rem;
+    display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap;
+  }
+  .hist-avatar {
+    width: 3rem; height: 3rem; border-radius: 10px;
+    background: var(--sky-pale); border: 1px solid var(--sky-tint);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem; color: var(--sky); flex-shrink: 0; overflow: hidden;
+  }
+  .hist-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .hist-name { font-family: var(--serif); font-size: 1.2rem; }
+  .hist-meta { font-size: 0.74rem; color: var(--ash); margin-top: 0.18rem; }
+  .hist-stats { margin-left: auto; display: flex; gap: 1.2rem; flex-wrap: wrap; }
+  .hist-stat { text-align: center; }
+  .hist-stat-val { font-family: var(--serif); font-size: 1.4rem; line-height: 1; }
+  .hist-stat-val.green  { color: var(--leaf); }
+  .hist-stat-val.amber  { color: var(--amber); }
+  .hist-stat-val.red    { color: var(--red); }
+  .hist-stat-val.blue   { color: var(--sky); }
+  .hist-stat-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ash); margin-top: 0.2rem; }
+
+  .card { background: var(--ivory); border: 1px solid var(--mist); border-radius: 12px; overflow: hidden; }
+  .tbl { width: 100%; border-collapse: collapse; }
+  .tbl thead { border-bottom: 1px solid var(--mist); }
+  .tbl thead th {
+    padding: 0.6rem 1rem; text-align: left; font-size: 0.67rem; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--ash); background: var(--cream);
+  }
+  .tbl tbody tr { border-bottom: 1px solid var(--mist); transition: background 0.1s; }
+  .tbl tbody tr:last-child { border-bottom: none; }
+  .tbl tbody tr:hover { background: #f6f5f1; }
+  .tbl td { padding: 0.7rem 1rem; vertical-align: middle; font-size: 0.82rem; }
+
+  .tipo-pill {
+    display: inline-flex; align-items: center; gap: 0.28rem;
+    padding: 0.2rem 0.6rem; border-radius: 99px; font-size: 0.7rem; font-weight: 600;
+  }
+  .tipo-entrada { background: var(--leaf-pale);   color: var(--leaf-dark); }
+  .tipo-salida  { background: var(--amber-pale);  color: var(--amber); }
+  .tipo-ajuste  { background: var(--sky-pale);    color: var(--sky); }
+  .tipo-merma   { background: var(--red-pale);    color: var(--red); }
+
+  .empty-state { padding: 3rem 1rem; text-align: center; color: var(--ash); font-size: 0.82rem; }
+  .empty-state i { font-size: 2.2rem; display: block; margin-bottom: 0.6rem; color: var(--fog); }
+
+  @keyframes fadeInRow { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+  .tbl tbody tr { animation: fadeInRow 0.15s var(--ease) both; }
+</style>
+
+{# ── Cabecera del insumo ── #}
+<div class="hist-header">
+  <div class="hist-avatar">
+    {% if insumo.imagen %}
+    <img src="{{ insumo.imagen.url }}" alt="{{ insumo.nombre }}">
+    {% else %}
+    <i class="bi bi-box2"></i>
+    {% endif %}
+  </div>
+  <div>
+    <div class="hist-name">{{ insumo.nombre }}</div>
+    <div class="hist-meta">
+      {{ insumo.get_categoria_display }} · {{ insumo.get_unidad_display }} ·
+      Stock actual: <strong>{{ insumo.stock|floatformat:"-2" }}</strong>
+    </div>
+  </div>
+  <div class="hist-stats">
+    <div class="hist-stat">
+      <div class="hist-stat-val green">{{ totales.entrada|floatformat:"-2" }}</div>
+      <div class="hist-stat-label">Entradas</div>
+    </div>
+    <div class="hist-stat">
+      <div class="hist-stat-val amber">{{ totales.salida|floatformat:"-2" }}</div>
+      <div class="hist-stat-label">Salidas</div>
+    </div>
+    <div class="hist-stat">
+      <div class="hist-stat-val red">{{ totales.merma|floatformat:"-2" }}</div>
+      <div class="hist-stat-label">Mermas</div>
+    </div>
+    <div class="hist-stat">
+      <div class="hist-stat-val blue">{{ movimientos.count }}</div>
+      <div class="hist-stat-label">Total movs.</div>
+    </div>
+  </div>
+</div>
+
+{# ── Tabla de movimientos ── #}
+<div class="card">
+  {% if movimientos %}
+  <div style="overflow-x:auto;">
+  <table class="tbl">
+    <thead>
+      <tr>
+        <th>Tipo</th>
+        <th>Cantidad</th>
+        <th>Nota / Motivo</th>
+        <th>Fecha</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for m in movimientos %}
+    <tr>
+      <td>
+        <span class="tipo-pill tipo-{{ m.tipo }}">
+          {% if m.tipo == 'entrada' %}<i class="bi bi-box-arrow-in-down"></i>
+          {% elif m.tipo == 'salida' %}<i class="bi bi-box-arrow-up"></i>
+          {% elif m.tipo == 'merma' %}<i class="bi bi-exclamation-triangle-fill"></i>
+          {% else %}<i class="bi bi-sliders"></i>{% endif %}
+          {{ m.get_tipo_display }}
+        </span>
+      </td>
+      <td style="font-weight:600;">
+        {{ m.cantidad|floatformat:"-2" }} <span style="color:var(--ash);font-weight:400;font-size:0.75rem;">{{ insumo.get_unidad_display }}</span>
+      </td>
+      <td style="color:var(--stone);">{{ m.nota|default:"—" }}</td>
+      <td style="color:var(--ash);font-size:0.76rem;white-space:nowrap;">{{ m.fecha|date:"d/m/Y H:i" }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-journal-x"></i>
+    <p>No hay movimientos registrados para este insumo.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

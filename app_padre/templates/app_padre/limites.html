@@ -1,0 +1,227 @@
+{% extends 'app_padre/base_padre.html' %}
+{% load filtros %}
+{% block title %}Límites de Gasto{% endblock %}
+{% block page_title %}Límites de Gasto{% endblock %}
+{% block nav_hijos %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+  .page-layout { display: grid; grid-template-columns: 1fr 360px; gap: 1.4rem; align-items: start; }
+  @media (max-width: 960px) { .page-layout { grid-template-columns: 1fr; } }
+
+  .hijo-chip {
+    display: flex; align-items: center; gap: 0.85rem;
+    background: var(--ink); border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.4rem; color: #fff;
+  }
+  .hijo-chip-ava {
+    width: 2.5rem; height: 2.5rem; border-radius: 50%;
+    background: rgba(34,197,94,0.2); border: 1px solid rgba(34,197,94,0.3);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--serif); font-size: 1rem; color: var(--leaf-bright); flex-shrink: 0;
+  }
+  .hijo-chip-name { font-family: var(--serif); font-size: 1.1rem; }
+  .hijo-chip-meta { font-size: 0.71rem; color: rgba(255,255,255,0.45); margin-top: 0.07rem; }
+  .hijo-chip-saldo { margin-left: auto; text-align: right; }
+  .hijo-chip-saldo-val { font-family: var(--serif); font-size: 1.3rem; color: var(--leaf-bright); }
+  .hijo-chip-saldo-lbl { font-size: 0.62rem; color: rgba(255,255,255,0.4); letter-spacing: 0.06em; }
+
+  .limite-card {
+    background: var(--ivory); border: 1px solid var(--mist); border-radius: 10px;
+    padding: 1.2rem 1.4rem; margin-bottom: 0.85rem; position: relative;
+  }
+  .limite-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.9rem; }
+  .limite-tipo { font-family: var(--serif); font-size: 1.05rem; font-weight: 500; }
+  .limite-monto { font-family: var(--serif); font-size: 1.4rem; color: var(--leaf); }
+  .limite-pct-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.4rem; }
+  .limite-pct-label { font-size: 0.7rem; font-weight: 700; min-width: 3.5rem; }
+  .limite-pct-bar { flex: 1; }
+  .limite-pct-val { font-size: 0.7rem; font-weight: 700; white-space: nowrap; }
+  .limite-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-top: 0.75rem; }
+  .limite-stat { background: var(--cream); border-radius: 7px; padding: 0.6rem 0.75rem; text-align: center; }
+  .limite-stat-label { font-size: 0.58rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ash); margin-bottom: 0.2rem; }
+  .limite-stat-val { font-family: var(--serif); font-size: 1.1rem; }
+  .limite-stat-val.green { color: var(--leaf); }
+  .limite-stat-val.amber { color: var(--amber); }
+  .limite-stat-val.red   { color: var(--red); }
+  .limite-actions { display: flex; gap: 0.4rem; margin-top: 0.75rem; }
+  .limite-inactivo { opacity: 0.55; }
+
+  .tipos-grid { display: grid; grid-template-columns: 1fr; gap: 0.5rem; margin-bottom: 1rem; }
+  .tipo-opt {
+    display: flex; align-items: center; gap: 0.65rem;
+    padding: 0.75rem 1rem; border: 1px solid var(--fog); border-radius: 8px;
+    cursor: pointer; transition: border-color 0.14s, background 0.14s;
+  }
+  .tipo-opt:has(input:checked) { border-color: var(--leaf); background: var(--leaf-pale); }
+  .tipo-opt input { accent-color: var(--leaf); }
+  .tipo-opt-label { font-size: 0.82rem; font-weight: 600; }
+  .tipo-opt-sub { font-size: 0.7rem; color: var(--ash); margin-top: 0.05rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Chip del hijo -->
+<div class="hijo-chip">
+  <div class="hijo-chip-ava">{{ estudiante.perfil.user.first_name|slice:":1"|upper }}</div>
+  <div>
+    <div class="hijo-chip-name">{{ estudiante.perfil.user.get_full_name }}</div>
+    <div class="hijo-chip-meta">Grado {{ estudiante.grado }} · {{ estudiante.codigo }}</div>
+  </div>
+  <div class="hijo-chip-saldo">
+    <div class="hijo-chip-saldo-val">${{ estudiante.saldo|miles }}</div>
+    <div class="hijo-chip-saldo-lbl">saldo</div>
+  </div>
+</div>
+
+<div class="page-layout">
+
+  <!-- Límites actuales -->
+  <div>
+    <h2 style="font-family:var(--serif);font-size:1.25rem;font-weight:500;margin-bottom:1rem;">Límites configurados</h2>
+
+    {% if limites_data %}
+      {% for item in limites_data %}
+      <div class="limite-card {% if not item.limite.activo %}limite-inactivo{% endif %}">
+        <div class="limite-card-head">
+          <div>
+            <div class="limite-tipo">Límite {{ item.limite.get_tipo_display }}</div>
+            <div class="limite-monto">${{ item.limite.monto|miles }}</div>
+          </div>
+          <span class="badge {% if item.limite.activo %}badge-activo{% else %}badge-inactivo{% endif %}">
+            {% if item.limite.activo %}Activo{% else %}Inactivo{% endif %}
+          </span>
+        </div>
+
+        <!-- Barra de progreso -->
+        <div class="limite-pct-row">
+          <div class="limite-pct-label">Uso</div>
+          <div class="limite-pct-bar">
+            <div class="progress-bar">
+              <div class="progress-fill {% if item.pct >= 100 %}red{% elif item.pct >= 80 %}amber{% else %}green{% endif %}"
+                   style="width:{{ item.pct }}%;"></div>
+            </div>
+          </div>
+          <div class="limite-pct-val {% if item.pct >= 100 %}red{% elif item.pct >= 80 %}amber{% else %}green{% endif %}"
+               style="color:{% if item.pct >= 100 %}var(--red){% elif item.pct >= 80 %}var(--amber){% else %}var(--leaf){% endif %};">
+            {{ item.pct }}%
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="limite-stats">
+          <div class="limite-stat">
+            <div class="limite-stat-label">Gastado</div>
+            <div class="limite-stat-val amber">${{ item.gasto|floatformat:0|miles }}</div>
+          </div>
+          <div class="limite-stat">
+            <div class="limite-stat-label">Disponible</div>
+            <div class="limite-stat-val {% if item.disponible == 0 %}red{% else %}green{% endif %}">${{ item.disponible|floatformat:0|miles }}</div>
+          </div>
+          <div class="limite-stat">
+            <div class="limite-stat-label">Límite</div>
+            <div class="limite-stat-val">${{ item.limite.monto|miles }}</div>
+          </div>
+        </div>
+
+        <!-- Acciones -->
+        <div class="limite-actions">
+          <form method="post" style="display:inline;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="toggle">
+            <input type="hidden" name="limite_id" value="{{ item.limite.pk }}">
+            <button type="submit" class="btn btn-ghost btn-xs">
+              <i class="bi bi-{% if item.limite.activo %}pause-circle{% else %}play-circle{% endif %}"></i>
+              {% if item.limite.activo %}Desactivar{% else %}Activar{% endif %}
+            </button>
+          </form>
+          <form method="post" style="display:inline;"
+                onsubmit="return confirm('¿Eliminar este límite?')">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="limite_id" value="{{ item.limite.pk }}">
+            <button type="submit" class="btn btn-danger btn-xs"><i class="bi bi-trash"></i> Eliminar</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="card">
+        <div class="empty-state">
+          <i class="bi bi-speedometer2 es-icon"></i>
+          <p>No hay límites configurados para este estudiante.</p>
+          <p style="margin-top:0.4rem;font-size:0.78rem;">Usa el formulario para crear uno.</p>
+        </div>
+      </div>
+    {% endif %}
+
+    <a href="{% url 'app_padre:hijos' %}" class="btn btn-ghost btn-sm" style="margin-top:0.5rem;">
+      <i class="bi bi-arrow-left"></i> Volver a Mis Hijos
+    </a>
+  </div>
+
+  <!-- Formulario nuevo límite -->
+  <div class="card">
+    <div class="card-head"><span class="card-title">Nuevo límite</span></div>
+    <div class="card-body">
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save">
+
+        <div style="margin-bottom:1rem;">
+          <div class="field">
+            <label>Tipo de límite *</label>
+          </div>
+          <div class="tipos-grid" style="margin-top:0.4rem;">
+            <label class="tipo-opt">
+              <input type="radio" name="tipo" value="diario" required>
+              <div>
+                <div class="tipo-opt-label">Diario</div>
+                <div class="tipo-opt-sub">Reinicia cada día a medianoche</div>
+              </div>
+            </label>
+            <label class="tipo-opt">
+              <input type="radio" name="tipo" value="semanal">
+              <div>
+                <div class="tipo-opt-label">Semanal</div>
+                <div class="tipo-opt-sub">Reinicia cada lunes</div>
+              </div>
+            </label>
+            <label class="tipo-opt">
+              <input type="radio" name="tipo" value="mensual">
+              <div>
+                <div class="tipo-opt-label">Mensual</div>
+                <div class="tipo-opt-sub">Reinicia el 1° de cada mes</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="field" style="margin-bottom:1.1rem;">
+          <label for="monto_limite">Monto máximo ($) *</label>
+          <input type="number" id="monto_limite" name="monto" min="1000" step="500" placeholder="Ej: 15000" required>
+          <span class="hint">El estudiante no podrá gastar más de este monto en el período</span>
+        </div>
+
+        <!-- Sugerencias rápidas -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;margin-bottom:1.1rem;">
+          <button type="button" class="monto-btn" onclick="document.getElementById('monto_limite').value=5000" style="padding:0.5rem;border:1px solid var(--fog);border-radius:7px;background:var(--ivory);cursor:pointer;font-size:0.77rem;font-weight:600;">$5.000</button>
+          <button type="button" class="monto-btn" onclick="document.getElementById('monto_limite').value=10000" style="padding:0.5rem;border:1px solid var(--fog);border-radius:7px;background:var(--ivory);cursor:pointer;font-size:0.77rem;font-weight:600;">$10.000</button>
+          <button type="button" class="monto-btn" onclick="document.getElementById('monto_limite').value=20000" style="padding:0.5rem;border:1px solid var(--fog);border-radius:7px;background:var(--ivory);cursor:pointer;font-size:0.77rem;font-weight:600;">$20.000</button>
+          <button type="button" class="monto-btn" onclick="document.getElementById('monto_limite').value=50000" style="padding:0.5rem;border:1px solid var(--fog);border-radius:7px;background:var(--ivory);cursor:pointer;font-size:0.77rem;font-weight:600;">$50.000</button>
+        </div>
+
+        <div style="background:var(--sky-pale);border:1px solid var(--sky-tint);border-radius:8px;padding:0.7rem 0.85rem;font-size:0.76rem;color:var(--sky);margin-bottom:1.1rem;display:flex;gap:0.4rem;">
+          <i class="bi bi-info-circle-fill" style="flex-shrink:0;"></i>
+          Si ya existe un límite del mismo tipo, será reemplazado.
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-full">
+          <i class="bi bi-speedometer2"></i> Guardar límite
+        </button>
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

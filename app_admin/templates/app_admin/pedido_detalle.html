@@ -4,7 +4,15 @@
 {% block page_title %}{{ pedido.ticket }}{% endblock %}
 {% block nav_pedidos %}active{% endblock %}
 {% block topbar_actions %}
-  <a href="{% url 'app_admin:pedidos' %}" class="btn btn-ghost"><i class="bi bi-arrow-left"></i> Volver a pedidos</a>
+  <a href="{% url 'app_admin:pedidos' %}" class="btn btn-ghost btn-sm"><i class="bi bi-arrow-left"></i> Volver a pedidos</a>
+  {% if pedido.estado == 'entregado' %}
+  <a href="{% url 'app_admin:factura_vista' pedido.pk %}" class="btn btn-ghost btn-sm">
+    <i class="bi bi-receipt"></i> Ver factura
+  </a>
+  <a href="{% url 'app_admin:factura_pdf' pedido.pk %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-file-earmark-pdf"></i> Descargar PDF
+  </a>
+  {% endif %}
 {% endblock %}
 
 {% block content %}

@@ -50,6 +50,7 @@ urlpatterns = [
     path('proveedores/<int:pk>/editar/',        views.proveedor_editar,         name='proveedor_editar'),
     path('proveedores/<int:pk>/compras/',       views.proveedor_compras,        name='proveedor_compras'),
     path('proveedores/<int:pk>/stats/',         views.proveedor_stats,          name='proveedor_stats'),
+    path('proveedores/<int:pk>/eliminar/',     views.proveedor_eliminar,       name='proveedor_eliminar'),
     path('compras/nueva/',                      views.compra_nueva,             name='compra_nueva'),
     path('compras/nueva/<int:prov_pk>/',        views.compra_nueva,             name='compra_nueva_proveedor'),
 
@@ -57,10 +58,14 @@ urlpatterns = [
     path('pedidos/',                            views.pedidos,                  name='pedidos'),
     path('pedidos/<int:pk>/',                   views.pedido_detalle,           name='pedido_detalle'),
     path('pedidos/<int:pk>/estado/',            views.pedido_estado,            name='pedido_estado'),
+    path('pedidos/<int:pk>/factura/',           views.factura_vista,            name='factura_vista'),
+    path('pedidos/<int:pk>/factura/pdf/',       views.factura_pdf,              name='factura_pdf'),
 
     # ── Usuarios ───────────────────────────────────────────────────────────
     path('usuarios/',                           views.usuarios,                 name='usuarios'),
+    path('usuarios/bulk/',                      views.usuario_bulk,             name='usuario_bulk'),
     path('usuarios/<int:pk>/toggle/',           views.usuario_toggle,           name='usuario_toggle'),
+    path('usuarios/<int:pk>/eliminar/',         views.usuario_eliminar,         name='usuario_eliminar'),
     path('usuarios/<int:pk>/',                  views.usuario_detalle,          name='usuario_detalle'),
 
     # ── Estadísticas ───────────────────────────────────────────────────────
@@ -70,8 +75,10 @@ urlpatterns = [
     path('estadisticas/api/productos/',         views.api_productos_top,        name='api_productos_top'),
 
     # ── Exportar ───────────────────────────────────────────────────────────
-    path('inventario/exportar/excel/',          views.exportar_excel,           name='exportar_excel'),
-    path('inventario/exportar/pdf/',            views.exportar_pdf,             name='exportar_pdf'),
+    path('inventario/exportar/excel/',          views.exportar_excel,               name='exportar_excel'),
+    path('inventario/exportar/pdf/',            views.exportar_pdf,                 name='exportar_pdf'),
+    path('ingredientes/exportar/excel/',        views.exportar_ingredientes_excel,  name='exportar_ingredientes_excel'),
+    path('ingredientes/exportar/pdf/',          views.exportar_ingredientes_pdf,    name='exportar_ingredientes_pdf'),
 
     # ── Perfil y Configuración ─────────────────────────────────────────────
     path('perfil/',                             views.perfil,                   name='perfil'),
@@ -79,4 +86,24 @@ urlpatterns = [
 
     # ── Alertas API ────────────────────────────────────────────────────────
     path('api/alertas/',                        views.api_alertas,              name='api_alertas'),
+
+    # ── Recargas (validación de comprobantes) ─────────────────────────────
+    path('recargas/',                           views.recargas,                 name='recargas'),
+    path('recargas/<int:pk>/resolver/',         views.recarga_resolver,         name='recarga_resolver'),
+
+    # ── Insumos ────────────────────────────────────────────────────────────
+    path('insumos/',                            views.insumos,                  name='insumos'),
+    path('insumos/nuevo/',                      views.insumo_nuevo,             name='insumo_nuevo'),
+    path('insumos/<int:pk>/editar/',            views.insumo_editar,            name='insumo_editar'),
+    path('insumos/<int:pk>/ajuste/',            views.insumo_ajuste,            name='insumo_ajuste'),
+    path('insumos/<int:pk>/historial/',         views.insumo_historial,         name='insumo_historial'),
+    path('insumos/<int:pk>/eliminar/',          views.insumo_eliminar,          name='insumo_eliminar'),
+    path('insumos/<int:pk>/toggle/',            views.insumo_toggle,            name='insumo_toggle'),
+    path('insumos/exportar/excel/',             views.exportar_insumos_excel,   name='exportar_insumos_excel'),
+    path('insumos/exportar/pdf/',               views.exportar_insumos_pdf,     name='exportar_insumos_pdf'),
+
+    # ── Acciones masivas ───────────────────────────────────────────────────
+    path('productos/bulk/',                     views.producto_bulk,            name='producto_bulk'),
+    path('ingredientes/bulk/',                  views.ingrediente_bulk,         name='ingrediente_bulk'),
+    path('insumos/bulk/',                       views.insumo_bulk,              name='insumo_bulk'),
 ]
