@@ -1,4 +1,32 @@
-Django
-Pillow
-openpyxl
-reportlab
+# ─── Framework principal ──────────────────────────────────────────────────────
+Django==6.0.3
+
+# ─── Procesamiento de imágenes ────────────────────────────────────────────────
+Pillow==12.1.1
+
+# ─── Exportación de reportes ──────────────────────────────────────────────────
+openpyxl==3.1.5
+reportlab==4.4.10
+
+# ─── Seguridad ────────────────────────────────────────────────────────────────
+django-environ==0.13.0       # Variables de entorno (.env) — SECRET_KEY, DEBUG, DB
+django-axes==8.3.1           # Bloqueo de fuerza bruta en login
+django-csp==4.0              # Content Security Policy (cabeceras HTTP)
+
+# ─── Rendimiento y archivos estáticos ────────────────────────────────────────
+whitenoise==6.12.0           # Servir archivos estáticos en producción sin Nginx
+
+# ─── Auditoría ────────────────────────────────────────────────────────────────
+django-simple-history==3.11.0  # Historial de cambios en modelos (Docente, Estudiante, RecargaSaldo)
+
+# ─── Observabilidad ───────────────────────────────────────────────────────────
+structlog==25.5.0            # Logging estructurado (JSON en producción)
+
+# ─── Formularios ──────────────────────────────────────────────────────────────
+django-widget-tweaks==1.5.0  # Añadir clases CSS a widgets Django en templates
+
+# ─── Desarrollo ───────────────────────────────────────────────────────────────
+django-debug-toolbar==6.3.0  # Panel SQL/queries en desarrollo (solo DEBUG=True)
+
+# ─── Despliegue ───────────────────────────────────────────────────────────────
+gunicorn==25.3.0             # Servidor WSGI de producción

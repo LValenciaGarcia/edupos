@@ -10,314 +10,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-  <style>
-    :root {
-      --ink:         #0f0f0e;
-      --ink-2:       #1c1c1a;
-      --ivory:       #faf9f6;
-      --cream:       #f3f2ee;
-      --mist:        #e8e7e2;
-      --fog:         #d2d1cb;
-      --ash:         #a4a39b;
-      --stone:       #6b6b63;
-
-      --leaf:        #16a34a;
-      --leaf-dark:   #14532d;
-      --leaf-bright: #22c55e;
-      --leaf-pale:   #f0fdf4;
-      --leaf-tint:   #dcfce7;
-
-      --red:         #dc2626;
-      --red-pale:    #fef2f2;
-      --red-tint:    #fee2e2;
-      --amber:       #d97706;
-      --amber-pale:  #fffbeb;
-      --amber-tint:  #fef3c7;
-      --sky:         #0284c7;
-      --sky-pale:    #f0f9ff;
-      --sky-tint:    #e0f2fe;
-      --violet:      #7c3aed;
-      --violet-pale: #f5f3ff;
-      --violet-tint: #ede9fe;
-
-      --serif: 'DM Serif Display', Georgia, serif;
-      --sans:  'Inter', system-ui, sans-serif;
-      --ease:  cubic-bezier(0.16, 1, 0.3, 1);
-
-      --sb-w-open:   15rem;
-      --sb-w-closed: 3.25rem;
-      --sidebar-w:   var(--sb-w-open);
-      --topbar-h:    3.25rem;
-      --radius:      8px;
-    }
-
-    body.sb-closed { --sidebar-w: var(--sb-w-closed); }
-
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      font-family: var(--sans);
-      background: var(--cream);
-      color: var(--ink);
-      display: flex;
-      min-height: 100vh;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    /* ══ SIDEBAR ═════════════════════════════════════════════════════════════ */
-    .sidebar {
-      width: var(--sidebar-w);
-      flex-shrink: 0;
-      background: var(--ink);
-      display: flex; flex-direction: column;
-      position: fixed; top: 0; left: 0;
-      height: 100vh; overflow: visible;
-      z-index: 100;
-      transition: width 0.28s var(--ease);
-    }
-
-    .sb-brand {
-      height: 3.25rem; flex-shrink: 0;
-      display: flex; align-items: center;
-      padding: 0 0.7rem;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-      gap: 0.5rem; overflow: hidden;
-    }
-    .sb-toggle {
-      width: 1.85rem; height: 1.85rem; flex-shrink: 0;
-      background: none; border: none; border-radius: 6px;
-      color: rgba(255,255,255,0.32); cursor: pointer;
-      font-size: 0.9rem;
-      display: flex; align-items: center; justify-content: center;
-      transition: background 0.15s, color 0.15s;
-    }
-    .sb-toggle:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.72); }
-    .sb-wordmark {
-      font-family: var(--serif); font-size: 1.05rem; font-weight: 500;
-      letter-spacing: 0.01em; color: rgba(255,255,255,0.85);
-      white-space: nowrap; opacity: 1;
-      transition: opacity 0.18s var(--ease); overflow: hidden;
-    }
-    body.sb-closed .sb-wordmark { opacity: 0; pointer-events: none; }
-
-    .sb-nav {
-      flex: 1; display: flex; flex-direction: column;
-      padding: 0.65rem 0.5rem; gap: 1px;
-      overflow-y: auto; overflow-x: clip;
-    }
-    .sb-nav::-webkit-scrollbar { width: 2px; }
-    .sb-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.07); border-radius: 99px; }
-
-    .sb-section-label {
-      font-size: 0.57rem; font-weight: 700;
-      letter-spacing: 0.14em; text-transform: uppercase;
-      color: rgba(255,255,255,0.18);
-      padding: 0.65rem 0.75rem 0.2rem;
-      white-space: nowrap; overflow: hidden;
-      max-height: 2.2rem; opacity: 1;
-      transition: opacity 0.15s, max-height 0.25s var(--ease), padding 0.25s var(--ease);
-    }
-    body.sb-closed .sb-section-label { opacity: 0; max-height: 0; padding: 0; }
-
-    .sb-link {
-      display: flex; align-items: center; gap: 0.65rem;
-      padding: 0.48rem 0.65rem; border-radius: 6px;
-      color: rgba(255,255,255,0.42); text-decoration: none;
-      font-size: 0.78rem; font-weight: 500;
-      white-space: nowrap;
-      transition: background 0.14s, color 0.14s;
-      overflow: hidden; position: relative;
-    }
-    .sb-link i { font-size: 0.92rem; flex-shrink: 0; min-width: 1rem; text-align: center; }
-    .sb-link .sb-label { opacity: 1; transition: opacity 0.15s var(--ease); letter-spacing: 0.01em; }
-    body.sb-closed .sb-link .sb-label { opacity: 0; }
-    .sb-link:hover { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.78); }
-    .sb-link.active { color: #fff; background: rgba(255,255,255,0.07); }
-    .sb-link.active::before {
-      content: ''; position: absolute; left: 0; top: 22%; bottom: 22%;
-      width: 2px; background: var(--leaf-bright); border-radius: 0 2px 2px 0;
-    }
-
-    .sb-divider { height: 1px; background: rgba(255,255,255,0.05); margin: 0.35rem 0.5rem; }
-
-    .sb-item { position: relative; }
-    .sb-tip {
-      position: absolute; left: calc(100% + 0.75rem); top: 50%; transform: translateY(-50%);
-      background: var(--ink-2); color: rgba(255,255,255,0.85);
-      font-size: 0.72rem; font-weight: 600; white-space: nowrap;
-      padding: 0.27rem 0.62rem; border-radius: 5px;
-      border: 1px solid rgba(255,255,255,0.08);
-      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-      pointer-events: none; opacity: 0; transition: opacity 0.1s; z-index: 300;
-    }
-    body.sb-closed .sb-item:hover .sb-tip { opacity: 1; }
-
-    /* Saldo chip en sidebar */
-    .sb-saldo-chip {
-      display: inline-flex; align-items: center; gap: 0.28rem;
-      background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.18);
-      border-radius: 99px; padding: 0.08rem 0.5rem;
-      font-size: 0.65rem; font-weight: 700; color: var(--leaf-bright);
-      margin-left: auto; flex-shrink: 0;
-      transition: opacity 0.15s;
-    }
-    body.sb-closed .sb-saldo-chip { opacity: 0; }
-
-    .sb-bottom { border-top: 1px solid rgba(255,255,255,0.05); padding: 0.5rem; flex-shrink: 0; overflow: visible; }
-    .sb-bottom-wrap { position: relative; overflow: visible; }
-    .sb-user-btn {
-      display: flex; align-items: center; gap: 0.65rem;
-      padding: 0.45rem 0.5rem; border-radius: 7px; width: 100%;
-      background: none; border: none; cursor: pointer; transition: background 0.14s;
-    }
-    .sb-user-btn:hover { background: rgba(255,255,255,0.05); }
-    .sb-avatar {
-      width: 1.9rem; height: 1.9rem; border-radius: 50%; flex-shrink: 0;
-      background: rgba(22,163,74,0.18); border: 1px solid rgba(34,197,94,0.22);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 0.7rem; font-weight: 700; color: var(--leaf-bright); overflow: hidden;
-    }
-    .sb-user-info { text-align: left; overflow: hidden; opacity: 1; transition: opacity 0.15s; }
-    body.sb-closed .sb-user-info { opacity: 0; }
-    .sb-uname { font-size: 0.77rem; font-weight: 600; color: rgba(255,255,255,0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.01em; }
-    .sb-urole  { font-size: 0.6rem; color: var(--leaf-bright); font-weight: 500; letter-spacing: 0.04em; }
-
-    .sb-user-dropdown {
-      position: absolute; bottom: calc(100% + 0.5rem); left: 0.5rem;
-      min-width: 13rem; background: var(--ink-2);
-      border: 1px solid rgba(255,255,255,0.08); border-radius: var(--radius);
-      padding: 0.4rem; box-shadow: 0 16px 48px rgba(0,0,0,0.65);
-      opacity: 0; pointer-events: none; transform: translateY(8px);
-      transition: opacity 0.18s var(--ease), transform 0.18s var(--ease); z-index: 300;
-    }
-    .sb-user-dropdown.open { opacity: 1; pointer-events: all; transform: translateY(0); }
-    .sb-drop-info { padding: 0.5rem 0.6rem 0.6rem; border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 0.3rem; }
-    .sb-drop-name { font-size: 0.81rem; font-weight: 700; color: rgba(255,255,255,0.85); letter-spacing: 0.01em; }
-    .sb-drop-role { font-size: 0.63rem; color: var(--leaf-bright); margin-top: 0.07rem; letter-spacing: 0.04em; }
-    .sb-drop-link {
-      display: flex; align-items: center; gap: 0.5rem;
-      padding: 0.38rem 0.6rem; border-radius: 5px;
-      color: rgba(255,255,255,0.52); text-decoration: none;
-      font-size: 0.77rem; font-weight: 500; transition: background 0.12s, color 0.12s; letter-spacing: 0.01em;
-    }
-    .sb-drop-link:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.85); }
-    .sb-drop-link.danger { color: #f87171; }
-    .sb-drop-link.danger:hover { background: rgba(220,38,38,0.12); color: #ef4444; }
-
-    /* ══ MAIN ════════════════════════════════════════════════════════════════ */
-    .main {
-      margin-left: var(--sidebar-w); flex: 1;
-      display: flex; flex-direction: column; min-height: 100vh;
-      transition: margin-left 0.28s var(--ease);
-    }
-    .topbar {
-      height: var(--topbar-h); background: var(--ivory);
-      border-bottom: 1px solid var(--mist);
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0 1.75rem; position: sticky; top: 0; z-index: 50;
-    }
-    .topbar-left { display: flex; align-items: center; gap: 0.4rem; }
-    .topbar-breadcrumb { font-size: 0.71rem; color: var(--ash); }
-    .topbar-sep { color: var(--fog); font-size: 0.68rem; }
-    .topbar-title { font-family: var(--serif); font-size: 1.15rem; font-weight: 500; color: var(--ink); letter-spacing: 0.01em; }
-    .topbar-right { display: flex; align-items: center; gap: 0.5rem; }
-
-    /* Saldo chip en topbar */
-    .saldo-topbar-chip {
-      display: flex; align-items: center; gap: 0.4rem;
-      padding: 0.28rem 0.75rem; border-radius: 7px;
-      background: var(--leaf-pale); border: 1px solid var(--leaf-tint);
-      font-size: 0.76rem; font-weight: 700; color: var(--leaf-dark);
-    }
-    .saldo-topbar-chip i { font-size: 0.78rem; }
-
-    .page-body { padding: 1.75rem; flex: 1; }
-
-    /* ══ MENSAJES ════════════════════════════════════════════════════════════ */
-    .msg-list { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1.25rem; }
-    .msg { display: flex; align-items: center; gap: 0.55rem; padding: 0.65rem 1rem; border-radius: var(--radius); font-size: 0.81rem; font-weight: 500; letter-spacing: 0.01em; }
-    .msg-success { background: var(--leaf-pale); color: var(--leaf-dark); border: 1px solid var(--leaf-tint); }
-    .msg-error   { background: var(--red-pale);  color: var(--red);       border: 1px solid var(--red-tint); }
-    .msg-warning { background: var(--amber-pale); color: var(--amber);    border: 1px solid var(--amber-tint); }
-    .msg-info    { background: var(--sky-pale);   color: var(--sky);      border: 1px solid var(--sky-tint); }
-
-    /* ══ CARDS ═══════════════════════════════════════════════════════════════ */
-    .card { background: var(--ivory); border: 1px solid var(--mist); border-radius: var(--radius); overflow: hidden; }
-    .card-head { padding: 1rem 1.5rem; border-bottom: 1px solid var(--mist); display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
-    .card-title { font-family: var(--serif); font-size: 1.05rem; font-weight: 500; letter-spacing: 0.01em; }
-    .card-body  { padding: 1.5rem; }
-
-    /* ══ STAT CARDS ══════════════════════════════════════════════════════════ */
-    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-    .stat-card { background: var(--ivory); border: 1px solid var(--mist); border-radius: var(--radius); padding: 1.3rem 1.5rem; }
-    .stat-label { font-size: 0.63rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ash); margin-bottom: 0.65rem; }
-    .stat-val { font-family: var(--serif); font-size: 2.25rem; font-weight: 300; line-height: 1; letter-spacing: -0.01em; }
-    .stat-sub { font-size: 0.71rem; color: var(--ash); margin-top: 0.38rem; }
-    .stat-card.green .stat-val { color: var(--leaf); }
-    .stat-card.amber .stat-val { color: var(--amber); }
-    .stat-card.red   .stat-val { color: var(--red); }
-    .stat-card.blue  .stat-val { color: var(--sky); }
-
-    /* ══ TABLA ═══════════════════════════════════════════════════════════════ */
-    .tbl { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-    .tbl th { background: var(--cream); padding: 0.7rem 1.2rem; text-align: left; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--stone); border-bottom: 1px solid var(--mist); white-space: nowrap; }
-    .tbl td { padding: 0.85rem 1.2rem; border-top: 1px solid var(--mist); vertical-align: middle; color: var(--ink); }
-    .tbl tr:hover td { background: var(--cream); }
-
-    /* ══ BADGES ══════════════════════════════════════════════════════════════ */
-    .badge { display: inline-block; padding: 0.17rem 0.52rem; border-radius: 99px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.03em; white-space: nowrap; }
-    .badge-pendiente  { background: var(--amber-pale);  color: var(--amber); }
-    .badge-preparando { background: var(--sky-pale);    color: var(--sky); }
-    .badge-listo      { background: var(--leaf-pale);   color: var(--leaf-dark); }
-    .badge-entregado  { background: var(--mist);        color: var(--stone); }
-    .badge-cancelado  { background: var(--red-pale);    color: var(--red); }
-
-    /* ══ BOTONES ═════════════════════════════════════════════════════════════ */
-    .btn { display: inline-flex; align-items: center; gap: 0.38rem; padding: 0.47rem 1rem; border-radius: 7px; font-family: var(--sans); font-size: 0.79rem; font-weight: 600; cursor: pointer; text-decoration: none; border: none; transition: all 0.15s var(--ease); white-space: nowrap; letter-spacing: 0.01em; }
-    .btn-primary { background: var(--leaf); color: #fff; }
-    .btn-primary:hover { background: var(--leaf-dark); }
-    .btn-ghost { background: transparent; color: var(--stone); border: 1px solid var(--fog); }
-    .btn-ghost:hover { background: var(--cream); color: var(--ink); border-color: var(--ash); }
-    .btn-danger { background: var(--red-pale); color: var(--red); border: 1px solid var(--red-tint); }
-    .btn-danger:hover { background: var(--red); color: #fff; }
-    .btn-amber { background: var(--amber-pale); color: var(--amber); border: 1px solid var(--amber-tint); }
-    .btn-amber:hover { background: var(--amber); color: #fff; }
-    .btn-sm { padding: 0.31rem 0.7rem; font-size: 0.74rem; }
-    .btn-xs { padding: 0.19rem 0.5rem; font-size: 0.69rem; border-radius: 5px; }
-    .btn-full { width: 100%; justify-content: center; }
-
-    /* ══ FORMULARIOS ═════════════════════════════════════════════════════════ */
-    .form-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem; }
-    .field { display: flex; flex-direction: column; gap: 0.3rem; }
-    .field.full { grid-column: 1 / -1; }
-    .field label { font-size: 0.67rem; font-weight: 700; color: var(--stone); letter-spacing: 0.07em; text-transform: uppercase; }
-    .field input, .field select, .field textarea { font-family: var(--sans); font-size: 0.86rem; padding: 0.57rem 0.85rem; border: 1px solid var(--fog); border-radius: 7px; background: var(--ivory); color: var(--ink); transition: border-color 0.15s, box-shadow 0.15s; width: 100%; }
-    .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--leaf); box-shadow: 0 0 0 3px rgba(34,197,94,0.1); }
-    .field .hint { font-size: 0.69rem; color: var(--ash); margin-top: 0.2rem; }
-    .form-footer { display: flex; gap: 0.65rem; padding-top: 1.2rem; border-top: 1px solid var(--mist); margin-top: 1.2rem; }
-    .form-page { max-width: 44rem; margin: 0 auto; }
-
-    /* ══ EMPTY STATE ═════════════════════════════════════════════════════════ */
-    .empty-state { padding: 3rem 1rem; text-align: center; color: var(--ash); }
-    .empty-state .es-icon { font-size: 1.9rem; margin-bottom: 0.5rem; opacity: 0.45; display: block; }
-    .empty-state p { font-size: 0.84rem; }
-
-    /* ══ PROGRESO ════════════════════════════════════════════════════════════ */
-    .progress-bar { height: 6px; background: var(--mist); border-radius: 99px; overflow: hidden; }
-    .progress-fill { height: 100%; border-radius: 99px; transition: width 0.5s var(--ease); }
-    .progress-fill.green  { background: var(--leaf); }
-    .progress-fill.amber  { background: var(--amber); }
-    .progress-fill.red    { background: var(--red); }
-
-    /* ══ ANIMACIÓN ═══════════════════════════════════════════════════════════ */
-    @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-    .page-body > * { animation: fadeUp 0.32s var(--ease) both; }
-    .page-body > *:nth-child(1) { animation-delay: 0.03s; }
-    .page-body > *:nth-child(2) { animation-delay: 0.07s; }
-    .page-body > *:nth-child(3) { animation-delay: 0.11s; }
-    .page-body > *:nth-child(4) { animation-delay: 0.15s; }
-    .page-body > *:nth-child(5) { animation-delay: 0.19s; }
-  </style>
+  <link rel="stylesheet" href="{% static 'css/base.css' %}">
+  <link rel="stylesheet" href="{% static 'css/estudiante.css' %}">
   {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -332,7 +26,6 @@
   </div>
 
   <nav class="sb-nav">
-    <!-- INICIO -->
     <div class="sb-item">
       <a href="{% url 'app_estudiante:dashboard' %}" class="sb-link {% block nav_dashboard %}{% endblock %}">
         <i class="bi bi-grid-1x2"></i><span class="sb-label">Inicio</span>
@@ -412,7 +105,7 @@
         </div>
         <a href="{% url 'app_estudiante:perfil' %}" class="sb-drop-link"><i class="bi bi-person"></i> Mi perfil</a>
         <a href="{% url 'authentication:logout' %}" class="sb-drop-link danger">
-          <i class="bi bi-box-arrow-right"></i> Cerrar sesion
+          <i class="bi bi-box-arrow-right"></i> Cerrar sesión
         </a>
       </div>
     </div>
@@ -453,28 +146,28 @@
 </div>
 
 <script>
-  const SBKEY = 'est_sb_closed';
+const SBKEY = 'est_sb_closed';
 
-  function toggleSidebar() {
-    document.body.classList.toggle('sb-closed');
-    localStorage.setItem(SBKEY, document.body.classList.contains('sb-closed') ? '1' : '0');
-  }
+function applySidebarState() {
+  const closed = localStorage.getItem(SBKEY) === '1';
+  document.body.classList.toggle('sb-closed', closed);
+  const icon = document.getElementById('sb-toggle-icon');
+  if (icon) icon.className = closed ? 'bi bi-layout-sidebar' : 'bi bi-layout-sidebar-reverse';
+}
+function toggleSidebar() {
+  const closed = document.body.classList.toggle('sb-closed');
+  localStorage.setItem(SBKEY, closed ? '1' : '0');
+  const icon = document.getElementById('sb-toggle-icon');
+  if (icon) icon.className = closed ? 'bi bi-layout-sidebar' : 'bi bi-layout-sidebar-reverse';
+}
+applySidebarState();
 
-  function toggleUserDrop() {
-    document.getElementById('userDrop').classList.toggle('open');
-  }
-
-  document.addEventListener('click', function(e) {
-    const btn  = document.getElementById('userBtn');
-    const drop = document.getElementById('userDrop');
-    if (drop && btn && !btn.contains(e.target) && !drop.contains(e.target)) {
-      drop.classList.remove('open');
-    }
-  });
-
-  if (localStorage.getItem(SBKEY) === '1') {
-    document.body.classList.add('sb-closed');
-  }
+function toggleUserDrop() { document.getElementById('userDrop').classList.toggle('open'); }
+document.addEventListener('click', function(e) {
+  const btn  = document.getElementById('userBtn');
+  const drop = document.getElementById('userDrop');
+  if (drop && btn && !btn.contains(e.target) && !drop.contains(e.target)) drop.classList.remove('open');
+});
 </script>
 {% block extra_js %}{% endblock %}
 </body>

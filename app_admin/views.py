@@ -1717,18 +1717,22 @@ def usuarios(request):
             Q(user__email__icontains=q)
         )
 
-    todos   = Perfil.objects.select_related('user')
+    conteos = {
+        r['rol']: r['n']
+        for r in Perfil.objects.values('rol').annotate(n=Count('id'))
+    }
+    activos = Perfil.objects.filter(activo=True).count()
     return render(request, 'app_admin/usuarios.html', _ctx({
-        'perfiles':          perfiles,
-        'rol_f':             rol_f,
-        'estado_f':          estado_f,
-        'q':                 q,
-        'roles':             Perfil.ROL_CHOICES,
-        'perfiles_activos':  todos.filter(activo=True).count(),
-        'perfiles_inactivos':todos.filter(activo=False).count(),
-        'perfiles_admin':    todos.filter(rol='admin').count(),
-        'perfiles_padre':    todos.filter(rol='padre').count(),
-        'perfiles_estudiante':todos.filter(rol='estudiante').count(),
+        'perfiles':            perfiles,
+        'rol_f':               rol_f,
+        'estado_f':            estado_f,
+        'q':                   q,
+        'roles':               Perfil.ROL_CHOICES,
+        'perfiles_activos':    activos,
+        'perfiles_inactivos':  Perfil.objects.count() - activos,
+        'perfiles_admin':      conteos.get('admin', 0),
+        'perfiles_padre':      conteos.get('padre', 0),
+        'perfiles_estudiante': conteos.get('estudiante', 0),
     }))
 
 
@@ -1749,7 +1753,9 @@ def usuario_detalle(request, pk):
     if perfil.rol == 'estudiante':
         try:
             context['estudiante'] = perfil.estudiante
-            context['pedidos']    = perfil.estudiante.pedidos.order_by('-fecha_pedido')[:10]
+            context['pedidos']    = perfil.estudiante.pedidos.prefetch_related(
+                'detalles__producto'
+            ).order_by('-fecha_pedido')[:10]
         except: pass
     elif perfil.rol == 'padre':
         try:
@@ -1818,12 +1824,9 @@ def estadisticas(request):
     # Filtrar solo pedidos entregados para ingresos reales
     pedidos = Pedido.objects.filter(fecha_pedido__date__gte=desde, estado='entregado')
 
-    # Asegurar que se calcula con los valores completos del pedido
-    ingresos_agg = pedidos.aggregate(t=Sum('total'))['t']
-    costos_agg = pedidos.aggregate(t=Sum('costo_total'))['t']
-
-    ingresos = float(ingresos_agg) if ingresos_agg else 0
-    costos   = float(costos_agg) if costos_agg else 0
+    agg      = pedidos.aggregate(t=Sum('total'), c=Sum('costo_total'))
+    ingresos = float(agg['t'] or 0)
+    costos   = float(agg['c'] or 0)
     ganancia  = ingresos - costos
     margen    = round((ganancia / ingresos) * 100, 1) if ingresos > 0 else 0
     n_pedidos = pedidos.count()
@@ -1850,6 +1853,9 @@ def estadisticas(request):
 
 @admin_required
 def api_ventas(request):
+    from django.core.cache import cache
+    from django.db.models.functions import TruncDate
+
     try:
         dias = int(request.GET.get('dias', 7))
         if dias < 1 or dias > 365:
@@ -1857,51 +1863,75 @@ def api_ventas(request):
     except (ValueError, TypeError):
         dias = 7
 
-    hoy   = date.today()
-    labels, ingresos_data, ganancia_data = [], [], []
-    for i in range(dias - 1, -1, -1):
-        d   = hoy - timedelta(days=i)
-        ped = Pedido.objects.filter(fecha_pedido__date=d, estado='entregado')
-
-        # Agregar con un solo query
-        agg = ped.aggregate(ingresos=Sum('total'), costos=Sum('costo_total'))
-        ing = float(agg['ingresos'] or 0)
-        cos = float(agg['costos'] or 0)
-
-        labels.append(d.strftime('%d/%m'))
-        ingresos_data.append(ing)
-        ganancia_data.append(round(ing - cos, 2))
-    return JsonResponse({'labels': labels, 'ingresos': ingresos_data, 'ganancia': ganancia_data})
+    cache_key = f'api_ventas_{date.today().isoformat()}_{dias}'
+    resultado = cache.get(cache_key)
+    if resultado is None:
+        hoy   = date.today()
+        desde = hoy - timedelta(days=dias - 1)
+        rows  = {
+            row['dia']: row
+            for row in Pedido.objects.filter(
+                fecha_pedido__date__gte=desde, estado='entregado'
+            ).annotate(dia=TruncDate('fecha_pedido')).values('dia').annotate(
+                ingresos=Sum('total'), costos=Sum('costo_total')
+            )
+        }
+        labels, ingresos_data, ganancia_data = [], [], []
+        for i in range(dias - 1, -1, -1):
+            d   = hoy - timedelta(days=i)
+            row = rows.get(d, {})
+            ing = float(row.get('ingresos') or 0)
+            cos = float(row.get('costos') or 0)
+            labels.append(d.strftime('%d/%m'))
+            ingresos_data.append(ing)
+            ganancia_data.append(round(ing - cos, 2))
+        resultado = {'labels': labels, 'ingresos': ingresos_data, 'ganancia': ganancia_data}
+        cache.set(cache_key, resultado, timeout=1800)  # 30 min
+    return JsonResponse(resultado)
 
 
 @admin_required
 def api_categorias(request):
-    dias  = int(request.GET.get('dias', 7))
-    desde = date.today() - timedelta(days=dias)
-    data  = DetallePedido.objects.filter(
-        pedido__fecha_pedido__date__gte=desde, pedido__estado='entregado'
-    ).values(cat=F('producto__categoria__nombre')).annotate(
-        total=Sum(F('cantidad') * F('precio_unitario'))
-    ).order_by('-total')
-    return JsonResponse({
-        'labels': [d['cat'] for d in data],
-        'values': [float(d['total'] or 0) for d in data],
-    })
+    from django.core.cache import cache
+
+    dias      = int(request.GET.get('dias', 7))
+    cache_key = f'api_categorias_{date.today().isoformat()}_{dias}'
+    resultado = cache.get(cache_key)
+    if resultado is None:
+        desde = date.today() - timedelta(days=dias)
+        data  = DetallePedido.objects.filter(
+            pedido__fecha_pedido__date__gte=desde, pedido__estado='entregado'
+        ).values(cat=F('producto__categoria__nombre')).annotate(
+            total=Sum(F('cantidad') * F('precio_unitario'))
+        ).order_by('-total')
+        resultado = {
+            'labels': [d['cat'] for d in data],
+            'values': [float(d['total'] or 0) for d in data],
+        }
+        cache.set(cache_key, resultado, timeout=1800)
+    return JsonResponse(resultado)
 
 
 @admin_required
 def api_productos_top(request):
-    dias  = int(request.GET.get('dias', 7))
-    desde = date.today() - timedelta(days=dias)
-    data  = DetallePedido.objects.filter(
-        pedido__fecha_pedido__date__gte=desde, pedido__estado='entregado'
-    ).values(nombre=F('producto__nombre')).annotate(
-        unidades=Sum('cantidad')
-    ).order_by('-unidades')[:8]
-    return JsonResponse({
-        'labels': [d['nombre'] for d in data],
-        'values': [d['unidades'] for d in data],
-    })
+    from django.core.cache import cache
+
+    dias      = int(request.GET.get('dias', 7))
+    cache_key = f'api_productos_top_{date.today().isoformat()}_{dias}'
+    resultado = cache.get(cache_key)
+    if resultado is None:
+        desde = date.today() - timedelta(days=dias)
+        data  = DetallePedido.objects.filter(
+            pedido__fecha_pedido__date__gte=desde, pedido__estado='entregado'
+        ).values(nombre=F('producto__nombre')).annotate(
+            unidades=Sum('cantidad')
+        ).order_by('-unidades')[:8]
+        resultado = {
+            'labels': [d['nombre'] for d in data],
+            'values': [d['unidades'] for d in data],
+        }
+        cache.set(cache_key, resultado, timeout=1800)
+    return JsonResponse(resultado)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

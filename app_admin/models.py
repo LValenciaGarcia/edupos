@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
 from authentication.models import Estudiante
+from authentication.validators import validate_image
 import datetime
 
 
@@ -13,7 +14,7 @@ class Proveedor(models.Model):
     telefono   = models.CharField(max_length=20, blank=True)
     email      = models.EmailField(blank=True)
     direccion  = models.TextField(blank=True)
-    logo       = models.ImageField(upload_to='proveedores/', blank=True, null=True)
+    logo       = models.ImageField(upload_to='proveedores/', blank=True, null=True, validators=[validate_image])
     activo     = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -64,7 +65,7 @@ class Ingrediente(models.Model):
     ]
 
     nombre            = models.CharField(max_length=100)
-    imagen            = models.ImageField(upload_to='ingredientes/', blank=True, null=True)
+    imagen            = models.ImageField(upload_to='ingredientes/', blank=True, null=True, validators=[validate_image])
     unidad            = models.CharField(max_length=10, choices=UNIDAD_CHOICES, default='g')
     precio_unitario   = models.DecimalField(
         max_digits=10, decimal_places=4,
@@ -169,7 +170,7 @@ class Producto(models.Model):
     )
     stock        = models.PositiveIntegerField(default=0)
     stock_minimo = models.PositiveIntegerField(default=5)
-    imagen       = models.ImageField(upload_to='productos/', blank=True, null=True)
+    imagen       = models.ImageField(upload_to='productos/', blank=True, null=True, validators=[validate_image])
     disponible   = models.BooleanField(default=True)
     created_at   = models.DateTimeField(auto_now_add=True)
     updated_at   = models.DateTimeField(auto_now=True)
@@ -427,7 +428,7 @@ class Insumo(models.Model):
     nombre          = models.CharField(max_length=100)
     categoria       = models.CharField(max_length=15, choices=CATEGORIA_CHOICES, default='otro')
     unidad          = models.CharField(max_length=10, choices=UNIDAD_CHOICES, default='und')
-    imagen          = models.ImageField(upload_to='insumos/', blank=True, null=True)
+    imagen          = models.ImageField(upload_to='insumos/', blank=True, null=True, validators=[validate_image])
     descripcion     = models.TextField(blank=True)
     stock           = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     stock_minimo    = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -494,7 +495,7 @@ class PerfilAdmin(models.Model):
     telefono         = models.CharField(max_length=20, blank=True)
     direccion        = models.CharField(max_length=200, blank=True)
     fecha_nacimiento = models.DateField(null=True, blank=True)
-    foto             = models.ImageField(upload_to='perfiles/', blank=True, null=True)
+    foto             = models.ImageField(upload_to='perfiles/', blank=True, null=True, validators=[validate_image])
     cargo            = models.CharField(max_length=100, blank=True, default='Administrador de Cafetería')
 
     def __str__(self):

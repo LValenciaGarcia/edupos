@@ -8,7 +8,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Sum, Count, Avg, Q
+from django.db.models import Sum, Count, Avg, Q, F
 from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -486,8 +486,13 @@ def api_programados(request):
 
 @docente_required
 def historial(request):
+    from django.core.paginator import Paginator
+    from datetime import date as date_type
+
     docente  = _get_docente(request)
-    pedidos  = PedidoDocente.objects.filter(docente=docente).prefetch_related('detalles__producto')
+    pedidos  = PedidoDocente.objects.filter(docente=docente).prefetch_related(
+        'detalles__producto'
+    ).order_by('-fecha_pedido')
 
     estado_f = request.GET.get('estado', '')
     fecha_f  = request.GET.get('fecha', '')
@@ -495,15 +500,18 @@ def historial(request):
         pedidos = pedidos.filter(estado=estado_f)
     if fecha_f:
         try:
-            from datetime import date
-            d = date.fromisoformat(fecha_f)
+            d = date_type.fromisoformat(fecha_f)
             pedidos = pedidos.filter(fecha_pedido__date=d)
         except ValueError:
             pass
 
+    paginator = Paginator(pedidos, 20)
+    page      = paginator.get_page(request.GET.get('pagina', 1))
+
     return render(request, 'app_docente/historial.html', _ctx(docente, {
         'docente':  docente,
-        'pedidos':  pedidos,
+        'page':     page,
+        'pedidos':  page,           # alias para compatibilidad con templates existentes
         'estado_f': estado_f,
         'fecha_f':  fecha_f,
     }))
@@ -533,44 +541,60 @@ def estadisticas(request):
     docente = _get_docente(request)
     ahora = timezone.now()
 
-    # Gasto por mes (últimos 6)
+    from django.db.models.functions import TruncMonth
+    from datetime import timedelta
+
+    hace_6_meses = (ahora - timedelta(days=180)).date()
+
+    # Gasto por mes (últimos 6) — una sola query con TruncMonth
+    rows_mes = {
+        row['mes']: float(row['t'] or 0)
+        for row in PedidoDocente.objects.filter(
+            docente=docente, estado='entregado',
+            fecha_pedido__date__gte=hace_6_meses,
+        ).annotate(mes=TruncMonth('fecha_pedido')).values('mes').annotate(t=Sum('total'))
+    }
     gasto_meses = []
     for i in range(5, -1, -1):
         months_total = ahora.year * 12 + ahora.month - 1 - i
-        mes = ahora.replace(year=months_total // 12, month=months_total % 12 + 1, day=1)
-        total = PedidoDocente.objects.filter(
-            docente=docente, estado='entregado',
-            fecha_pedido__month=mes.month, fecha_pedido__year=mes.year,
-        ).aggregate(t=Sum('total'))['t'] or 0
-        gasto_meses.append({'mes': mes.strftime('%b %Y'), 'total': float(total)})
+        mes_dt = ahora.replace(year=months_total // 12, month=months_total % 12 + 1, day=1)
+        from django.utils.timezone import make_aware
+        import datetime
+        try:
+            mes_key = make_aware(datetime.datetime(mes_dt.year, mes_dt.month, 1))
+        except Exception:
+            mes_key = datetime.datetime(mes_dt.year, mes_dt.month, 1)
+        gasto_meses.append({'mes': mes_dt.strftime('%b %Y'), 'total': rows_mes.get(mes_key, 0)})
 
-    # Top 5 productos
-    top_prods_data = []
-    for t in DetallePedidoDocente.objects.filter(
+    # Top 5 productos — ya era una sola query con annotate, solo limpiar
+    top_prods_data = list(DetallePedidoDocente.objects.filter(
         pedido__docente=docente, pedido__estado='entregado'
     ).values('producto__nombre', 'producto__pk').annotate(
         total_cant=Sum('cantidad')
-    ).order_by('-total_cant')[:5]:
-        top_prods_data.append(t)
+    ).order_by('-total_cant')[:5])
 
-    # Distribución por categoría
-    cat_data = []
-    for cat in Categoria.objects.filter(activa=True):
-        total = PedidoDocente.objects.filter(
-            docente=docente, estado='entregado',
-            detalles__producto__categoria=cat,
-        ).aggregate(t=Sum('detalles__precio_unitario'))['t'] or 0
-        if total:
-            cat_data.append({'nombre': cat.get_nombre_display(), 'total': float(total)})
+    # Distribución por categoría — una sola query con values/annotate
+    cat_data = [
+        {'nombre': row['cat'], 'total': float(row['t'] or 0)}
+        for row in DetallePedidoDocente.objects.filter(
+            pedido__docente=docente, pedido__estado='entregado'
+        ).values(cat=F('producto__categoria__nombre')).annotate(
+            t=Sum(F('cantidad') * F('precio_unitario'))
+        ).order_by('-t')
+        if row['t']
+    ]
 
-    # Resumen fiado
+    # Resumen fiado — una sola query de agregación
+    agg_res = PedidoDocente.objects.filter(docente=docente, estado='entregado').aggregate(
+        total_gastado=Sum('total')
+    )
     resumen = {
-        'saldo':          docente.saldo,
-        'limite_fiado':   docente.limite_fiado,
-        'deuda_fiado':    docente.deuda_fiado,
-        'credito_disp':   docente.credito_disponible,
-        'total_gastado':  PedidoDocente.objects.filter(docente=docente, estado='entregado').aggregate(t=Sum('total'))['t'] or 0,
-        'total_pedidos':  PedidoDocente.objects.filter(docente=docente).count(),
+        'saldo':         docente.saldo,
+        'limite_fiado':  docente.limite_fiado,
+        'deuda_fiado':   docente.deuda_fiado,
+        'credito_disp':  docente.credito_disponible,
+        'total_gastado': agg_res['total_gastado'] or 0,
+        'total_pedidos': PedidoDocente.objects.filter(docente=docente).count(),
     }
 
     return render(request, 'app_docente/estadisticas.html', _ctx(docente, {

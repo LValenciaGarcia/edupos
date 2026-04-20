@@ -1,30 +1,9 @@
-import unicodedata
-import re
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
 from django.contrib import messages
 from .models import Perfil, Padre, Docente
-
-
-# ─── HELPERS ──────────────────────────────────────────────────────────────────
-
-def _normalizar(s):
-    """Quita tildes y caracteres especiales, deja solo a-z0-9."""
-    s = unicodedata.normalize('NFD', s)
-    s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
-    return re.sub(r'[^a-z0-9]', '', s.lower())
-
-
-def generar_username(first_name, last_name):
-    """Genera un username único a partir de nombre y apellido."""
-    base = f"{_normalizar(first_name)}.{_normalizar(last_name)}"
-    username = base
-    counter = 1
-    while User.objects.filter(username=username).exists():
-        username = f"{base}{counter}"
-        counter += 1
-    return username
+from .utils import generar_username
 
 
 # ─── LOGIN ────────────────────────────────────────────────────────────────────

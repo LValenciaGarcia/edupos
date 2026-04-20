@@ -1,7 +1,9 @@
 from django.db import models, transaction
 from django.utils import timezone
 from authentication.models import Estudiante, Padre
+from authentication.validators import validate_image
 from app_admin.models import Producto, Categoria
+from simple_history.models import HistoricalRecords
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -18,12 +20,13 @@ class RecargaSaldo(models.Model):
     estudiante       = models.ForeignKey(Estudiante, on_delete=models.CASCADE, related_name='recargas')
     padre            = models.ForeignKey(Padre, on_delete=models.SET_NULL, null=True, related_name='recargas_realizadas')
     monto            = models.DecimalField(max_digits=10, decimal_places=2)
-    comprobante      = models.ImageField(upload_to='recargas/comprobantes/', blank=True, null=True)
+    comprobante      = models.ImageField(upload_to='recargas/comprobantes/', blank=True, null=True, validators=[validate_image])
     nota             = models.CharField(max_length=300, blank=True)
     estado           = models.CharField(max_length=15, choices=ESTADO_CHOICES, default='pendiente')
     nota_admin       = models.CharField(max_length=300, blank=True, verbose_name='Nota del administrador')
     fecha            = models.DateTimeField(auto_now_add=True)
     fecha_resolucion = models.DateTimeField(null=True, blank=True)
+    history          = HistoricalRecords()
 
     @transaction.atomic
     def aprobar(self):

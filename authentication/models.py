@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from simple_history.models import HistoricalRecords
 
 
 class Perfil(models.Model):
@@ -60,7 +61,8 @@ class Estudiante(models.Model):
     )
     grado    = models.CharField(max_length=10)   # Ej: "8B", "10A"
     codigo   = models.CharField(max_length=20, unique=True)  # Código estudiantil
-    saldo    = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    saldo   = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    history = HistoricalRecords()
 
     def __str__(self):
         return f'{self.perfil} — Grado {self.grado}'
@@ -82,6 +84,7 @@ class Docente(models.Model):
         help_text='Monto máximo que puede pedir sin saldo suficiente'
     )
     deuda_fiado  = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='Deuda de fiado')
+    history      = HistoricalRecords()
 
     @property
     def credito_disponible(self):

@@ -1,124 +1,140 @@
 # Punto Asis — EduPos
-Sistema de gestión para cafetería escolar del Colegio San Francisco de Asís.
+
+Sistema POS Django para cafetería escolar del Colegio San Francisco de Asís, Cali. Proyecto de tesis académica.
 
 ---
 
-## Estructura del proyecto
-
-```
-edupos/
-├── edupos/          → Configuración principal (settings, urls)
-├── core/            → Landing page pública
-├── authentication/  → Login, logout, registro de padres
-├── app_admin/       → Módulo administrador (COMPLETO)
-├── app_estudiante/  → Módulo estudiante (próximamente)
-└── app_padre/       → Módulo padre (próximamente)
-```
-
----
-
-## Instalación paso a paso
-
-### 1. Crear entorno virtual e instalar dependencias
+## 🚀 Quick Start
 
 ```bash
-python -m venv venv
-venv\Scripts\activate        # Windows
-# source venv/bin/activate   # Mac/Linux
-
+# Instalar dependencias
 pip install -r requirements.txt
-```
 
-### 2. Migraciones
-
-```bash
-python manage.py makemigrations authentication
-python manage.py makemigrations app_admin
+# Migraciones
 python manage.py migrate
-```
-
-### 3. Crear usuario administrador
-
-```bash
-python manage.py shell
-```
-
-Dentro del shell:
-
-```python
-from django.contrib.auth.models import User
-from authentication.models import Perfil
-from app_admin.models import Categoria
 
 # Crear usuario admin
-u = User.objects.create_superuser('admin', 'admin@puntoasis.com', 'admin1234')
-u.first_name = 'Administrador'
-u.last_name  = 'Punto Asis'
-u.save()
-Perfil.objects.create(user=u, rol='admin')
+python manage.py createsuperuser
 
-# Crear categorías base
-Categoria.objects.create(nombre='desayuno', icono='🥐')
-Categoria.objects.create(nombre='almuerzo', icono='🍽️')
-Categoria.objects.create(nombre='snacks',   icono='🍿')
-Categoria.objects.create(nombre='bebidas',  icono='🥤')
-
-print("✅ Todo listo")
-exit()
-```
-
-### 4. Correr el servidor
-
-```bash
+# Ejecutar servidor
 python manage.py runserver
 ```
 
-### 5. Acceder
-
-| URL | Descripción |
-|-----|-------------|
-| `http://127.0.0.1:8000/` | Landing page |
-| `http://127.0.0.1:8000/login/` | Login |
-| `http://127.0.0.1:8000/admin-panel/` | Panel administrador |
-| `http://127.0.0.1:8000/registro/padre/` | Registro padres |
-
-Credenciales por defecto: **admin / admin1234**
+Acceso: `http://127.0.0.1:8000`
 
 ---
 
-## Módulo Admin — Funcionalidades
+## 📁 Estructura del Proyecto
+
+```
+edupos/
+├── authentication/      → Login, registro, modelo Perfil (rol-based)
+├── core/               → Landing page pública
+├── app_admin/          → Panel administrador (COMPLETO)
+├── app_docente/        → Módulo docente (EN PROGRESO)
+├── app_estudiante/     → Módulo estudiante (EN PROGRESO)
+└── app_padre/          → Módulo padre (EN PROGRESO)
+```
+
+---
+
+## 👥 Sistema de Roles
+
+Cada usuario tiene un `Perfil` con un rol: `admin`, `docente`, `estudiante`, `padre`.
+
+- **Estudiante:** Cuenta creada por su padre (no self-registered). Saldo de recargas.
+- **Padre:** Crea estudiantes, recarga saldo, ve pedidos del hijo.
+- **Docente:** Acceso a crédito (fiado) con `limite_fiado` y `deuda_fiado`.
+- **Admin:** Panel de administración completo.
+
+---
+
+## 📋 Aplicaciones y URLs
+
+| App | Prefijo | Estado |
+|-----|---------|--------|
+| `core` | `/` | Completo |
+| `authentication` | `/login/`, `/registro/` | En progreso |
+| `app_admin` | `/admin-panel/` | En progreso |
+| `app_docente` | `/docente/` | En progreso |
+| `app_estudiante` | `/estudiante/` | En progreso |
+| `app_padre` | `/padre/` | En progreso |
+| Django Admin | `/django-admin/` | Admin only |
+
+---
+
+## ⚙️ Módulo Admin — Funcionalidades
 
 - **Dashboard** → KPIs del día, gráfica de ventas, alertas de stock
-- **Productos** → Grid estilo tienda, CRUD completo, productos simples y elaborados con receta
-- **Inventario** → Control de stock, ajustes, historial, proyección de agotamiento
-- **Ingredientes** → Materia prima para productos elaborados, stock propio
-- **Pedidos** → Vista Kanban por estado, tickets `#PA-2025-XXXXX`, cambio de estado
+- **Productos** → CRUD completo, productos simples y elaborados con receta
+- **Inventario** → Control de stock, ajustes, historial, proyección
+- **Ingredientes** → Materia prima para productos elaborados
+- **Pedidos** → Vista Kanban, tickets `#PA-XXXXX`, cambio de estado
 - **Proveedores** → CRUD, historial de compras, actualización automática de stock
-- **Usuarios** → Lista por rol, activar/desactivar cuentas, detalle por usuario
-- **Estadísticas** → Gráficas de ventas, ganancia neta, margen, top productos, ventas por categoría
+- **Usuarios** → Lista por rol, activar/desactivar, detalles
+- **Estadísticas** → Gráficas de ventas, ganancia neta, margen, top productos
 
 ---
 
-## Próximos módulos
+## 🎨 Convenciones de Diseño
 
-- `app_estudiante` → Ver menú, hacer pedidos, ver historial y saldo
-- `app_padre` → Ver hijos, recargar saldo, ver pedidos del hijo
+- **Base template:** `app_admin/templates/base_admin.html`
+- **Colores:** Sidebar `#0f0f0e` (oscuro), fondo `#f3f2ee` (crema)
+- **Acentos por rol:** Docente = `#7c3aed` (morado)
+- **Librerías:** Bootstrap Icons, Chart.js, FullCalendar, DM Serif Display + Inter fonts (CDN)
+- **Filtro custom:** `|miles` → formato colombiano (`1.500.000`) en `app_admin/templatetags/filtros.py`
 
----
-
-## Correcciones v2
-
-- **Sidebar** → icon-only minimalista, tooltip al hover, menú de usuario colapsable
-- **Bootstrap Icons** → reemplaza todos los emojis en el módulo admin
-- **Productos** → imagen con `aspect-ratio: 4/3` + `object-fit: cover` (siempre completa)
-- **Botones** → solo icono, sin texto, animación hover
-- **Tooltip Info** → panel flotante con datos completos del producto al hacer hover en (i)
-- **Proveedor** → campos NIT y logo de empresa agregados
-- **Formularios** → centrados con `max-width` + `margin: 0 auto`
-- **Formato miles** → filtro `|miles` con separador de puntos colombiano (`1.500.000`)
-
-### Nuevo comando de migración necesario
-```bash
-python manage.py makemigrations app_admin
-python manage.py migrate
+```django
+{% load filtros %}
+{{ valor|miles }}  {# 1500000 → 1.500.000 #}
 ```
+
+---
+
+## 📂 Media Uploads
+
+Los modelos con campos de imagen/archivo escriben en `media/`:
+
+```
+media/
+├── ingredientes/
+├── perfiles/
+├── productos/
+├── proveedores/
+└── recargas/
+```
+
+---
+
+## 🔑 Archivos Clave
+
+- `edupos/settings.py` → Configuración (SQLite, DEBUG=True)
+- `edupos/urls.py` → Rutas principales
+- `authentication/models.py` → Perfil, Padre, Estudiante, Docente
+- `app_admin/templatetags/filtros.py` → Filtro `|miles`
+- `app_admin/templates/base_admin.html` → Template base (sidebar, diseño)
+
+---
+
+## 📦 Dependencias
+
+Instaladas en `requirements.txt`:
+
+- Django
+- Pillow (procesamiento de imágenes)
+- openpyxl (exportar Excel)
+- reportlab (reportes PDF)
+
+---
+
+## 🚧 Estado Actual (Abril 2026)
+
+- ✅ `core` → Completo
+- ✅ `app_admin` → Completo (+ v2 improvements pendientes)
+- 🔄 `authentication` → En progreso (forms, validators)
+- 🔄 `app_docente` → En progreso (models, views, forms)
+- 🔄 `app_estudiante` → En progreso
+- 🔄 `app_padre` → En progreso
+
+---
+

@@ -1,8 +1,6 @@
 import json
 import csv
 import io
-import unicodedata
-import re
 from decimal import Decimal
 from collections import defaultdict
 
@@ -17,6 +15,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from authentication.models import Perfil, Padre, Estudiante
+from authentication.utils import generar_username as _generar_username
 from app_admin.models import Producto, Categoria, Pedido, DetallePedido
 from .models import (
     RecargaSaldo, LimiteGasto, RestriccionAlimento,
@@ -47,20 +46,6 @@ def padre_required(view_func):
 def _get_padre(request):
     return get_object_or_404(Padre, perfil=request.user.perfil)
 
-
-def _generar_username(first_name, last_name):
-    """Genera un username único a partir de nombre y apellido."""
-    def _norm(s):
-        s = unicodedata.normalize('NFD', s)
-        s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
-        return re.sub(r'[^a-z0-9]', '', s.lower())
-    base = f"{_norm(first_name)}.{_norm(last_name)}"
-    username = base
-    counter = 1
-    while User.objects.filter(username=username).exists():
-        username = f"{base}{counter}"
-        counter += 1
-    return username
 
 
 def _n_notif(padre):
@@ -363,19 +348,25 @@ def historial(request):
     if fecha_h:
         pedidos = pedidos.filter(fecha_pedido__date__lte=fecha_h)
 
+    from django.core.paginator import Paginator
+
     gasto_total = pedidos.filter(estado='entregado').aggregate(t=Sum('total'))['t'] or 0
     n_pedidos   = pedidos.count()
 
+    paginator = Paginator(pedidos, 20)
+    page      = paginator.get_page(request.GET.get('pagina', 1))
+
     return render(request, 'app_padre/historial.html', _ctx_padre(padre, {
-        'padre': padre,
-        'pedidos': pedidos[:80],
-        'hijos': hijos_qs,
-        'hijo_activo': hijo_pk,
+        'padre':         padre,
+        'page':          page,
+        'pedidos':       page,   # alias para compatibilidad con templates existentes
+        'hijos':         hijos_qs,
+        'hijo_activo':   hijo_pk,
         'estado_activo': estado,
-        'fecha_desde': fecha_d,
-        'fecha_hasta': fecha_h,
-        'gasto_total': gasto_total,
-        'n_pedidos': n_pedidos,
+        'fecha_desde':   fecha_d,
+        'fecha_hasta':   fecha_h,
+        'gasto_total':   gasto_total,
+        'n_pedidos':     n_pedidos,
         'ESTADO_CHOICES': Pedido.ESTADO_CHOICES,
     }))
 
