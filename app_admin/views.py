@@ -15,7 +15,7 @@ from .models import (
     Pedido, DetallePedido,
     MovimientoInventario, MovimientoIngrediente,
     Insumo, MovimientoInsumo,
-    PerfilAdmin,
+    PerfilAdmin, Alergeno,
 )
 
 
@@ -366,6 +366,9 @@ def inventario(request):
     ings = Ingrediente.objects.select_related('proveedor').filter(activo=True)
     if q: ings = ings.filter(Q(nombre__icontains=q) | Q(proveedor__nombre__icontains=q))
 
+    insumos_qs = Insumo.objects.select_related('proveedor').filter(activo=True)
+    if q: insumos_qs = insumos_qs.filter(Q(nombre__icontains=q) | Q(proveedor__nombre__icontains=q))
+
     movimientos = MovimientoInventario.objects.select_related(
         'producto', 'compra__proveedor'
     ).order_by('-fecha')[:30]
@@ -377,6 +380,7 @@ def inventario(request):
     return render(request, 'app_admin/inventario.html', _ctx({
         'productos':        qs,
         'ingredientes':     ings,
+        'insumos':          insumos_qs,
         'movimientos':      movimientos,
         'movimientos_ings': movimientos_ings,
         'categorias':       Categoria.objects.filter(activa=True),
@@ -618,7 +622,7 @@ def ingrediente_eliminar(request, pk):
 
 @admin_required
 def ingredientes(request):
-    qs  = Ingrediente.objects.select_related('proveedor').filter(activo=True)
+    qs  = Ingrediente.objects.select_related('proveedor').prefetch_related('alergenos').filter(activo=True)
     q   = request.GET.get('q', '').strip()
     if q: qs = qs.filter(Q(nombre__icontains=q) | Q(proveedor__nombre__icontains=q))
 
@@ -626,12 +630,12 @@ def ingredientes(request):
         'ingrediente', 'compra__proveedor'
     ).order_by('-fecha')[:50]
 
-    # KPI counts — evaluated once from the full (unfiltered) queryset
     todos = Ingrediente.objects.filter(activo=True)
     kpi = {
-        'sin_stock':     sum(1 for i in todos if i.sin_stock),
-        'stock_bajo':    sum(1 for i in todos if i.stock_bajo and not i.sin_stock),
-        'con_proveedor': todos.filter(proveedor__isnull=False).count(),
+        'sin_stock':      sum(1 for i in todos if i.sin_stock),
+        'stock_bajo':     sum(1 for i in todos if i.stock_bajo and not i.sin_stock),
+        'con_proveedor':  todos.filter(proveedor__isnull=False).count(),
+        'sobrestock':     sum(1 for i in todos if i.stock_sobrepasado),
     }
 
     return render(request, 'app_admin/ingredientes.html', _ctx({
@@ -644,52 +648,67 @@ def ingredientes(request):
 
 @admin_required
 def ingrediente_nuevo(request):
-    proveedores = Proveedor.objects.filter(activo=True)
+    proveedores    = Proveedor.objects.filter(activo=True)
+    alergenos_todos = Alergeno.objects.all()
     if request.method == 'POST':
-        nombre    = request.POST.get('nombre', '').strip()
-        unidad    = request.POST.get('unidad')
-        precio    = request.POST.get('precio_unitario')
-        stock     = request.POST.get('stock', 0)
-        stock_min = request.POST.get('stock_minimo', 0)
-        prov_id   = request.POST.get('proveedor') or None
-        f_venc    = request.POST.get('fecha_vencimiento') or None
-        imagen    = request.FILES.get('imagen')
+        nombre       = request.POST.get('nombre', '').strip()
+        unidad       = request.POST.get('unidad')
+        precio       = request.POST.get('precio_unitario')
+        stock        = request.POST.get('stock', 0)
+        stock_min    = request.POST.get('stock_minimo', 0)
+        stock_max    = request.POST.get('stock_maximo') or None
+        merma        = request.POST.get('porcentaje_merma', 0)
+        prov_id      = request.POST.get('proveedor') or None
+        f_venc       = request.POST.get('fecha_vencimiento') or None
+        imagen       = request.FILES.get('imagen')
+        alerg_ids    = request.POST.getlist('alergenos')
 
         if not nombre or not precio:
             messages.error(request, 'Nombre y precio son obligatorios.')
         else:
-            Ingrediente.objects.create(
+            ing = Ingrediente.objects.create(
                 nombre=nombre, unidad=unidad, precio_unitario=precio,
-                stock=stock, stock_minimo=stock_min, proveedor_id=prov_id,
+                stock=stock, stock_minimo=stock_min, stock_maximo=stock_max,
+                porcentaje_merma=merma, proveedor_id=prov_id,
                 fecha_vencimiento=f_venc, imagen=imagen,
             )
+            if alerg_ids:
+                ing.alergenos.set(alerg_ids)
             messages.success(request, f'Ingrediente "{nombre}" creado.')
             return redirect('app_admin:ingredientes')
 
     return render(request, 'app_admin/ingrediente_form.html', _ctx({
-        'proveedores': proveedores, 'accion': 'Nuevo ingrediente',
+        'proveedores': proveedores, 'alergenos_todos': alergenos_todos,
+        'accion': 'Nuevo ingrediente',
     }))
 
 
 @admin_required
 def ingrediente_editar(request, pk):
-    ing         = get_object_or_404(Ingrediente, pk=pk)
-    proveedores = Proveedor.objects.filter(activo=True)
+    ing            = get_object_or_404(Ingrediente, pk=pk)
+    proveedores    = Proveedor.objects.filter(activo=True)
+    alergenos_todos = Alergeno.objects.all()
     if request.method == 'POST':
-        ing.nombre          = request.POST.get('nombre', ing.nombre).strip()
-        ing.unidad          = request.POST.get('unidad', ing.unidad)
-        ing.precio_unitario = request.POST.get('precio_unitario', ing.precio_unitario)
-        ing.stock_minimo    = request.POST.get('stock_minimo', ing.stock_minimo)
-        ing.proveedor_id    = request.POST.get('proveedor') or None
+        ing.nombre            = request.POST.get('nombre', ing.nombre).strip()
+        ing.unidad            = request.POST.get('unidad', ing.unidad)
+        ing.precio_unitario   = request.POST.get('precio_unitario', ing.precio_unitario)
+        ing.stock_minimo      = request.POST.get('stock_minimo', ing.stock_minimo)
+        ing.stock_maximo      = request.POST.get('stock_maximo') or None
+        ing.porcentaje_merma  = request.POST.get('porcentaje_merma', 0)
+        ing.proveedor_id      = request.POST.get('proveedor') or None
         ing.fecha_vencimiento = request.POST.get('fecha_vencimiento') or None
         if request.FILES.get('imagen'):
             ing.imagen = request.FILES['imagen']
         ing.save()
+        ing.alergenos.set(request.POST.getlist('alergenos'))
         messages.success(request, f'Ingrediente "{ing.nombre}" actualizado.')
         return redirect('app_admin:ingredientes')
 
     return render(request, 'app_admin/ingrediente_form.html', _ctx({
-        'ingrediente': ing, 'proveedores': proveedores, 'accion': 'Editar ingrediente',
+        'ingrediente': ing, 'proveedores': proveedores,
+        'alergenos_todos': alergenos_todos,
+        'alergenos_seleccionados': set(ing.alergenos.values_list('pk', flat=True)),
+        'accion': 'Editar ingrediente',
     }))
 
 
@@ -2496,3 +2515,205 @@ def exportar_insumos_pdf(request):
     return response
 
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EMPLEADOS
+# ══════════════════════════════════════════════════════════════════════════════
+
+import secrets
+import string as _string
+
+
+def _generar_password(length=10):
+    alphabet = _string.ascii_letters + _string.digits
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
+
+
+@admin_required
+def empleados(request):
+    from authentication.models import Empleado, Sede
+
+    qs = Empleado.objects.select_related('perfil__user').prefetch_related('sedes').order_by('perfil__user__last_name')
+
+    q       = request.GET.get('q', '').strip()
+    sede_id = request.GET.get('sede', '')
+
+    if q:
+        qs = qs.filter(
+            Q(perfil__user__first_name__icontains=q) |
+            Q(perfil__user__last_name__icontains=q) |
+            Q(perfil__user__username__icontains=q) |
+            Q(documento__icontains=q)
+        )
+    if sede_id:
+        qs = qs.filter(sedes__pk=sede_id)
+
+    sedes = Sede.objects.filter(activa=True)
+
+    return render(request, 'app_admin/empleados.html', _ctx({
+        'empleados': qs,
+        'sedes':     sedes,
+        'q':         q,
+        'sede_id':   sede_id,
+    }))
+
+
+@admin_required
+def empleado_nuevo(request):
+    from authentication.models import Empleado, Sede, Perfil
+    from authentication.utils import generar_username
+    from django.contrib.auth.models import User
+
+    sedes = Sede.objects.filter(activa=True)
+
+    if request.method == 'POST':
+        first_name = request.POST.get('first_name', '').strip()
+        last_name  = request.POST.get('last_name', '').strip()
+        email      = request.POST.get('email', '').strip()
+        telefono   = request.POST.get('telefono', '').strip()
+        documento  = request.POST.get('documento', '').strip()
+        cargo      = request.POST.get('cargo', 'cajero')
+        es_global  = request.POST.get('es_global') == 'on'
+        sede_ids   = request.POST.getlist('sedes')
+
+        errores = []
+        if not first_name or not last_name:
+            errores.append('Nombre y apellido son obligatorios.')
+        if email and User.objects.filter(email=email).exists():
+            errores.append('Ya existe una cuenta registrada con ese correo.')
+
+        if errores:
+            for e in errores:
+                messages.error(request, e)
+        else:
+            password = _generar_password()
+            username = generar_username(first_name, last_name)
+
+            user = User.objects.create_user(
+                username=username, password=password,
+                first_name=first_name, last_name=last_name, email=email,
+            )
+            perfil   = Perfil.objects.create(user=user, rol='empleado', telefono=telefono)
+            empleado = Empleado.objects.create(
+                perfil=perfil, documento=documento, cargo=cargo, es_global=es_global,
+            )
+            if sede_ids:
+                from authentication.models import Sede as SedeModel
+                empleado.sedes.set(SedeModel.objects.filter(pk__in=sede_ids))
+
+            messages.success(
+                request,
+                f'Empleado creado. Usuario: <strong>{username}</strong> — '
+                f'Contrasena temporal: <strong>{password}</strong>. '
+                f'Comparte estas credenciales de forma segura.'
+            )
+            return redirect('app_admin:empleado_detalle', pk=empleado.pk)
+
+    from authentication.models import Empleado as EmpModel
+    return render(request, 'app_admin/empleado_nuevo.html', _ctx({
+        'sedes':  sedes,
+        'cargos': EmpModel.CARGO_CHOICES,
+    }))
+
+
+@admin_required
+def empleado_detalle(request, pk):
+    from authentication.models import Empleado, Sede
+
+    empleado = get_object_or_404(Empleado, pk=pk)
+    sedes    = Sede.objects.all()
+
+    if request.method == 'POST':
+        accion = request.POST.get('accion', 'editar')
+
+        if accion == 'editar':
+            empleado.documento = request.POST.get('documento', '').strip()
+            empleado.cargo     = request.POST.get('cargo', 'cajero')
+            empleado.es_global = request.POST.get('es_global') == 'on'
+            sede_ids           = request.POST.getlist('sedes')
+            empleado.sedes.set(Sede.objects.filter(pk__in=sede_ids))
+            empleado.save()
+
+            perfil = empleado.perfil
+            perfil.telefono = request.POST.get('telefono', '').strip()
+            perfil.save(update_fields=['telefono'])
+
+            user = perfil.user
+            user.first_name = request.POST.get('first_name', user.first_name).strip()
+            user.last_name  = request.POST.get('last_name', user.last_name).strip()
+            email_nuevo     = request.POST.get('email', '').strip()
+            if email_nuevo:
+                user.email = email_nuevo
+            user.save(update_fields=['first_name', 'last_name', 'email'])
+
+            messages.success(request, 'Empleado actualizado correctamente.')
+
+        elif accion == 'reset_password':
+            nueva = _generar_password()
+            empleado.perfil.user.set_password(nueva)
+            empleado.perfil.user.save()
+            messages.success(
+                request,
+                f'Contrasena restablecida: <strong>{nueva}</strong>. Compartela de forma segura.'
+            )
+
+        return redirect('app_admin:empleado_detalle', pk=pk)
+
+    from app_empleado.models import VentaEmpleado
+    ventas_recientes = VentaEmpleado.objects.filter(empleado=empleado).order_by('-fecha')[:10]
+
+    return render(request, 'app_admin/empleado_detalle.html', _ctx({
+        'empleado':         empleado,
+        'sedes':            sedes,
+        'cargos':           empleado.CARGO_CHOICES,
+        'ventas_recientes': ventas_recientes,
+    }))
+
+
+@admin_required
+def empleado_toggle(request, pk):
+    from authentication.models import Empleado
+
+    empleado = get_object_or_404(Empleado, pk=pk)
+    perfil   = empleado.perfil
+    perfil.activo = not perfil.activo
+    perfil.save(update_fields=['activo'])
+    estado = 'activado' if perfil.activo else 'desactivado'
+    messages.success(request, f'Empleado {estado} correctamente.')
+    return redirect('app_admin:empleados')
+
+
+# ── SEDES ──────────────────────────────────────────────────────────────────────
+
+@admin_required
+def sedes(request):
+    from authentication.models import Sede
+
+    if request.method == 'POST':
+        nombre    = request.POST.get('nombre', '').strip()
+        direccion = request.POST.get('direccion', '').strip()
+        ciudad    = request.POST.get('ciudad', 'Cali').strip()
+
+        if not nombre:
+            messages.error(request, 'El nombre de la sede es obligatorio.')
+        elif Sede.objects.filter(nombre__iexact=nombre).exists():
+            messages.error(request, f'Ya existe una sede con el nombre "{nombre}".')
+        else:
+            Sede.objects.create(nombre=nombre, direccion=direccion, ciudad=ciudad)
+            messages.success(request, f'Sede "{nombre}" creada correctamente.')
+        return redirect('app_admin:sedes')
+
+    qs = Sede.objects.annotate(num_empleados=Count('empleados')).order_by('nombre')
+    return render(request, 'app_admin/sedes.html', _ctx({'sedes': qs}))
+
+
+@admin_required
+def sede_toggle(request, pk):
+    from authentication.models import Sede
+
+    sede = get_object_or_404(Sede, pk=pk)
+    sede.activa = not sede.activa
+    sede.save(update_fields=['activa'])
+    estado = 'activada' if sede.activa else 'desactivada'
+    messages.success(request, f'Sede "{sede.nombre}" {estado}.')
+    return redirect('app_admin:sedes')

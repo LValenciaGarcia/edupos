@@ -4,6 +4,18 @@
 {% block nav_proveedores %}active{% endblock %}
 {% block topbar_actions %}<a href="{% url 'app_admin:proveedores' %}" class="btn btn-ghost"><i class="bi bi-arrow-left"></i> Volver</a>{% endblock %}
 
+{% block extra_css %}
+<style>
+.compra-header { display:grid; grid-template-columns:auto 1fr 1fr 1fr 2rem; gap:0.5rem; margin-bottom:0.5rem; padding:0 0.2rem; }
+.compra-row    { display:grid; grid-template-columns:auto 1fr 1fr 1fr 2rem; gap:0.5rem; margin-bottom:0.5rem; align-items:center; }
+@media (max-width:640px) {
+  .compra-header { display:none; }
+  .compra-row    { grid-template-columns:1fr 1fr; row-gap:0.4rem; }
+  .compra-row > button { grid-column:2; justify-self:end; }
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div style="max-width:56rem;">
 <div class="card">
@@ -35,7 +47,7 @@
       <i class="bi bi-box-seam"></i> Ítems comprados
     </div>
 
-    <div style="display:grid;grid-template-columns:auto 1fr 1fr 1fr 2rem;gap:0.5rem;margin-bottom:0.5rem;padding:0 0.2rem;">
+    <div class="compra-header">
       <span style="font-size:0.68rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;">Tipo</span>
       <span style="font-size:0.68rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;">Producto / Ingrediente</span>
       <span style="font-size:0.68rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;">Cantidad</span>
@@ -45,7 +57,7 @@
 
     <div id="items-container">
       <!-- Fila inicial -->
-      <div class="compra-row" style="display:grid;grid-template-columns:auto 1fr 1fr 1fr 2rem;gap:0.5rem;margin-bottom:0.5rem;align-items:center;">
+      <div class="compra-row">
         <select name="item_tipo" onchange="actualizarSelect(this)" style="font-family:var(--sans);font-size:0.82rem;padding:0.45rem 0.6rem;border:1.5px solid var(--gray-200);border-radius:8px;">
           <option value="producto">Producto</option>
           <option value="ingrediente">Ingrediente</option>
@@ -102,7 +114,7 @@ function agregarFila() {
   const container = document.getElementById('items-container');
   const row = document.createElement('div');
   row.className = 'compra-row';
-  row.style.cssText = 'display:grid;grid-template-columns:auto 1fr 1fr 1fr 2rem;gap:0.5rem;margin-bottom:0.5rem;align-items:center;';
+  row.className = 'compra-row';
   row.innerHTML = `
     <select name="item_tipo" onchange="actualizarSelect(this)" style="font-family:var(--sans);font-size:0.82rem;padding:0.45rem 0.6rem;border:1.5px solid var(--gray-200);border-radius:8px;">
       <option value="producto">Producto</option>

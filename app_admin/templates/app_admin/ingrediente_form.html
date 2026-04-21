@@ -72,11 +72,20 @@
 
       <!-- Stock mínimo -->
       <div class="field">
-        <label>Stock mínimo (alerta)</label>
+        <label>Stock mínimo (alerta baja)</label>
         <input type="number" name="stock_minimo"
                value="{{ ingrediente.stock_minimo|default:'0' }}"
                min="0" step="0.01">
-        <span class="hint">Se generará alerta cuando el stock baje de este valor.</span>
+        <span class="hint">Alerta cuando el stock baje de este valor.</span>
+      </div>
+
+      <!-- Stock máximo -->
+      <div class="field">
+        <label>Stock máximo (alerta sobrestock)</label>
+        <input type="number" name="stock_maximo"
+               value="{{ ingrediente.stock_maximo|default:'' }}"
+               min="0" step="0.01" placeholder="Sin límite">
+        <span class="hint">Opcional. Alerta si el stock supera este valor.</span>
       </div>
 
       <!-- Fecha de vencimiento -->
@@ -85,6 +94,15 @@
         <input type="date" name="fecha_vencimiento"
                value="{{ ingrediente.fecha_vencimiento|date:'Y-m-d'|default:'' }}">
         <span class="hint">Opcional. Se alertará 7 días antes.</span>
+      </div>
+
+      <!-- Merma -->
+      <div class="field">
+        <label>% Merma esperada en preparación</label>
+        <input type="number" name="porcentaje_merma"
+               value="{{ ingrediente.porcentaje_merma|default:'0' }}"
+               min="0" max="99" step="0.01" placeholder="0">
+        <span class="hint">Pérdida típica al cocinar/procesar. Afecta el costo real en recetas.</span>
       </div>
 
       <!-- Proveedor -->
@@ -100,6 +118,26 @@
           {% endfor %}
         </select>
       </div>
+
+      <!-- Alérgenos -->
+      {% if alergenos_todos %}
+      <div class="field full">
+        <label>Alérgenos que contiene</label>
+        <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.3rem;">
+          {% for alerg in alergenos_todos %}
+          <label style="display:flex;align-items:center;gap:0.4rem;padding:0.35rem 0.7rem;border:1px solid var(--fog);border-radius:99px;cursor:pointer;font-size:0.78rem;font-weight:600;transition:all 0.14s;"
+                 id="alerg-label-{{ alerg.pk }}">
+            <input type="checkbox" name="alergenos" value="{{ alerg.pk }}"
+                   {% if alerg.pk in alergenos_seleccionados %}checked{% endif %}
+                   style="accent-color:var(--red);cursor:pointer;"
+                   onchange="toggleAlergLabel(this, {{ alerg.pk }})">
+            {% if alerg.icono %}{{ alerg.icono }} {% endif %}{{ alerg.get_codigo_display }}
+          </label>
+          {% endfor %}
+        </div>
+        <span class="hint">Marca todos los alérgenos presentes en este ingrediente.</span>
+      </div>
+      {% endif %}
 
     </div><!-- /form-grid -->
 
@@ -125,5 +163,23 @@ function previewImg(input) {
     preview.style.display = 'block';
   }
 }
+
+function toggleAlergLabel(input, pk) {
+  const label = document.getElementById('alerg-label-' + pk);
+  if (input.checked) {
+    label.style.borderColor = 'var(--red)';
+    label.style.background  = 'var(--red-pale)';
+    label.style.color       = 'var(--red)';
+  } else {
+    label.style.borderColor = 'var(--fog)';
+    label.style.background  = '';
+    label.style.color       = '';
+  }
+}
+
+// Aplicar estilos iniciales a los ya marcados
+document.querySelectorAll('input[name="alergenos"]:checked').forEach(inp => {
+  toggleAlergLabel(inp, inp.value);
+});
 </script>
 {% endblock %}

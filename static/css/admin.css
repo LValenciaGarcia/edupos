@@ -170,3 +170,30 @@
   border: 1px solid var(--mist); margin-top: 0.5rem;
   display: none; object-fit: cover;
 }
+
+/* ══ MOBILE RESPONSIVE (≤ 640px) ═══════════════════════════════════════════ */
+@media (max-width: 640px) {
+  /* Kanban: columna única */
+  .kanban { grid-template-columns: 1fr; }
+
+  /* Product grid: 2 columnas en móvil (era 3) */
+  .product-grid { grid-template-columns: 1fr 1fr; }
+
+  /* Alert panel */
+  .alert-panel {
+    position: fixed;
+    top: 3.5rem; left: 0.75rem; right: 0.75rem;
+    width: auto;
+  }
+
+  /* Modal full-width en móvil */
+  .modal-box {
+    max-width: calc(100vw - 1.5rem);
+    margin: 0.75rem;
+    max-height: calc(100dvh - 1.5rem);
+  }
+  .modal-body { max-height: 60dvh; }
+
+  /* Receta row: 2 columnas */
+  .receta-row { grid-template-columns: 1fr 6rem 2rem; }
+}

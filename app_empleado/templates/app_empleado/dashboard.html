@@ -1,0 +1,162 @@
+{% extends 'app_empleado/base_empleado.html' %}
+{% load static %}
+
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'app_empleado:caja' %}" class="btn btn-primary btn-sm">
+  <i class="bi bi-cash-register"></i> Abrir Caja
+</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;flex-direction:column;gap:1.25rem;">
+
+  <!-- Bienvenida -->
+  <div class="emp-welcome anim-1">
+    <div>
+      <div class="emp-welcome-name">
+        Hola, {{ request.user.first_name|default:request.user.username }}
+        <span style="font-style:italic;opacity:.7;">—</span>
+      </div>
+      <div class="emp-welcome-sub">
+        {{ empleado.get_cargo_display }}
+        {% if sede %} &mdash; {{ sede.nombre }}{% endif %}
+        {% if empleado.es_global %} &mdash; <span class="emp-accent">Acceso global</span>{% endif %}
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+      <!-- Estado del turno en bienvenida -->
+      {% if turno %}
+        <a href="{% url 'app_empleado:turno' %}" class="dash-turno-pill dash-turno-open">
+          <span class="dash-turno-dot"></span>
+          Turno activo · {{ turno.apertura|time:"H:i" }}
+        </a>
+      {% else %}
+        <a href="{% url 'app_empleado:turno' %}" class="dash-turno-pill dash-turno-closed">
+          <i class="bi bi-clock"></i> Sin turno abierto
+        </a>
+      {% endif %}
+      <div class="emp-welcome-date">
+        <i class="bi bi-calendar3"></i>
+        <script>document.write(new Date().toLocaleDateString('es-CO',{weekday:'long',year:'numeric',month:'long',day:'numeric'}));</script>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stat cards -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:1rem;" class="anim-2">
+
+    <div class="emp-stat">
+      <div class="emp-stat-icon"><i class="bi bi-receipt"></i></div>
+      <div class="emp-stat-label">Ventas hoy</div>
+      <div class="emp-stat-val">{{ num_ventas }}</div>
+      <div class="emp-stat-sub">transacciones</div>
+    </div>
+
+    <div class="emp-stat">
+      <div class="emp-stat-icon"><i class="bi bi-cash-coin"></i></div>
+      <div class="emp-stat-label">Total vendido</div>
+      <div class="emp-stat-val" style="font-size:1.5rem;">${{ total_hoy|floatformat:0 }}</div>
+      <div class="emp-stat-sub">acumulado del día</div>
+    </div>
+
+    <div class="emp-stat">
+      <div class="emp-stat-icon"><i class="bi bi-cash"></i></div>
+      <div class="emp-stat-label">En efectivo</div>
+      <div class="emp-stat-val" style="font-size:1.5rem;">${{ total_efectivo|floatformat:0 }}</div>
+      <div class="emp-stat-sub">cobrado en caja</div>
+    </div>
+
+    <div class="emp-stat emp-stat-turno">
+      <div class="emp-stat-icon"><i class="bi bi-clock-history"></i></div>
+      <div class="emp-stat-label">Turno</div>
+      {% if turno %}
+        <div class="emp-stat-val" style="font-size:1.3rem;color:var(--leaf);">{{ turno.duracion_str }}</div>
+        <div class="emp-stat-sub">desde las {{ turno.apertura|time:"H:i" }}</div>
+      {% else %}
+        <div class="emp-stat-val" style="font-size:1.1rem;color:var(--ash);">Sin turno</div>
+        <div class="emp-stat-sub"><a href="{% url 'app_empleado:turno' %}" style="color:var(--emp);text-decoration:none;font-weight:600;">Abrir turno →</a></div>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <!-- Ventas recientes -->
+  <div class="card anim-3">
+    <div class="card-head" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>Ventas recientes del día</span>
+      <a href="{% url 'app_empleado:ventas' %}" class="btn btn-ghost btn-xs">Ver todas <i class="bi bi-arrow-right"></i></a>
+    </div>
+    {% if ventas_recientes %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Ticket</th>
+            <th>Pago</th>
+            <th>Cliente</th>
+            <th style="text-align:right;">Total</th>
+            <th>Hora</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in ventas_recientes %}
+          <tr {% if v.anulada %}style="opacity:.45;text-decoration:line-through;"{% endif %}>
+            <td style="font-family:var(--serif);font-size:var(--text-sm);font-weight:600;color:var(--emp-dark);">
+              {{ v.ticket }}
+              {% if v.anulada %}<span class="badge" style="background:var(--red-pale);color:var(--red-dark);border:none;font-size:.6rem;margin-left:.25rem;">ANULADA</span>{% endif %}
+            </td>
+            <td>
+              {% if v.tipo_pago == 'efectivo' %}
+                <span class="badge badge-efectivo">Efectivo</span>
+              {% elif v.tipo_pago == 'cuenta_estudiante' %}
+                <span class="badge badge-est">Estudiante</span>
+              {% else %}
+                <span class="badge badge-doc">Docente</span>
+              {% endif %}
+            </td>
+            <td style="font-size:var(--text-sm);color:var(--stone);">
+              {% if v.estudiante %}{{ v.estudiante.perfil.user.get_full_name }}
+              {% elif v.docente %}{{ v.docente.perfil.user.get_full_name }}
+              {% else %}<span style="color:var(--ash);">—</span>{% endif %}
+            </td>
+            <td style="text-align:right;font-weight:700;color:var(--emp-dark);">${{ v.total|floatformat:0 }}</td>
+            <td style="font-size:var(--text-xs);color:var(--ash);">{{ v.fecha|time:"H:i" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="padding:2.5rem;text-align:center;color:var(--ash);">
+      <i class="bi bi-receipt" style="font-size:2.5rem;display:block;margin-bottom:.6rem;color:var(--fog);"></i>
+      No hay ventas registradas hoy.
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Accesos rápidos -->
+  <div class="anim-4" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem;">
+    <a href="{% url 'app_empleado:caja' %}" class="dash-quick-card">
+      <i class="bi bi-cash-register"></i>
+      <span>Caja / POS</span>
+    </a>
+    <a href="{% url 'app_empleado:inventario' %}" class="dash-quick-card">
+      <i class="bi bi-box-seam"></i>
+      <span>Inventario</span>
+    </a>
+    <a href="{% url 'app_empleado:clientes' %}" class="dash-quick-card">
+      <i class="bi bi-people"></i>
+      <span>Clientes</span>
+    </a>
+    <a href="{% url 'app_empleado:turno' %}" class="dash-quick-card">
+      <i class="bi bi-clock-history"></i>
+      <span>Mi Turno</span>
+    </a>
+  </div>
+
+</div>
+{% endblock %}

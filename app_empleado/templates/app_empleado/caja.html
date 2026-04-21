@@ -1,0 +1,495 @@
+{% extends 'app_empleado/base_empleado.html' %}
+{% load static %}
+
+{% block title %}Caja{% endblock %}
+{% block page_title %}Caja / POS{% endblock %}
+{% block nav_caja %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Caja ocupa todo el alto disponible */
+  .page-body { padding: 0.75rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pos-layout" id="posLayout">
+
+  <!-- ══ CATÁLOGO ══ -->
+  <div class="pos-catalog">
+    <div class="pos-cat-header">
+      <i class="bi bi-search" style="color:var(--ash);"></i>
+      <input type="text" class="pos-search" id="posSearch" placeholder="Buscar producto..." oninput="filtrarProductos()">
+    </div>
+
+    <div class="pos-cat-tabs" id="catTabs">
+      <button class="pos-tab active" data-cat="todos" onclick="filtrarCategoria(this,'todos')">Todos</button>
+      {% for cat in categorias %}
+      <button class="pos-tab" data-cat="{{ cat.nombre }}" onclick="filtrarCategoria(this,'{{ cat.nombre }}')">
+        {{ cat.get_nombre_display }}
+      </button>
+      {% endfor %}
+    </div>
+
+    <div class="pos-grid" id="posGrid">
+      {% for p in productos %}
+      <div class="pos-item {% if p.sin_stock %}agotado{% endif %}"
+           data-id="{{ p.pk }}"
+           data-nombre="{{ p.nombre }}"
+           data-precio="{{ p.precio_venta }}"
+           data-cat="{{ p.categoria.nombre }}"
+           data-stock="{{ p.stock }}"
+           data-tipo="{{ p.tipo }}"
+           onclick="agregarAlCarrito({{ p.pk }})"
+           title="{{ p.nombre }}{% if p.sin_stock %} — Agotado{% endif %}">
+        <div class="pos-item-img">
+          {% if p.imagen %}
+            <img src="{{ p.imagen.url }}" alt="{{ p.nombre }}">
+          {% else %}
+            <i class="bi bi-bag" style="font-size:2rem;color:var(--fog);display:flex;align-items:center;justify-content:center;height:90px;width:100%;"></i>
+          {% endif %}
+        </div>
+        <div class="pos-item-badge" id="badge-{{ p.pk }}">0</div>
+        <div class="pos-item-body">
+          <div class="pos-item-name">{{ p.nombre }}</div>
+          <div class="pos-item-price">${{ p.precio_venta|floatformat:0 }}</div>
+          {% if p.tipo == 'simple' %}
+          <div class="pos-item-stock">
+            {% if p.sin_stock %}Agotado{% else %}Stock: {{ p.stock }}{% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ══ CARRITO ══ -->
+  <div class="pos-cart">
+    <div class="pos-cart-header">
+      <span class="pos-cart-title">Carrito</span>
+      <span class="pos-cart-count" id="cartCount">0</span>
+    </div>
+
+    <div class="pos-cart-items" id="cartItems">
+      <div class="pos-cart-empty" id="cartEmpty">
+        <i class="bi bi-cart3"></i>
+        <span>Agrega productos</span>
+      </div>
+    </div>
+
+    <div class="pos-cart-footer">
+      <!-- Total -->
+      <div class="cart-total-row">
+        <span class="cart-total-label">Total</span>
+        <span class="cart-total-val" id="cartTotal">$0</span>
+      </div>
+
+      <!-- Tipo de pago -->
+      <div style="font-size:var(--text-xs);color:var(--stone);font-weight:600;margin-top:.25rem;">Tipo de pago</div>
+      <div class="pago-tabs">
+        <button class="pago-tab active" data-pago="efectivo" onclick="selPago(this,'efectivo')">
+          <i class="bi bi-cash"></i><br>Efectivo
+        </button>
+        <button class="pago-tab" data-pago="cuenta_estudiante" onclick="selPago(this,'cuenta_estudiante')">
+          <i class="bi bi-mortarboard"></i><br>Estudiante
+        </button>
+        <button class="pago-tab" data-pago="cuenta_docente" onclick="selPago(this,'cuenta_docente')">
+          <i class="bi bi-person-badge"></i><br>Docente
+        </button>
+      </div>
+
+      <!-- Búsqueda de cliente -->
+      <div id="clienteWrap" style="display:none;">
+        <div id="clienteSelectedWrap" style="display:none;">
+          <div class="cliente-selected">
+            <div>
+              <div class="cliente-selected-name" id="clienteSelectedName"></div>
+              <div class="cliente-selected-saldo" id="clienteSelectedSaldo"></div>
+            </div>
+            <button class="btn-clear-cliente" onclick="limpiarCliente()"><i class="bi bi-x"></i></button>
+          </div>
+        </div>
+        <div id="clienteSearchWrap" class="cliente-search-wrap">
+          <input type="text" class="cliente-search-input" id="clienteInput"
+                 placeholder="Buscar por nombre o código..."
+                 oninput="buscarCliente(this.value)" autocomplete="off">
+          <div class="cliente-results" id="clienteResults"></div>
+        </div>
+      </div>
+
+      <!-- Calculadora de cambio (solo efectivo) -->
+      <div id="cambioWrap" style="display:none;">
+        <div style="font-size:var(--text-xs);color:var(--stone);font-weight:600;margin-bottom:.25rem;">Recibido del cliente</div>
+        <div style="display:flex;gap:.35rem;align-items:center;">
+          <span style="font-size:var(--text-sm);color:var(--stone);">$</span>
+          <input type="number" id="efectivoRecibido" class="form-input"
+                 placeholder="0" min="0" oninput="calcularCambio()"
+                 style="font-size:var(--text-sm);padding:.35rem .6rem;flex:1;">
+        </div>
+        <div id="cambioDisplay" style="display:none;" class="cambio-display">
+          <span>Cambio</span>
+          <span id="cambioVal" class="cambio-val"></span>
+        </div>
+      </div>
+
+      <!-- Nota -->
+      <input type="text" class="form-input" id="notaInput" placeholder="Nota opcional..." style="font-size:var(--text-xs);padding:.35rem .6rem;">
+
+      <!-- Botón cobrar -->
+      <button class="btn-cobrar" id="btnCobrar" onclick="procesarVenta()" disabled>
+        <i class="bi bi-check2-circle"></i> Cobrar
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ RECIBO MODAL ══ -->
+<div class="recibo-overlay" id="reciboOverlay">
+  <div class="recibo-box">
+    <div class="recibo-head">
+      <div class="recibo-check"><i class="bi bi-check-lg"></i></div>
+      <div class="recibo-head-title">Venta registrada</div>
+      <div class="recibo-head-ticket" id="reciboTicketLabel"></div>
+    </div>
+    <div class="recibo-body" id="reciboBody"></div>
+    <div class="recibo-footer">
+      <button class="btn btn-ghost btn-full" onclick="cerrarRecibo()">Cerrar</button>
+      <button class="btn btn-primary btn-full" onclick="cerrarRecibo()">Nueva venta</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF = '{{ csrf_token }}';
+const URL_VENTA  = '{% url "app_empleado:procesar_venta" %}';
+const URL_CLIENTE = '{% url "app_empleado:buscar_cliente" %}';
+
+// ── Estado ────────────────────────────────────────────────────────────────────
+let carrito     = {};   // { id: { nombre, precio, cantidad } }
+let tipoPago    = 'efectivo';
+let cliente     = null; // { id, nombre, tipo, saldo, credito? }
+let tipoCliente = 'estudiante';
+let catActiva   = 'todos';
+
+// Mostrar calculadora de cambio al inicio (efectivo es el default)
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('cambioWrap').style.display = 'block';
+});
+
+// ── Catálogo ──────────────────────────────────────────────────────────────────
+function filtrarProductos() {
+  const q    = document.getElementById('posSearch').value.toLowerCase();
+  const items = document.querySelectorAll('.pos-item');
+  items.forEach(item => {
+    const nombre = item.dataset.nombre.toLowerCase();
+    const cat    = item.dataset.cat;
+    const matchQ = nombre.includes(q);
+    const matchC = catActiva === 'todos' || cat === catActiva;
+    item.style.display = (matchQ && matchC) ? '' : 'none';
+  });
+}
+
+function filtrarCategoria(btn, cat) {
+  catActiva = cat;
+  document.querySelectorAll('.pos-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  filtrarProductos();
+}
+
+// ── Carrito ───────────────────────────────────────────────────────────────────
+function agregarAlCarrito(id) {
+  const el      = document.querySelector(`.pos-item[data-id="${id}"]`);
+  const nombre  = el.dataset.nombre;
+  const precio  = parseFloat(el.dataset.precio);
+  const stock   = parseInt(el.dataset.stock);
+  const tipo    = el.dataset.tipo;
+
+  if (carrito[id]) {
+    if (tipo === 'simple' && carrito[id].cantidad >= stock) return;
+    carrito[id].cantidad++;
+  } else {
+    carrito[id] = { nombre, precio, cantidad: 1, stock, tipo };
+  }
+  renderCarrito();
+}
+
+function cambiarCantidad(id, delta) {
+  if (!carrito[id]) return;
+  carrito[id].cantidad += delta;
+  if (carrito[id].cantidad <= 0) { delete carrito[id]; }
+  else if (carrito[id].tipo === 'simple' && carrito[id].cantidad > carrito[id].stock) {
+    carrito[id].cantidad = carrito[id].stock;
+  }
+  renderCarrito();
+}
+
+function eliminarDelCarrito(id) {
+  delete carrito[id];
+  renderCarrito();
+}
+
+function fmtPeso(n) {
+  return '$' + Math.round(n).toLocaleString('es-CO');
+}
+
+function renderCarrito() {
+  const ids    = Object.keys(carrito);
+  const total  = ids.reduce((s, id) => s + carrito[id].precio * carrito[id].cantidad, 0);
+  const items  = document.getElementById('cartItems');
+  const empty  = document.getElementById('cartEmpty');
+  const count  = document.getElementById('cartCount');
+  const totEl  = document.getElementById('cartTotal');
+  const btnCob = document.getElementById('btnCobrar');
+
+  count.textContent = ids.reduce((s, id) => s + carrito[id].cantidad, 0);
+  totEl.textContent = fmtPeso(total);
+
+  // Badges en productos
+  document.querySelectorAll('.pos-item').forEach(el => {
+    const id  = el.dataset.id;
+    const bdg = document.getElementById('badge-' + id);
+    if (carrito[id]) {
+      el.classList.add('in-cart');
+      if (bdg) { bdg.textContent = carrito[id].cantidad; bdg.style.display = 'flex'; }
+    } else {
+      el.classList.remove('in-cart');
+      if (bdg) bdg.style.display = 'none';
+    }
+  });
+
+  if (ids.length === 0) {
+    items.innerHTML = '';
+    empty.style.display = 'flex';
+    btnCob.disabled = true;
+    return;
+  }
+
+  empty.style.display = 'none';
+  items.innerHTML = ids.map(id => {
+    const it = carrito[id];
+    return `<div class="cart-row">
+      <div class="cart-row-name">${it.nombre}</div>
+      <div class="cart-row-qty">
+        <button class="cart-qty-btn" onclick="cambiarCantidad(${id},-1)"><i class="bi bi-dash"></i></button>
+        <span class="cart-qty-num">${it.cantidad}</span>
+        <button class="cart-qty-btn" onclick="cambiarCantidad(${id},1)"><i class="bi bi-plus"></i></button>
+      </div>
+      <div class="cart-row-sub">${fmtPeso(it.precio * it.cantidad)}</div>
+      <button class="cart-row-del" onclick="eliminarDelCarrito(${id})"><i class="bi bi-trash3"></i></button>
+    </div>`;
+  }).join('');
+
+  btnCob.disabled = (tipoPago !== 'efectivo' && !cliente);
+}
+
+// ── Tipo de pago ──────────────────────────────────────────────────────────────
+function selPago(btn, pago) {
+  tipoPago = pago;
+  document.querySelectorAll('.pago-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const wrap       = document.getElementById('clienteWrap');
+  const cambioWrap = document.getElementById('cambioWrap');
+
+  if (pago === 'efectivo') {
+    wrap.style.display       = 'none';
+    cambioWrap.style.display = 'block';
+    limpiarCliente();
+    calcularCambio();
+  } else {
+    wrap.style.display       = 'block';
+    cambioWrap.style.display = 'none';
+    tipoCliente = pago === 'cuenta_estudiante' ? 'estudiante' : 'docente';
+    document.getElementById('clienteInput').placeholder =
+      pago === 'cuenta_estudiante' ? 'Buscar estudiante (nombre o código)...' : 'Buscar docente (nombre o documento)...';
+  }
+  renderCarrito();
+}
+
+// ── Calculadora de cambio ─────────────────────────────────────────────────────
+function calcularCambio() {
+  const ids    = Object.keys(carrito);
+  const total  = ids.reduce((s, id) => s + carrito[id].precio * carrito[id].cantidad, 0);
+  const recib  = parseFloat(document.getElementById('efectivoRecibido').value) || 0;
+  const dispEl = document.getElementById('cambioDisplay');
+  const valEl  = document.getElementById('cambioVal');
+
+  if (recib > 0) {
+    const cambio = recib - total;
+    valEl.textContent = fmtPeso(Math.max(0, cambio));
+    valEl.style.color = cambio >= 0 ? 'var(--leaf)' : 'var(--red)';
+    if (cambio < 0) {
+      valEl.textContent = '— falta ' + fmtPeso(Math.abs(cambio));
+    }
+    dispEl.style.display = 'flex';
+  } else {
+    dispEl.style.display = 'none';
+  }
+}
+
+// ── Búsqueda cliente ──────────────────────────────────────────────────────────
+let buscarTimer = null;
+function buscarCliente(q) {
+  clearTimeout(buscarTimer);
+  const res = document.getElementById('clienteResults');
+  if (q.length < 2) { res.classList.remove('open'); return; }
+  buscarTimer = setTimeout(async () => {
+    const r = await fetch(`${URL_CLIENTE}?q=${encodeURIComponent(q)}&tipo=${tipoCliente}`);
+    const d = await r.json();
+    if (d.results.length === 0) {
+      res.innerHTML = '<div class="cliente-result-item" style="color:var(--ash);">Sin resultados</div>';
+    } else {
+      res.innerHTML = d.results.map(c => {
+        const det = tipoCliente === 'estudiante'
+          ? `Cód: ${c.codigo} · Saldo: ${fmtPeso(c.saldo)}`
+          : `Saldo: ${fmtPeso(c.saldo)} · Crédito: ${fmtPeso(c.credito||0)}`;
+        return `<div class="cliente-result-item" onclick='selCliente(${JSON.stringify(c)})'>
+          <div class="cr-name">${c.nombre}</div>
+          <div class="cr-detail">${det}</div>
+        </div>`;
+      }).join('');
+    }
+    res.classList.add('open');
+  }, 280);
+}
+
+function selCliente(c) {
+  cliente = { ...c, tipo: tipoCliente };
+  document.getElementById('clienteResults').classList.remove('open');
+  document.getElementById('clienteSearchWrap').style.display = 'none';
+  document.getElementById('clienteSelectedWrap').style.display = 'block';
+  document.getElementById('clienteSelectedName').textContent = c.nombre;
+
+  const saldoDisp = tipoCliente === 'estudiante'
+    ? `Saldo: ${fmtPeso(c.saldo)}`
+    : `Saldo: ${fmtPeso(c.saldo)} · Crédito: ${fmtPeso(c.credito||0)}`;
+  document.getElementById('clienteSelectedSaldo').textContent = saldoDisp;
+
+  renderCarrito();
+}
+
+function limpiarCliente() {
+  cliente = null;
+  document.getElementById('clienteInput').value = '';
+  document.getElementById('clienteResults').classList.remove('open');
+  document.getElementById('clienteSearchWrap').style.display = 'block';
+  document.getElementById('clienteSelectedWrap').style.display = 'none';
+  renderCarrito();
+}
+
+document.addEventListener('click', function(e) {
+  const res  = document.getElementById('clienteResults');
+  const wrap = document.getElementById('clienteSearchWrap');
+  if (res && wrap && !wrap.contains(e.target)) res.classList.remove('open');
+});
+
+// ── Procesar venta ────────────────────────────────────────────────────────────
+async function procesarVenta() {
+  const ids = Object.keys(carrito);
+  if (ids.length === 0) return;
+
+  const btn = document.getElementById('btnCobrar');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Procesando...';
+
+  const payload = {
+    items:       ids.map(id => ({ id: parseInt(id), cantidad: carrito[id].cantidad })),
+    tipo_pago:   tipoPago,
+    nota:        document.getElementById('notaInput').value,
+    cliente_id:  cliente ? cliente.id : null,
+    tipo_cliente: tipoCliente,
+  };
+
+  try {
+    const r = await fetch(URL_VENTA, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      body:    JSON.stringify(payload),
+    });
+    const d = await r.json();
+
+    if (d.ok) {
+      mostrarRecibo(d);
+      limpiarCarrito();
+    } else {
+      alert('Error: ' + d.error);
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-check2-circle"></i> Cobrar';
+    }
+  } catch (e) {
+    alert('Error de conexión. Intenta nuevamente.');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check2-circle"></i> Cobrar';
+  }
+}
+
+function limpiarCarrito() {
+  carrito = {};
+  cliente = null;
+  tipoPago = 'efectivo';
+  document.querySelectorAll('.pago-tab').forEach(b => b.classList.remove('active'));
+  document.querySelector('.pago-tab[data-pago="efectivo"]').classList.add('active');
+  document.getElementById('clienteWrap').style.display = 'none';
+  document.getElementById('cambioWrap').style.display = 'block';
+  document.getElementById('efectivoRecibido').value = '';
+  document.getElementById('cambioDisplay').style.display = 'none';
+  limpiarCliente();
+  document.getElementById('notaInput').value = '';
+  renderCarrito();
+}
+
+// ── Recibo ────────────────────────────────────────────────────────────────────
+function mostrarRecibo(d) {
+  const pagoLabel = { efectivo: 'Efectivo', cuenta_estudiante: 'Cuenta Estudiante', cuenta_docente: 'Cuenta Docente' };
+
+  document.getElementById('reciboTicketLabel').textContent = d.ticket;
+
+  const detallesHtml = (d.detalles || []).map(item =>
+    `<div class="recibo-row">
+      <span class="recibo-row-label">${item.nombre} ×${item.cantidad}</span>
+      <span class="recibo-row-val">${fmtPeso(item.subtotal)}</span>
+    </div>`
+  ).join('');
+
+  let cambioHtml = '';
+  if (tipoPago === 'efectivo') {
+    const recib = parseFloat(document.getElementById('efectivoRecibido').value) || 0;
+    if (recib > 0) {
+      const cambio = recib - d.total;
+      cambioHtml = `<div class="recibo-row" style="margin-top:.25rem;">
+        <span class="recibo-row-label">Recibido</span>
+        <span class="recibo-row-val">${fmtPeso(recib)}</span>
+      </div>
+      <div class="recibo-row">
+        <span class="recibo-row-label">Cambio</span>
+        <span class="recibo-row-val" style="color:var(--leaf);font-weight:700;">${fmtPeso(Math.max(0, cambio))}</span>
+      </div>`;
+    }
+  }
+
+  document.getElementById('reciboBody').innerHTML = `
+    ${detallesHtml}
+    <div class="recibo-row" style="border-top:1px solid var(--mist);padding-top:.5rem;margin-top:.25rem;">
+      <span class="recibo-row-label">Pago</span>
+      <span class="recibo-row-val">${pagoLabel[tipoPago] || tipoPago}</span>
+    </div>
+    ${cliente ? `<div class="recibo-row"><span class="recibo-row-label">Cliente</span><span class="recibo-row-val">${cliente.nombre}</span></div>` : ''}
+    ${cambioHtml}
+    <div class="recibo-total-row">
+      <span class="recibo-total-label">Total cobrado</span>
+      <span class="recibo-total-val">${fmtPeso(d.total)}</span>
+    </div>`;
+  document.getElementById('reciboOverlay').classList.add('open');
+}
+
+function cerrarRecibo() {
+  document.getElementById('reciboOverlay').classList.remove('open');
+  // Recargar para reflejar stock actualizado
+  setTimeout(() => location.reload(), 100);
+}
+</script>
+{% endblock %}

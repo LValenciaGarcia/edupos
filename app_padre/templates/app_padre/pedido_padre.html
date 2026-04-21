@@ -54,6 +54,17 @@
     font-size: 0.6rem; font-weight: 800; color: var(--red); letter-spacing: 0.12em;
     border: 1.5px dashed var(--red); border-radius: 10px; pointer-events: none;
   }
+  .prod-card.alergia-warn { border-color: #fbbf24; }
+  .alerg-badge {
+    display: inline-flex; align-items: center; gap: 0.2rem;
+    padding: 0.1rem 0.4rem; background: var(--red-pale); color: var(--red);
+    border-radius: 99px; font-size: 0.6rem; font-weight: 700; white-space: nowrap;
+  }
+  .alerg-warn-strip {
+    background: #fef3c7; border-top: 1px solid #fde68a;
+    padding: 0.3rem 0.6rem; font-size: 0.64rem; font-weight: 700; color: #92400e;
+    display: flex; align-items: center; gap: 0.3rem;
+  }
   .prod-img { height: 80px; background: var(--cream); display: flex; align-items: center; justify-content: center; overflow: hidden; }
   .prod-img img { width: 100%; height: 100%; object-fit: cover; }
   .prod-img .prod-icon { font-size: 1.6rem; color: var(--fog); }
@@ -145,9 +156,9 @@
     </div>
 
     <div class="productos-grid" id="prodGrid">
-      {% for prod, restringido in prods_lista %}
+      {% for prod, restringido, alergenos_prod, tiene_alergia in prods_lista %}
       {% if not request.GET.cat or request.GET.cat == prod.categoria.nombre %}
-      <div class="prod-card {% if restringido %}restringido{% endif %}"
+      <div class="prod-card {% if restringido %}restringido{% elif tiene_alergia %}alergia-warn{% endif %}"
            data-nombre="{{ prod.nombre|lower }}" data-id="{{ prod.pk }}">
         <div class="prod-img">
           {% if prod.imagen %}
@@ -156,9 +167,24 @@
           <i class="bi bi-box-seam prod-icon"></i>
           {% endif %}
         </div>
+        {% if tiene_alergia and not restringido %}
+        <div class="alerg-warn-strip">
+          <i class="bi bi-exclamation-triangle-fill"></i> Alérgeno registrado
+        </div>
+        {% endif %}
         <div class="prod-body">
           <div class="prod-nombre">{{ prod.nombre }}</div>
           <div class="prod-cat">{{ prod.categoria.get_nombre_display }}</div>
+          {% if alergenos_prod %}
+          <div style="display:flex;flex-wrap:wrap;gap:0.2rem;margin-top:0.25rem;">
+            {% for a in alergenos_prod %}
+            <span class="alerg-badge" title="{{ a.get_codigo_display }}">
+              {% if a.icono %}{{ a.icono }}{% else %}<i class="bi bi-exclamation-triangle-fill"></i>{% endif %}
+              {{ a.get_codigo_display }}
+            </span>
+            {% endfor %}
+          </div>
+          {% endif %}
           <div class="prod-precio">${{ prod.precio_venta|miles }}</div>
           {% if not restringido %}
           <div class="qty-control">

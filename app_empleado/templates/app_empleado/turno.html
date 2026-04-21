@@ -1,0 +1,165 @@
+{% extends 'app_empleado/base_empleado.html' %}
+{% load static %}
+
+{% block title %}Mi Turno{% endblock %}
+{% block page_title %}Mi Turno{% endblock %}
+{% block nav_turno %}active{% endblock %}
+
+{% block content %}
+<div style="display:flex;flex-direction:column;gap:1.25rem;max-width:900px;">
+
+  <!-- Estado del turno activo -->
+  {% if turno_activo %}
+  <div class="turno-activo-card anim-1">
+    <div class="turno-activo-pulse"></div>
+    <div class="turno-activo-info">
+      <div class="turno-activo-badge"><i class="bi bi-circle-fill"></i> Turno en curso</div>
+      <div class="turno-activo-hora">Inicio: {{ turno_activo.apertura|time:"H:i" }} — {{ turno_activo.apertura|date:"d/m/Y" }}</div>
+      <div class="turno-activo-dur" id="turnoTimer"></div>
+    </div>
+    <div style="display:flex;gap:1.5rem;flex-wrap:wrap;">
+      <div class="turno-stat">
+        <div class="turno-stat-label">Ventas</div>
+        <div class="turno-stat-val">{{ turno_activo.num_ventas }}</div>
+      </div>
+      <div class="turno-stat">
+        <div class="turno-stat-label">Total vendido</div>
+        <div class="turno-stat-val">${{ turno_activo.total_ventas|floatformat:0 }}</div>
+      </div>
+      <div class="turno-stat">
+        <div class="turno-stat-label">En efectivo</div>
+        <div class="turno-stat-val">${{ turno_activo.total_efectivo|floatformat:0 }}</div>
+      </div>
+      <div class="turno-stat">
+        <div class="turno-stat-label">Efectivo inicial</div>
+        <div class="turno-stat-val">${{ turno_activo.efectivo_inicial|floatformat:0 }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Formulario de cierre -->
+  <div class="card anim-2">
+    <div class="card-head" style="display:flex;align-items:center;gap:.6rem;">
+      <i class="bi bi-lock" style="color:var(--emp);"></i> Cerrar turno
+    </div>
+    <form method="post" style="padding:1.25rem;display:flex;flex-direction:column;gap:.75rem;">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="cerrar">
+      <div class="field">
+        <label class="field-label">Efectivo en caja al cierre ($)</label>
+        <input type="number" name="efectivo_final" class="form-input fmt-miles"
+               placeholder="0" min="0" step="100"
+               value="{{ turno_activo.efectivo_inicial|floatformat:0 }}">
+        <small class="field-help">Cuenta el efectivo físico en caja. El sistema calculará la diferencia.</small>
+      </div>
+      <div class="field">
+        <label class="field-label">Observaciones de cierre</label>
+        <input type="text" name="nota_cierre" class="form-input" placeholder="Opcional…">
+      </div>
+      <button type="submit" class="btn btn-primary"
+              onclick="return confirm('¿Confirmas el cierre del turno?')">
+        <i class="bi bi-lock-fill"></i> Confirmar cierre de turno
+      </button>
+    </form>
+  </div>
+
+  {% else %}
+  <!-- Sin turno activo → formulario de apertura -->
+  <div class="card anim-1">
+    <div class="card-head" style="display:flex;align-items:center;gap:.6rem;">
+      <i class="bi bi-unlock" style="color:var(--emp);"></i> Abrir nuevo turno
+    </div>
+    {% if not sede and not empleado.es_global %}
+    <div style="padding:1.25rem;">
+      <div class="no-sede-banner">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <span><strong>Sin sede asignada.</strong> Contacta al administrador para iniciar un turno.</span>
+      </div>
+    </div>
+    {% else %}
+    <form method="post" style="padding:1.25rem;display:flex;flex-direction:column;gap:.75rem;">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="abrir">
+      <div class="field">
+        <label class="field-label">Efectivo inicial en caja ($)</label>
+        <input type="number" name="efectivo_inicial" class="form-input fmt-miles"
+               placeholder="0" min="0" step="100">
+        <small class="field-help">Ingresa el monto de efectivo con el que arrancas el turno (fondo de caja).</small>
+      </div>
+      <div class="field">
+        <label class="field-label">Observaciones de apertura</label>
+        <input type="text" name="nota" class="form-input" placeholder="Opcional…">
+      </div>
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-unlock-fill"></i> Abrir turno
+      </button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Historial de turnos -->
+  {% if historial %}
+  <div class="card anim-3">
+    <div class="card-head">Historial de turnos recientes</div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Apertura</th>
+            <th>Cierre</th>
+            <th>Duración</th>
+            <th style="text-align:center;">Ventas</th>
+            <th style="text-align:right;">Total</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in historial %}
+          <tr>
+            <td style="font-size:var(--text-xs);color:var(--ash);">#{{ t.pk }}</td>
+            <td style="font-size:var(--text-sm);white-space:nowrap;">{{ t.apertura|date:"d/m/Y" }} {{ t.apertura|time:"H:i" }}</td>
+            <td style="font-size:var(--text-sm);color:var(--stone);white-space:nowrap;">
+              {% if t.cierre %}{{ t.cierre|time:"H:i" }}{% else %}<span style="color:var(--emp);font-weight:600;">En curso</span>{% endif %}
+            </td>
+            <td style="font-size:var(--text-sm);color:var(--stone);">{{ t.duracion_str }}</td>
+            <td style="text-align:center;">
+              <span class="badge badge-simple">{{ t.num_ventas }}</span>
+            </td>
+            <td style="text-align:right;font-weight:700;color:var(--emp-dark);">${{ t.total_ventas|floatformat:0 }}</td>
+            <td>
+              {% if t.estado == 'abierto' %}
+                <span class="badge badge-activo">Abierto</span>
+              {% else %}
+                <span class="badge badge-inactivo">Cerrado</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if turno_activo %}
+<script>
+const apertura = new Date('{{ turno_activo.apertura|date:"c" }}');
+function actualizarTimer() {
+  const diff = Math.floor((Date.now() - apertura) / 1000);
+  const h    = Math.floor(diff / 3600);
+  const m    = Math.floor((diff % 3600) / 60);
+  const s    = diff % 60;
+  document.getElementById('turnoTimer').textContent =
+    String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+}
+actualizarTimer();
+setInterval(actualizarTimer, 1000);
+</script>
+{% endif %}
+{% endblock %}

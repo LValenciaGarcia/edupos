@@ -17,7 +17,7 @@
 
 {% block content %}
 <div style="max-width:52rem;">
-<div style="display:grid;grid-template-columns:1fr 300px;gap:1.2rem;align-items:start;">
+<div class="grid-sidebar" style="gap:1.2rem;">
 
   <!-- Detalle principal -->
   <div>
@@ -27,7 +27,7 @@
         <span class="badge badge-{{ pedido.estado }}">{{ pedido.get_estado_display }}</span>
       </div>
       <div class="card-body">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+        <div class="grid-2" style="gap:1rem;margin-bottom:1rem;">
           <div>
             <div style="font-size:0.7rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.2rem;">Estudiante</div>
             <div style="font-weight:600;">{{ pedido.estudiante.perfil.user.get_full_name|default:pedido.estudiante.perfil.user.username }}</div>

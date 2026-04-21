@@ -16,7 +16,7 @@ from django.views.decorators.http import require_POST
 
 from authentication.models import Perfil, Padre, Estudiante
 from authentication.utils import generar_username as _generar_username
-from app_admin.models import Producto, Categoria, Pedido, DetallePedido
+from app_admin.models import Producto, Categoria, Pedido, DetallePedido, Alergeno
 from .models import (
     RecargaSaldo, LimiteGasto, RestriccionAlimento,
     Notificacion, HorarioCompra, PedidoPadre,
@@ -749,6 +749,21 @@ def pedido_padre(request, pk):
             messages.error(request, 'El carrito está vacío.')
             return redirect('app_padre:pedido_padre', pk=pk)
 
+        # Validar horario de compra permitido
+        horarios_activos = HorarioCompra.objects.filter(estudiante=estudiante, activo=True)
+        if horarios_activos.exists():
+            ahora_hora = timezone.localtime().time()
+            en_horario = any(h.hora_inicio <= ahora_hora <= h.hora_fin for h in horarios_activos)
+            if not en_horario:
+                messages.error(request, 'No es un horario permitido para realizar pedidos para este estudiante.')
+                return redirect('app_padre:pedido_padre', pk=pk)
+
+        # Cargar alergias activas del estudiante (nombres normalizados)
+        alergias_nombres = set(
+            AlergiaEstudiante.objects.filter(estudiante=estudiante, activo=True)
+            .values_list('nombre', flat=True)
+        )
+
         # Validar productos y calcular total
         total = Decimal('0')
         lineas = []
@@ -761,6 +776,17 @@ def pedido_padre(request, pk):
             if prod.id in restricciones_prod_ids or prod.categoria_id in restricciones_cat_ids:
                 messages.error(request, f'"{prod.nombre}" está restringido para este estudiante.')
                 return redirect('app_padre:pedido_padre', pk=pk)
+            # Bloquear si el producto contiene un alérgeno registrado del estudiante
+            if alergias_nombres:
+                alergenos_prod = set(prod.alergenos.values_list('codigo', flat=True))
+                # También verificar por nombre libre (texto) contra código de alérgeno
+                conflicto = any(
+                    a.lower() in ' '.join(alergenos_prod).lower()
+                    for a in alergias_nombres
+                )
+                if conflicto:
+                    messages.error(request, f'"{prod.nombre}" puede contener alérgenos registrados para este estudiante.')
+                    return redirect('app_padre:pedido_padre', pk=pk)
             subtotal = Decimal(str(prod.precio_venta)) * qty
             total   += subtotal
             lineas.append((prod, qty, subtotal))
@@ -825,19 +851,30 @@ def pedido_padre(request, pk):
         messages.success(request, f'Pedido {pedido.ticket} creado exitosamente por ${total:,.0f}.')
         return redirect('app_padre:historial')
 
-    productos    = Producto.objects.filter(disponible=True).select_related('categoria').order_by('categoria', 'nombre')
+    productos    = Producto.objects.filter(disponible=True).select_related('categoria').prefetch_related('receta__ingrediente__alergenos').order_by('categoria', 'nombre')
     categorias   = Categoria.objects.filter(activa=True)
+
+    alergias_estudiante = set(
+        AlergiaEstudiante.objects.filter(estudiante=estudiante, activo=True)
+        .values_list('nombre', flat=True)
+    )
 
     prods_lista = []
     for p in productos:
         restringido = p.id in restricciones_prod_ids or p.categoria_id in restricciones_cat_ids
-        prods_lista.append((p, restringido))
+        alergenos_prod = list(p.alergenos)
+        tiene_alergia = bool(alergias_estudiante) and any(
+            a.lower() in ' '.join(ae.codigo for ae in alergenos_prod).lower()
+            for a in alergias_estudiante
+        )
+        prods_lista.append((p, restringido, alergenos_prod, tiene_alergia))
 
     return render(request, 'app_padre/pedido_padre.html', _ctx_padre(padre, {
         'padre': padre,
         'estudiante': estudiante,
         'prods_lista': prods_lista,
         'categorias': categorias,
+        'alergias_estudiante': alergias_estudiante,
     }))
 
 
@@ -885,6 +922,28 @@ def pedidos_programados(request, pk):
             messages.error(request, 'Agrega al menos un producto.')
             return redirect('app_padre:pedidos_programados', pk=pk)
 
+        # Validar restricciones antes de crear el programado
+        restricciones_prod_ids = set(
+            RestriccionAlimento.objects.filter(
+                Q(estudiante=estudiante) | Q(estudiante__isnull=True, padre=padre),
+                activo=True, producto__isnull=False,
+            ).values_list('producto_id', flat=True)
+        )
+        restricciones_cat_ids = set(
+            RestriccionAlimento.objects.filter(
+                Q(estudiante=estudiante) | Q(estudiante__isnull=True, padre=padre),
+                activo=True, categoria__isnull=False,
+            ).values_list('categoria_id', flat=True)
+        )
+        for prod_id in carrito:
+            try:
+                prod = Producto.objects.get(pk=prod_id)
+                if prod.id in restricciones_prod_ids or prod.categoria_id in restricciones_cat_ids:
+                    messages.error(request, f'"{prod.nombre}" está restringido para este estudiante.')
+                    return redirect('app_padre:pedidos_programados', pk=pk)
+            except Producto.DoesNotExist:
+                pass
+
         prog = PedidoProgramado.objects.create(
             padre=padre, estudiante=estudiante,
             fecha_entrega=fecha, hora_entrega=hora,
@@ -893,6 +952,7 @@ def pedidos_programados(request, pk):
         for prod_id, qty in carrito.items():
             try:
                 prod = Producto.objects.get(pk=prod_id)
+                # precio_unitario se congela automáticamente en DetalleProgramado.save()
                 DetalleProgramado.objects.create(pedido_prog=prog, producto=prod, cantidad=qty)
             except Producto.DoesNotExist:
                 pass
@@ -1126,4 +1186,5 @@ def alergias(request, pk):
         'alergias': alergias_qs,
         'TIPO_CHOICES': AlergiaEstudiante.TIPO_CHOICES,
         'GRAVEDAD_CHOICES': AlergiaEstudiante.GRAVEDAD_CHOICES,
+        'alergenos_catalogo': Alergeno.objects.all(),
     }))

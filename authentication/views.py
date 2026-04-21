@@ -48,6 +48,8 @@ def _redirigir_por_rol(user):
             return redirect('app_estudiante:dashboard')
         elif rol == 'docente':
             return redirect('app_docente:dashboard')
+        elif rol == 'empleado':
+            return redirect('app_empleado:dashboard')
     except Perfil.DoesNotExist:
         pass
     return redirect('core:home')

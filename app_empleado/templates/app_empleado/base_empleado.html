@@ -1,0 +1,251 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}Empleado{% endblock %} — Punto Asis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="{% static 'css/base.css' %}">
+  <link rel="stylesheet" href="{% static 'css/empleado.css' %}">
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#d97706">
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+<!-- ══ SIDEBAR ══ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sb-brand">
+    <button class="sb-toggle" onclick="toggleSidebar()" title="Colapsar menú">
+      <i class="bi bi-layout-sidebar-reverse" id="sb-toggle-icon"></i>
+    </button>
+    <span class="sb-wordmark">Punto Asis</span>
+  </div>
+
+  <nav class="sb-nav">
+    <div class="sb-item">
+      <a href="{% url 'app_empleado:dashboard' %}" class="sb-link {% block nav_dashboard %}{% endblock %}">
+        <i class="bi bi-grid-1x2"></i><span class="sb-label">Dashboard</span>
+      </a>
+      <span class="sb-tip">Dashboard</span>
+    </div>
+
+    <span class="sb-section-label">Tienda</span>
+
+    <div class="sb-item">
+      <a href="{% url 'app_empleado:turno' %}" class="sb-link {% block nav_turno %}{% endblock %}">
+        <i class="bi bi-clock-history"></i><span class="sb-label">Mi Turno</span>
+      </a>
+      <span class="sb-tip">Mi Turno</span>
+    </div>
+    <div class="sb-item">
+      <a href="{% url 'app_empleado:caja' %}" class="sb-link {% block nav_caja %}{% endblock %}">
+        <i class="bi bi-cash-register"></i><span class="sb-label">Caja / POS</span>
+      </a>
+      <span class="sb-tip">Caja</span>
+    </div>
+    <div class="sb-item">
+      <a href="{% url 'app_empleado:ventas' %}" class="sb-link {% block nav_ventas %}{% endblock %}">
+        <i class="bi bi-receipt"></i><span class="sb-label">Mis Ventas</span>
+      </a>
+      <span class="sb-tip">Mis Ventas</span>
+    </div>
+
+    <span class="sb-section-label">Consulta</span>
+
+    <div class="sb-item">
+      <a href="{% url 'app_empleado:inventario' %}" class="sb-link {% block nav_inventario %}{% endblock %}">
+        <i class="bi bi-box-seam"></i><span class="sb-label">Inventario</span>
+      </a>
+      <span class="sb-tip">Inventario</span>
+    </div>
+    <div class="sb-item">
+      <a href="{% url 'app_empleado:clientes' %}" class="sb-link {% block nav_clientes %}{% endblock %}">
+        <i class="bi bi-people"></i><span class="sb-label">Clientes</span>
+      </a>
+      <span class="sb-tip">Clientes</span>
+    </div>
+
+    <span class="sb-section-label">Cuenta</span>
+
+    <div class="sb-item">
+      <a href="{% url 'app_empleado:perfil' %}" class="sb-link {% block nav_perfil %}{% endblock %}">
+        <i class="bi bi-person"></i><span class="sb-label">Mi Perfil</span>
+      </a>
+      <span class="sb-tip">Mi Perfil</span>
+    </div>
+  </nav>
+
+  <div class="sb-bottom">
+    <div class="sb-bottom-wrap">
+      <button class="sb-user-btn" onclick="toggleUserDrop()" id="userBtn">
+        <div class="sb-avatar">{{ request.user.username|slice:":1"|upper }}</div>
+        <div class="sb-user-info">
+          <div class="sb-uname">{{ request.user.get_full_name|default:request.user.username }}</div>
+          <div class="sb-urole sb-urole-emp">
+            {% if request.user.perfil.empleado.es_global %}
+              Global
+            {% else %}
+              {% with sede=request.user.perfil.empleado.sedes.first %}
+                {{ sede.nombre|default:"Sin sede" }}
+              {% endwith %}
+            {% endif %}
+          </div>
+        </div>
+      </button>
+      <div class="sb-user-dropdown" id="userDrop">
+        <div class="sb-drop-info">
+          <div class="sb-drop-name">{{ request.user.get_full_name|default:request.user.username }}</div>
+          <div class="sb-drop-role">{{ request.user.perfil.empleado.get_cargo_display }}</div>
+        </div>
+        <a href="{% url 'app_empleado:perfil' %}" class="sb-drop-link"><i class="bi bi-person"></i> Mi perfil</a>
+        <a href="{% url 'authentication:logout' %}" class="sb-drop-link danger">
+          <i class="bi bi-box-arrow-right"></i> Cerrar sesión
+        </a>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<div class="sb-overlay" id="sb-overlay" onclick="toggleSidebar()"></div>
+
+<!-- ══ MAIN ══ -->
+<div class="main">
+  <header class="topbar topbar-emp">
+    <div class="topbar-left">
+      <button class="sb-mobile-toggle" onclick="toggleSidebar()" aria-label="Menú">
+        <i class="bi bi-list"></i>
+      </button>
+      <span class="topbar-breadcrumb">Empleado</span>
+      <span class="topbar-sep">/</span>
+      <span class="topbar-title">{% block page_title %}Dashboard{% endblock %}</span>
+    </div>
+    <div class="topbar-right">
+      {% block topbar_actions %}{% endblock %}
+      {% with emp=request.user.perfil.empleado %}
+        {% if emp.es_global %}
+          <span class="sede-badge"><i class="bi bi-globe2"></i> Global</span>
+        {% else %}
+          {% with sede=emp.sedes.first %}
+            {% if sede %}
+              <span class="sede-badge"><i class="bi bi-geo-alt"></i> {{ sede.nombre }}</span>
+            {% else %}
+              <span class="sede-badge" style="border-color:var(--red);background:var(--red-pale);color:var(--red-dark);">
+                <i class="bi bi-exclamation-circle"></i> Sin sede
+              </span>
+            {% endif %}
+          {% endwith %}
+        {% endif %}
+      {% endwith %}
+    </div>
+  </header>
+
+  <div class="page-body">
+
+    <!-- Alerta global: sin sede asignada -->
+    {% with emp=request.user.perfil.empleado %}
+    {% if not emp.es_global and not emp.sedes.exists %}
+    <div class="no-sede-banner">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      <span>
+        <strong>Sin sede asignada.</strong>
+        Puedes consultar el historial de ventas y tu perfil, pero no puedes procesar cobros en caja hasta que el administrador te asigne una sede activa.
+      </span>
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <!-- Mensajes Django -->
+    {% if messages %}
+    <div class="msg-list">
+      {% for m in messages %}
+      <div class="msg msg-{{ m.tags }}">
+        {% if m.tags == 'success' %}<i class="bi bi-check-circle-fill"></i>
+        {% elif m.tags == 'error' %}<i class="bi bi-x-circle-fill"></i>
+        {% elif m.tags == 'warning' %}<i class="bi bi-exclamation-triangle-fill"></i>
+        {% else %}<i class="bi bi-info-circle-fill"></i>{% endif %}
+        {{ m }}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% block content %}{% endblock %}
+  </div>
+</div>
+
+<!-- Toast stack -->
+<div class="toast-stack" id="toastStack"></div>
+
+{% block extra_js %}{% endblock %}
+
+<script>
+// ── Sidebar ───────────────────────────────────────────────────────────────────
+const STORAGE_KEY = 'sb_closed';
+
+function applySidebarState() {
+  const isMobile = window.innerWidth <= 640;
+  const stored   = localStorage.getItem(STORAGE_KEY);
+  const closed   = isMobile ? stored !== '0' : stored === '1';
+  document.body.classList.toggle('sb-closed', closed);
+  const icon = document.getElementById('sb-toggle-icon');
+  if (icon) icon.className = closed ? 'bi bi-layout-sidebar' : 'bi bi-layout-sidebar-reverse';
+}
+
+function toggleSidebar() {
+  const closed = document.body.classList.toggle('sb-closed');
+  localStorage.setItem(STORAGE_KEY, closed ? '1' : '0');
+  const icon = document.getElementById('sb-toggle-icon');
+  if (icon) icon.className = closed ? 'bi bi-layout-sidebar' : 'bi bi-layout-sidebar-reverse';
+}
+
+applySidebarState();
+
+// ── Dropdown usuario ──────────────────────────────────────────────────────────
+function toggleUserDrop() {
+  document.getElementById('userDrop').classList.toggle('open');
+}
+
+document.addEventListener('click', function(e) {
+  const btn  = document.getElementById('userBtn');
+  const drop = document.getElementById('userDrop');
+  if (btn && drop && !btn.contains(e.target) && !drop.contains(e.target)) {
+    drop.classList.remove('open');
+  }
+});
+
+// ── Toast system ──────────────────────────────────────────────────────────────
+function showToast(msg, type, duration) {
+  type     = type     || 'info';
+  duration = duration || 4500;
+
+  const stack = document.getElementById('toastStack');
+  if (!stack) return;
+
+  const icons = {
+    error:   'bi-x-circle-fill',
+    success: 'bi-check-circle-fill',
+    warning: 'bi-exclamation-triangle-fill',
+    info:    'bi-info-circle-fill',
+  };
+
+  const toast = document.createElement('div');
+  toast.className = 'toast toast-' + type;
+  toast.innerHTML = '<i class="bi ' + (icons[type] || icons.info) + '"></i><span>' + msg + '</span>';
+  stack.appendChild(toast);
+
+  const dismiss = function() {
+    toast.classList.add('out');
+    setTimeout(function() { if (toast.parentNode) toast.remove(); }, 270);
+  };
+
+  toast.addEventListener('click', dismiss);
+  setTimeout(dismiss, duration);
+}
+</script>
+</body>
+</html>

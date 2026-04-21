@@ -12,6 +12,9 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <link rel="stylesheet" href="{% static 'css/base.css' %}">
   <link rel="stylesheet" href="{% static 'css/admin.css' %}">
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#0f0f0e">
+  <link rel="apple-touch-icon" href="/static/img/icon.svg">
   {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -93,6 +96,21 @@
       <span class="sb-tip">Estadísticas</span>
     </div>
 
+    <span class="sb-section-label">Tienda Física</span>
+
+    <div class="sb-item">
+      <a href="{% url 'app_admin:empleados' %}" class="sb-link {% block nav_empleados %}{% endblock %}">
+        <i class="bi bi-person-badge"></i><span class="sb-label">Empleados</span>
+      </a>
+      <span class="sb-tip">Empleados</span>
+    </div>
+    <div class="sb-item">
+      <a href="{% url 'app_admin:sedes' %}" class="sb-link {% block nav_sedes %}{% endblock %}">
+        <i class="bi bi-geo-alt"></i><span class="sb-label">Sedes</span>
+      </a>
+      <span class="sb-tip">Sedes</span>
+    </div>
+
     <span class="sb-section-label">Registros</span>
 
     <div class="sb-item">
@@ -139,6 +157,9 @@
   </div>
 </aside>
 
+<!-- Overlay para cerrar sidebar en móvil -->
+<div class="sb-overlay" id="sb-overlay" onclick="toggleSidebar()"></div>
+
 <!-- ══ MODAL INFO PRODUCTO ══ -->
 <div id="modal-info-producto" class="modal-overlay">
   <div class="modal-box">
@@ -156,6 +177,9 @@
 <div class="main">
   <header class="topbar">
     <div class="topbar-left">
+      <button class="sb-mobile-toggle" onclick="toggleSidebar()" aria-label="Menú">
+        <i class="bi bi-list"></i>
+      </button>
       <span class="topbar-breadcrumb">Admin</span>
       <span class="topbar-sep">/</span>
       <span class="topbar-title">{% block page_title %}Dashboard{% endblock %}</span>
@@ -242,7 +266,10 @@ document.addEventListener('DOMContentLoaded', function() {
 const STORAGE_KEY = 'sb_closed';
 
 function applySidebarState() {
-  const closed = localStorage.getItem(STORAGE_KEY) === '1';
+  const isMobile = window.innerWidth <= 640;
+  const stored = localStorage.getItem(STORAGE_KEY);
+  // En móvil: cerrado por defecto salvo que el usuario lo haya abierto explícitamente
+  const closed = isMobile ? stored !== '0' : stored === '1';
   document.body.classList.toggle('sb-closed', closed);
   const icon = document.getElementById('sb-toggle-icon');
   if (icon) icon.className = closed ? 'bi bi-layout-sidebar' : 'bi bi-layout-sidebar-reverse';
@@ -315,6 +342,11 @@ document.addEventListener('click', function(e) {
   if (bell && panel && !bell.contains(e.target) && !panel.contains(e.target)) panel.classList.remove('open');
 });
 cargarAlertas();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
 </script>
 </body>
 </html>

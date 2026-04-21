@@ -99,33 +99,48 @@
     display: flex;
     gap: 0.3rem;
     flex-wrap: nowrap;
+    align-items: center;
+    justify-content: center;
   }
   .action-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.28rem;
-    padding: 0.28rem 0.55rem;
+    gap: 0.3rem;
+    padding: 0.32rem 0.65rem;
     border-radius: 6px;
-    font-size: 0.69rem;
+    font-size: 0.78rem;
     font-weight: 600;
     cursor: pointer;
     text-decoration: none;
     border: 1px solid transparent;
-    transition: all 0.14s;
+    transition: background 0.14s, color 0.14s, border-color 0.14s, transform 0.1s;
     white-space: nowrap;
     letter-spacing: 0.01em;
+    line-height: 1;
   }
-  .action-btn.entrada  { background: var(--leaf-pale);   color: var(--leaf-dark); border-color: var(--leaf-tint); }
-  .action-btn.entrada:hover  { background: var(--leaf); color: #fff; border-color: var(--leaf); }
-  .action-btn.salida   { background: var(--amber-pale);  color: var(--amber);      border-color: var(--amber-tint); }
-  .action-btn.salida:hover   { background: var(--amber); color: #fff; border-color: var(--amber); }
-  .action-btn.editar   { background: var(--sky-pale);    color: var(--sky);        border-color: var(--sky-tint); }
-  .action-btn.editar:hover   { background: var(--sky);   color: #fff; border-color: var(--sky); }
-  .action-btn.historial { background: var(--cream);      color: var(--stone);      border-color: var(--mist); }
-  .action-btn.historial:hover { background: var(--fog);  color: var(--ink);        border-color: var(--fog); }
-  .action-btn.eliminar { background: var(--red-pale);    color: var(--red);        border-color: var(--red-tint); }
-  .action-btn.eliminar:hover { background: var(--red);   color: #fff;              border-color: var(--red); }
+  .action-btn i { font-size: 0.76rem; }
+  .action-btn:active { transform: scale(0.97); }
+
+  /* Entrada — verde */
+  .action-btn.entrada   { background: var(--leaf-pale);   color: var(--leaf-dark);   border-color: #bbf7d0; }
+  .action-btn.entrada:hover { background: #dcfce7; border-color: var(--leaf); }
+
+  /* Salida — ámbar/naranja */
+  .action-btn.salida    { background: var(--amber-pale);  color: var(--amber-dark);  border-color: var(--amber-tint); }
+  .action-btn.salida:hover  { background: var(--amber-tint); border-color: var(--amber); }
+
+  /* Editar — azul */
+  .action-btn.editar    { background: var(--sky-pale);    color: var(--sky-dark);    border-color: var(--sky-tint); }
+  .action-btn.editar:hover  { background: var(--sky-tint); border-color: var(--sky); }
+
+  /* Historial — gris neutro */
+  .action-btn.historial { background: var(--cream);       color: var(--stone);       border-color: var(--mist); }
+  .action-btn.historial:hover { background: var(--mist);  color: var(--ink);         border-color: var(--fog); }
+
+  /* Eliminar — rojo */
+  .action-btn.eliminar  { background: var(--red-pale);    color: var(--red-dark);    border-color: var(--red-tint); }
+  .action-btn.eliminar:hover  { background: var(--red-tint); border-color: var(--red); }
 
   /* ── Stock pill ── */
   .stock-pill {
@@ -240,8 +255,8 @@
 <div class="inv-kpi">
   <div class="inv-kpi-card green">
     <div class="inv-kpi-label">Total ítems</div>
-    <div class="inv-kpi-val">{{ productos.count|add:ingredientes.count }}</div>
-    <div class="inv-kpi-sub">{{ productos.count }} prod. · {{ ingredientes.count }} ing.</div>
+    <div class="inv-kpi-val">{{ productos.count|add:ingredientes.count|add:insumos.count }}</div>
+    <div class="inv-kpi-sub">{{ productos.count }} prod. · {{ ingredientes.count }} ing. · {{ insumos.count }} ins.</div>
   </div>
   <div class="inv-kpi-card red">
     <div class="inv-kpi-label">Sin stock</div>
@@ -300,6 +315,10 @@
   <button class="inv-tab" data-tab="ingredientes" onclick="switchTab('ingredientes', this)">
     <i class="bi bi-basket"></i> Ingredientes
     <span class="tab-count">{{ ingredientes.count }}</span>
+  </button>
+  <button class="inv-tab" data-tab="insumos" onclick="switchTab('insumos', this)">
+    <i class="bi bi-clipboard2-pulse"></i> Insumos
+    <span class="tab-count">{{ insumos.count }}</span>
   </button>
   <button class="inv-tab" data-tab="movimientos" onclick="switchTab('movimientos', this)">
     <i class="bi bi-clock-history"></i> Movimientos recientes
@@ -604,6 +623,145 @@
   </div>
 </div>
 
+<!-- ══ PANEL INSUMOS ════════════════════════════════════════════════════════ -->
+<div id="panel-insumos" class="inv-panel">
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title" style="display:flex;align-items:center;gap:0.5rem;">
+        <i class="bi bi-clipboard2-pulse" style="color:var(--sky);font-size:1rem;"></i>
+        Insumos operacionales
+      </span>
+      <div style="display:flex;gap:0.5rem;align-items:center;">
+        <a href="{% url 'app_admin:exportar_insumos_excel' %}" class="btn btn-ghost btn-sm">
+          <i class="bi bi-file-earmark-excel"></i> Excel
+        </a>
+        <a href="{% url 'app_admin:exportar_insumos_pdf' %}" class="btn btn-ghost btn-sm">
+          <i class="bi bi-file-earmark-pdf"></i> PDF
+        </a>
+        <a href="{% url 'app_admin:insumo_nuevo' %}" class="btn btn-ghost btn-sm">
+          <i class="bi bi-plus-lg"></i> Nuevo insumo
+        </a>
+      </div>
+    </div>
+
+    {% if insumos %}
+
+    {# ── Barra de acciones masivas insumos ── #}
+    <div id="inv-ins-bulk-bar" style="display:none;align-items:center;gap:0.65rem;padding:0.65rem 1rem;background:var(--sky-pale);border-bottom:1px solid var(--sky-tint);flex-wrap:wrap;">
+      <span style="font-size:0.78rem;font-weight:600;color:var(--sky);">
+        <i class="bi bi-check2-square"></i>
+        <span id="inv-ins-bulk-count">0</span> insumo(s) seleccionado(s)
+      </span>
+      <form method="post" action="{% url 'app_admin:insumo_bulk' %}" id="form-inv-ins-bulk" style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+        {% csrf_token %}
+        <div id="inv-ins-bulk-pks"></div>
+        <input type="hidden" name="accion" id="inv-ins-bulk-accion" value="">
+        <button type="button" class="btn btn-danger btn-sm" onclick="invInsBulkAccion('eliminar')">
+          <i class="bi bi-trash3"></i> Eliminar
+        </button>
+      </form>
+      <button class="btn btn-ghost btn-sm" onclick="limpiarInvIns()" style="margin-left:auto;">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+
+    <div style="overflow-x:auto;">
+    <table class="tbl" id="tbl-insumos">
+      <thead>
+        <tr>
+          <th style="width:2.5rem;text-align:center;">
+            <input type="checkbox" id="inv-ins-check-all" title="Seleccionar todos" style="accent-color:var(--sky);cursor:pointer;">
+          </th>
+          <th>Insumo</th>
+          <th>Categoría</th>
+          <th>Unidad</th>
+          <th>Stock</th>
+          <th>Mínimo</th>
+          <th>Estado</th>
+          <th style="text-align:center;">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for ins in insumos %}
+      <tr data-pk="{{ ins.pk }}">
+        <td style="width:2.5rem;text-align:center;padding:0.5rem;">
+          <input type="checkbox" class="inv-ins-check" value="{{ ins.pk }}"
+                 style="accent-color:var(--sky);cursor:pointer;width:1rem;height:1rem;">
+        </td>
+        <td>
+          <div style="display:flex;align-items:center;gap:0.55rem;">
+            {% if ins.imagen %}
+            <img src="{{ ins.imagen.url }}" alt="{{ ins.nombre }}"
+                 style="width:2.2rem;height:2.2rem;object-fit:cover;border-radius:5px;flex-shrink:0;border:1px solid var(--mist);">
+            {% else %}
+            <div style="width:2.2rem;height:2.2rem;border-radius:5px;background:var(--cream);border:1px solid var(--mist);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <i class="bi bi-clipboard2-pulse" style="font-size:0.68rem;color:var(--fog);"></i>
+            </div>
+            {% endif %}
+            <div>
+              <div style="font-weight:600;font-size:0.85rem;">{{ ins.nombre }}</div>
+              {% if ins.proveedor %}
+              <div style="font-size:0.71rem;color:var(--ash);margin-top:0.1rem;">
+                <i class="bi bi-truck" style="font-size:0.65rem;"></i> {{ ins.proveedor.nombre }}
+              </div>
+              {% endif %}
+            </div>
+          </div>
+        </td>
+        <td><span style="font-size:0.78rem;color:var(--stone);">{{ ins.get_categoria_display }}</span></td>
+        <td><span style="font-size:0.78rem;color:var(--stone);">{{ ins.get_unidad_display }}</span></td>
+        <td>
+          {% if ins.sin_stock %}
+            <span class="stock-pill out"><i class="bi bi-x-circle-fill"></i> 0</span>
+          {% elif ins.stock_bajo %}
+            <span class="stock-pill low"><i class="bi bi-exclamation-triangle-fill"></i> {{ ins.stock }}</span>
+          {% else %}
+            <span class="stock-pill ok"><i class="bi bi-check-circle-fill"></i> {{ ins.stock }}</span>
+          {% endif %}
+        </td>
+        <td style="color:var(--ash);font-size:0.8rem;">{{ ins.stock_minimo }}</td>
+        <td>
+          {% if ins.sin_stock %}<span class="badge badge-out">Sin stock</span>
+          {% elif ins.stock_bajo %}<span class="badge badge-low">Stock bajo</span>
+          {% else %}<span class="badge badge-ok">OK</span>{% endif %}
+        </td>
+        <td>
+          <div class="action-group" style="justify-content:center;">
+            <a href="{% url 'app_admin:insumo_ajuste' ins.pk %}?tipo=entrada" class="action-btn entrada" title="Registrar entrada">
+              <i class="bi bi-box-arrow-in-down"></i> Entrada
+            </a>
+            <a href="{% url 'app_admin:insumo_ajuste' ins.pk %}?tipo=salida" class="action-btn salida" title="Registrar salida">
+              <i class="bi bi-box-arrow-up"></i> Salida
+            </a>
+            <a href="{% url 'app_admin:insumo_editar' ins.pk %}" class="action-btn editar" title="Editar insumo">
+              <i class="bi bi-pencil"></i>
+            </a>
+            <a href="{% url 'app_admin:insumo_historial' ins.pk %}" class="action-btn historial" title="Ver historial">
+              <i class="bi bi-clock-history"></i>
+            </a>
+            <button class="action-btn eliminar" title="Eliminar insumo"
+                    onclick="confirmarEliminarIns('{{ ins.nombre|escapejs }}', '{% url 'app_admin:insumo_eliminar' ins.pk %}')">
+              <i class="bi bi-trash3"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <div class="inv-empty">
+      <i class="bi bi-clipboard2-pulse"></i>
+      <p>Sin insumos registrados{% if q %} para "{{ q }}"{% endif %}.</p>
+      <a href="{% url 'app_admin:insumo_nuevo' %}" class="btn btn-ghost btn-sm">
+        <i class="bi bi-plus-lg"></i> Crear primer insumo
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
 <!-- ══ PANEL MOVIMIENTOS RECIENTES ═════════════════════════════════════════ -->
 <div id="panel-movimientos" class="inv-panel">
   <div class="mov-grid">
@@ -846,6 +1004,61 @@ function invIngBulkAccion(accion) {
     container.appendChild(inp);
   });
   document.getElementById('form-inv-ing-bulk').submit();
+}
+
+// ── Confirm eliminar insumo ───────────────────────────────────────────────
+function confirmarEliminarIns(nombre, url) {
+  document.getElementById('modal-eliminar-desc').innerHTML =
+    `Vas a eliminar el insumo <strong>${nombre}</strong>. Esta acción es irreversible.`;
+  document.getElementById('form-eliminar').action = url;
+  document.getElementById('modal-eliminar').classList.add('open');
+}
+
+// ── Selección múltiple insumos ────────────────────────────────────────────
+const invInsCheckAll = document.getElementById('inv-ins-check-all');
+if (invInsCheckAll) {
+  function actualizarInvInsBulk() {
+    const checks = document.querySelectorAll('.inv-ins-check:checked');
+    const bar = document.getElementById('inv-ins-bulk-bar');
+    document.getElementById('inv-ins-bulk-count').textContent = checks.length;
+    bar.style.display = checks.length > 0 ? 'flex' : 'none';
+    document.querySelectorAll('#tbl-insumos tbody tr').forEach(tr => {
+      const chk = tr.querySelector('.inv-ins-check');
+      if (chk) tr.style.background = chk.checked ? 'var(--sky-pale)' : '';
+    });
+    const total = document.querySelectorAll('.inv-ins-check').length;
+    invInsCheckAll.indeterminate = checks.length > 0 && checks.length < total;
+    invInsCheckAll.checked = checks.length === total && total > 0;
+  }
+  invInsCheckAll.addEventListener('change', function () {
+    document.querySelectorAll('.inv-ins-check').forEach(c => {
+      const row = c.closest('tr');
+      if (!row || row.style.display === 'none') return;
+      c.checked = this.checked;
+    });
+    actualizarInvInsBulk();
+  });
+  document.querySelectorAll('.inv-ins-check').forEach(c => c.addEventListener('change', actualizarInvInsBulk));
+}
+function limpiarInvIns() {
+  document.querySelectorAll('.inv-ins-check').forEach(c => c.checked = false);
+  if (invInsCheckAll) invInsCheckAll.checked = false;
+  document.getElementById('inv-ins-bulk-bar').style.display = 'none';
+  document.querySelectorAll('#tbl-insumos tbody tr').forEach(tr => tr.style.background = '');
+}
+function invInsBulkAccion(accion) {
+  const checks = document.querySelectorAll('.inv-ins-check:checked');
+  if (!checks.length) return;
+  if (!confirm('¿Eliminar ' + checks.length + ' insumo(s)?')) return;
+  document.getElementById('inv-ins-bulk-accion').value = accion;
+  const container = document.getElementById('inv-ins-bulk-pks');
+  container.innerHTML = '';
+  checks.forEach(c => {
+    const inp = document.createElement('input');
+    inp.type = 'hidden'; inp.name = 'pks'; inp.value = c.value;
+    container.appendChild(inp);
+  });
+  document.getElementById('form-inv-ins-bulk').submit();
 }
 
 // ── Búsqueda en tabla (client-side) ──────────────────────────────────────

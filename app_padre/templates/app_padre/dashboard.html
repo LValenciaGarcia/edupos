@@ -300,7 +300,7 @@
             <div style="font-size:0.67rem;color:var(--ash);">Grado {{ hijo.grado }}</div>
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;">
+        <div class="grid-2" style="gap:0.4rem;">
           <a href="{% url 'app_padre:recargar_saldo' hijo.pk %}" class="btn btn-primary btn-xs btn-full"><i class="bi bi-plus-circle"></i> Recargar</a>
           <a href="{% url 'app_padre:pedido_padre' hijo.pk %}" class="btn btn-sky btn-xs btn-full"><i class="bi bi-cart-plus"></i> Pedir</a>
           <a href="{% url 'app_padre:limites' hijo.pk %}" class="btn btn-amber btn-xs btn-full"><i class="bi bi-speedometer2"></i> Límites</a>

@@ -283,6 +283,13 @@
     <div class="ing-kpi-val">{{ kpi.con_proveedor|default:"0" }}</div>
     <div class="ing-kpi-sub">con proveedor asignado</div>
   </div>
+  {% if kpi.sobrestock %}
+  <div class="ing-kpi-card amber">
+    <div class="ing-kpi-label">Sobrestock</div>
+    <div class="ing-kpi-val">{{ kpi.sobrestock }}</div>
+    <div class="ing-kpi-sub">superan el máximo</div>
+  </div>
+  {% endif %}
 </div>
 
 <div class="ing-layout">
@@ -335,6 +342,7 @@
           <th>Stock</th>
           <th>Mínimo</th>
           <th>Precio/u</th>
+          <th>Alérgenos</th>
           <th>Vencimiento</th>
           <th>Proyección</th>
           <th style="text-align:right;padding-right:1rem;">Acciones</th>
@@ -376,12 +384,31 @@
             <span class="stock-pill out"><i class="bi bi-x-circle-fill"></i> {{ ing.stock|floatformat:"-2" }}</span>
           {% elif ing.stock_bajo %}
             <span class="stock-pill low"><i class="bi bi-exclamation-triangle-fill"></i> {{ ing.stock|floatformat:"-2" }}</span>
+          {% elif ing.stock_sobrepasado %}
+            <span class="stock-pill" style="background:var(--sky-pale);color:var(--sky);"><i class="bi bi-arrow-up-circle-fill"></i> {{ ing.stock|floatformat:"-2" }}</span>
           {% else %}
             <span class="stock-pill ok"><i class="bi bi-check-circle-fill"></i> {{ ing.stock|floatformat:"-2" }}</span>
           {% endif %}
         </td>
         <td style="color:var(--ash);font-size:0.8rem;">{{ ing.stock_minimo|floatformat:"-2" }}</td>
         <td style="font-size:0.8rem;color:var(--stone);">${{ ing.precio_unitario|miles }}</td>
+        <td>
+          {% with alerg_list=ing.alergenos.all %}
+          {% if alerg_list %}
+            <div style="display:flex;flex-wrap:wrap;gap:0.25rem;">
+              {% for a in alerg_list %}
+              <span title="{{ a.get_codigo_display }}"
+                    style="display:inline-flex;align-items:center;padding:0.12rem 0.45rem;background:var(--red-pale);color:var(--red);border-radius:99px;font-size:0.62rem;font-weight:700;white-space:nowrap;">
+                {% if a.icono %}{{ a.icono }}{% else %}<i class="bi bi-exclamation-triangle-fill" style="font-size:0.58rem;"></i>{% endif %}
+                {{ a.get_codigo_display }}
+              </span>
+              {% endfor %}
+            </div>
+          {% else %}
+            <span style="color:var(--fog);font-size:0.78rem;">—</span>
+          {% endif %}
+          {% endwith %}
+        </td>
         <td>
           {% if ing.fecha_vencimiento %}
             {% if ing.vencido %}
@@ -432,15 +459,20 @@
               "unidad":    "{{ ing.get_unidad_display }}",
               "stock":     "{{ ing.stock }}",
               "stock_minimo": "{{ ing.stock_minimo }}",
+              "stock_maximo": "{% if ing.stock_maximo %}{{ ing.stock_maximo }}{% endif %}",
               "precio_unitario": "${{ ing.precio_unitario|miles }}",
+              "precio_con_merma": "${{ ing.precio_con_merma|floatformat:4 }}",
+              "porcentaje_merma": "{{ ing.porcentaje_merma }}",
               "proveedor": "{{ ing.proveedor|default:'—' }}",
               "fecha_vencimiento": "{% if ing.fecha_vencimiento %}{{ ing.fecha_vencimiento|date:'d/m/Y' }}{% endif %}",
               "vencido":    {{ ing.vencido|yesno:"true,false" }},
               "vence_pronto": {{ ing.vence_pronto|yesno:"true,false" }},
               "sin_stock":  {{ ing.sin_stock|yesno:"true,false" }},
               "stock_bajo": {{ ing.stock_bajo|yesno:"true,false" }},
+              "sobrestock": {{ ing.stock_sobrepasado|yesno:"true,false" }},
               "dias_restantes": "{% if ing.dias_restantes %}~{{ ing.dias_restantes }}d{% endif %}",
-              "imagen_url": "{% if ing.imagen %}{{ ing.imagen.url }}{% endif %}"
+              "imagen_url": "{% if ing.imagen %}{{ ing.imagen.url }}{% endif %}",
+              "alergenos": [{% for a in ing.alergenos.all %}"{{ a.get_codigo_display }}"{% if not forloop.last %},{% endif %}{% endfor %}]
             }
             </script>
           </div>
@@ -526,6 +558,7 @@
     <!-- Cuerpo desplazable -->
     <div style="padding:1.2rem 1.4rem 1.4rem;overflow-y:auto;">
       <div id="info-ing-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:0.55rem 1rem;margin-bottom:1.1rem;"></div>
+      <div id="info-ing-alerg-wrap" style="display:none;margin-bottom:0.75rem;flex-wrap:wrap;"></div>
       <div id="info-ing-venc-wrap" style="display:none;padding:0.55rem 0.8rem;border-radius:8px;font-size:0.8rem;font-weight:600;"></div>
     </div>
   </div>
@@ -584,12 +617,22 @@ function abrirInfoIngrediente(pk) {
     imgWrap.style.display = 'none';
   }
 
+  // Icono sobrestock override
+  if (d.sobrestock && !d.sin_stock && !d.stock_bajo) {
+    iconEl.style.background = 'var(--sky-pale)'; iconEl.style.color = 'var(--sky)';
+  }
+
   // Grid de datos
   const grid = document.getElementById('info-ing-grid');
   const fields = [
     { label: 'Stock actual',  value: d.stock + ' ' + d.unidad },
     { label: 'Stock mínimo',  value: d.stock_minimo + ' ' + d.unidad },
+    ...(d.stock_maximo ? [{ label: 'Stock máximo', value: d.stock_maximo + ' ' + d.unidad }] : []),
     { label: 'Precio/unidad', value: d.precio_unitario },
+    ...(parseFloat(d.porcentaje_merma) > 0 ? [
+      { label: 'Merma estimada', value: d.porcentaje_merma + '%' },
+      { label: 'Costo con merma', value: d.precio_con_merma },
+    ] : []),
     { label: 'Proveedor',     value: d.proveedor },
     ...(d.dias_restantes ? [{ label: 'Proyección', value: d.dias_restantes }] : []),
   ];
@@ -599,6 +642,19 @@ function abrirInfoIngrediente(pk) {
       <span style="font-size:0.88rem;font-weight:600;color:var(--ink);">${f.value}</span>
     </div>
   `).join('');
+
+  // Sección de alérgenos
+  const vencWrapRef = document.getElementById('info-ing-venc-wrap');
+  const alergSection = document.getElementById('info-ing-alerg-wrap');
+  if (alergSection) {
+    if (d.alergenos && d.alergenos.length > 0) {
+      alergSection.style.display = '';
+      alergSection.innerHTML = '<div style="font-size:0.62rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--ash);margin-bottom:0.4rem;">Alérgenos</div>'
+        + d.alergenos.map(a => `<span style="display:inline-flex;align-items:center;padding:0.18rem 0.55rem;background:var(--red-pale);color:var(--red);border-radius:99px;font-size:0.7rem;font-weight:700;margin:0.15rem;">${a}</span>`).join('');
+    } else {
+      alergSection.style.display = 'none';
+    }
+  }
 
   // Vencimiento
   const vencWrap = document.getElementById('info-ing-venc-wrap');

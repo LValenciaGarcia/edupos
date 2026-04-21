@@ -1,0 +1,79 @@
+{% extends 'app_empleado/base_empleado.html' %}
+{% load static %}
+
+{% block title %}Mi Perfil{% endblock %}
+{% block page_title %}Mi Perfil{% endblock %}
+{% block nav_perfil %}active{% endblock %}
+
+{% block content %}
+<div style="max-width:560px;display:flex;flex-direction:column;gap:1.25rem;">
+
+  <!-- Tarjeta de identidad -->
+  <div class="card anim-1" style="padding:1.5rem;">
+    <div style="display:flex;align-items:center;gap:1.1rem;margin-bottom:1.5rem;">
+      <div class="perfil-avatar">
+        {{ request.user.username|slice:":1"|upper }}
+      </div>
+      <div>
+        <div style="font-family:var(--serif);font-size:1.2rem;color:var(--ink);">
+          {{ request.user.get_full_name|default:request.user.username }}
+        </div>
+        <div style="color:var(--emp);font-size:var(--text-xs);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:.15rem;">
+          {{ empleado.get_cargo_display }}
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:0;">
+      <div class="perfil-info-row">
+        <span class="perfil-info-label"><i class="bi bi-person" style="margin-right:.35rem;"></i>Usuario</span>
+        <span class="perfil-info-val">{{ request.user.username }}</span>
+      </div>
+      <div class="perfil-info-row">
+        <span class="perfil-info-label"><i class="bi bi-card-text" style="margin-right:.35rem;"></i>Documento</span>
+        <span class="perfil-info-val">{{ empleado.documento|default:"—" }}</span>
+      </div>
+      <div class="perfil-info-row">
+        <span class="perfil-info-label"><i class="bi bi-geo-alt" style="margin-right:.35rem;"></i>Sedes</span>
+        <span class="perfil-info-val">
+          {% if empleado.es_global %}
+            <span style="color:var(--emp);">Acceso global</span>
+          {% else %}
+            {% for s in empleado.sedes.all %}{{ s.nombre }}{% if not forloop.last %}, {% endif %}{% empty %}<span style="color:var(--ash);">Sin sede</span>{% endfor %}
+          {% endif %}
+        </span>
+      </div>
+      <div class="perfil-info-row">
+        <span class="perfil-info-label"><i class="bi bi-telephone" style="margin-right:.35rem;"></i>Teléfono</span>
+        <span class="perfil-info-val">{{ request.user.perfil.telefono|default:"—" }}</span>
+      </div>
+      <div class="perfil-info-row" style="border:none;">
+        <span class="perfil-info-label"><i class="bi bi-envelope" style="margin-right:.35rem;"></i>Correo</span>
+        <span class="perfil-info-val">{{ request.user.email|default:"—" }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Editar -->
+  <div class="card anim-2">
+    <div class="card-head">Actualizar datos de contacto</div>
+    <form method="post" style="padding:1.25rem;display:flex;flex-direction:column;gap:.75rem;">
+      {% csrf_token %}
+      <div class="field">
+        <label class="field-label">Teléfono</label>
+        <input type="tel" name="telefono" class="form-input"
+               value="{{ request.user.perfil.telefono }}"
+               placeholder="Ej: 3001234567">
+      </div>
+      <div class="field">
+        <label class="field-label">Correo electrónico</label>
+        <input type="email" name="email" class="form-input"
+               value="{{ request.user.email }}"
+               placeholder="correo@ejemplo.com">
+      </div>
+      <button type="submit" class="btn btn-primary">Guardar cambios</button>
+    </form>
+  </div>
+
+</div>
+{% endblock %}

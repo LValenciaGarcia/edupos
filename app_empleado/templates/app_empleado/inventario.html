@@ -1,0 +1,109 @@
+{% extends 'app_empleado/base_empleado.html' %}
+{% load static %}
+
+{% block title %}Inventario{% endblock %}
+{% block page_title %}Inventario{% endblock %}
+{% block nav_inventario %}active{% endblock %}
+
+{% block content %}
+<div style="display:flex;flex-direction:column;gap:1.25rem;">
+
+  <!-- Resumen de stock -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;" class="anim-1">
+    <div class="emp-stat">
+      <div class="emp-stat-icon"><i class="bi bi-bag-check"></i></div>
+      <div class="emp-stat-label">Productos disponibles</div>
+      <div class="emp-stat-val">{{ total_productos }}</div>
+      <div class="emp-stat-sub">en catálogo activo</div>
+    </div>
+    {% if stock_bajo_count %}
+    <div class="emp-stat">
+      <div class="emp-stat-icon" style="background:var(--amber-tint);color:var(--amber-dark);"><i class="bi bi-exclamation-triangle"></i></div>
+      <div class="emp-stat-label">Stock bajo</div>
+      <div class="emp-stat-val" style="color:var(--amber);">{{ stock_bajo_count }}</div>
+      <div class="emp-stat-sub">por debajo del mínimo</div>
+    </div>
+    {% endif %}
+    {% if sin_stock_count %}
+    <div class="emp-stat">
+      <div class="emp-stat-icon" style="background:var(--red-pale);color:var(--red-dark);"><i class="bi bi-x-circle"></i></div>
+      <div class="emp-stat-label">Sin stock</div>
+      <div class="emp-stat-val" style="color:var(--red);">{{ sin_stock_count }}</div>
+      <div class="emp-stat-sub">agotados</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Filtros -->
+  <div class="card anim-2" style="padding:1rem 1.25rem;">
+    <form method="get" style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center;">
+      <input type="text" name="q" value="{{ q }}" class="form-input"
+             placeholder="Buscar producto..." style="flex:1;min-width:180px;">
+      <select name="cat" class="form-input" style="width:auto;">
+        <option value="">Todas las categorías</option>
+        {% for cat in categorias %}
+        <option value="{{ cat.nombre }}" {% if cat_id == cat.nombre %}selected{% endif %}>{{ cat.get_nombre_display }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+      {% if q or cat_id %}<a href="{% url 'app_empleado:inventario' %}" class="btn btn-ghost btn-sm">Limpiar</a>{% endif %}
+    </form>
+  </div>
+
+  <!-- Grid de productos -->
+  <div class="card anim-3">
+    <div class="card-head" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>Productos</span>
+      <span style="font-size:var(--text-xs);color:var(--ash);">Solo lectura — no puedes modificar precios ni stock</span>
+    </div>
+    {% if productos %}
+    <div class="inv-grid">
+      {% for p in productos %}
+      <div class="inv-card {% if p.sin_stock %}inv-agotado{% elif p.stock_bajo %}inv-bajo{% endif %}">
+        <div class="inv-card-img">
+          {% if p.imagen %}
+            <img src="{{ p.imagen.url }}" alt="{{ p.nombre }}">
+          {% else %}
+            <i class="bi bi-bag" style="font-size:1.8rem;color:var(--fog);"></i>
+          {% endif %}
+        </div>
+        <div class="inv-card-body">
+          <div class="inv-card-name">{{ p.nombre }}</div>
+          <div class="inv-card-cat">{{ p.categoria.get_nombre_display }}</div>
+          <div class="inv-card-price">${{ p.precio_venta|floatformat:0 }}</div>
+          {% if p.tipo == 'simple' %}
+          <div class="inv-stock-row">
+            {% if p.sin_stock %}
+              <span class="inv-stock-badge inv-stock-out"><i class="bi bi-x-circle-fill"></i> Agotado</span>
+            {% elif p.stock_bajo %}
+              <span class="inv-stock-badge inv-stock-low"><i class="bi bi-exclamation-triangle-fill"></i> Stock bajo: {{ p.stock }}</span>
+            {% else %}
+              <span class="inv-stock-badge inv-stock-ok"><i class="bi bi-check-circle-fill"></i> {{ p.stock }} uds.</span>
+            {% endif %}
+          </div>
+          {% else %}
+          <div class="inv-stock-row">
+            <span class="inv-stock-badge" style="background:var(--sky-pale);color:var(--sky-dark);border-color:var(--sky-tint);">
+              <i class="bi bi-tools"></i> Elaborado
+            </span>
+          </div>
+          {% endif %}
+          {% if not p.disponible %}
+          <div class="inv-stock-row">
+            <span class="inv-stock-badge" style="background:var(--fog);color:var(--stone);">Deshabilitado</span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="padding:2.5rem;text-align:center;color:var(--ash);">
+      <i class="bi bi-box-seam" style="font-size:2.5rem;display:block;margin-bottom:.5rem;color:var(--fog);"></i>
+      No se encontraron productos con ese filtro.
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

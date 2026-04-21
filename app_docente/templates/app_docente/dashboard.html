@@ -48,7 +48,7 @@
   </div>
 </div>
 
-<div style="display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; margin-bottom:1.25rem;">
+<div class="grid-2" style="margin-bottom:1.25rem;">
 
   <!-- Pedidos activos -->
   <div class="card">
@@ -81,7 +81,7 @@
   <div class="card">
     <div class="section-title">Mis favoritos</div>
     {% if favoritos %}
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:.5rem;">
+    <div class="grid-2" style="gap:.5rem;">
       {% for fav in favoritos %}
       <div style="background:var(--leaf-pale); border:1px solid var(--leaf-tint); border-radius:8px; padding:.55rem .7rem; display:flex; align-items:center; gap:.5rem; transition:box-shadow .15s;" onmouseenter="this.style.boxShadow='0 2px 8px rgba(22,163,74,.1)'" onmouseleave="this.style.boxShadow='none'">
         <div style="width:1.6rem; height:1.6rem; background:var(--leaf-tint); border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
@@ -106,7 +106,7 @@
 
 </div>
 
-<div style="display:grid; grid-template-columns:1fr 1fr; gap:1.25rem;">
+<div class="grid-2">
 
   <!-- Próximos programados -->
   <div class="card">

@@ -106,4 +106,14 @@ urlpatterns = [
     path('productos/bulk/',                     views.producto_bulk,            name='producto_bulk'),
     path('ingredientes/bulk/',                  views.ingrediente_bulk,         name='ingrediente_bulk'),
     path('insumos/bulk/',                       views.insumo_bulk,              name='insumo_bulk'),
+
+    # ── Empleados ──────────────────────────────────────────────────────────
+    path('empleados/',                          views.empleados,                name='empleados'),
+    path('empleados/nuevo/',                    views.empleado_nuevo,           name='empleado_nuevo'),
+    path('empleados/<int:pk>/',                 views.empleado_detalle,         name='empleado_detalle'),
+    path('empleados/<int:pk>/toggle/',          views.empleado_toggle,          name='empleado_toggle'),
+
+    # ── Sedes ──────────────────────────────────────────────────────────────
+    path('sedes/',                              views.sedes,                    name='sedes'),
+    path('sedes/<int:pk>/toggle/',              views.sede_toggle,              name='sede_toggle'),
 ]

@@ -1,0 +1,155 @@
+{% extends 'app_empleado/base_empleado.html' %}
+{% load static %}
+
+{% block title %}Clientes{% endblock %}
+{% block page_title %}Consulta de Clientes{% endblock %}
+{% block nav_clientes %}active{% endblock %}
+
+{% block content %}
+<div style="display:flex;flex-direction:column;gap:1.25rem;max-width:860px;">
+
+  <!-- Buscador -->
+  <div class="card anim-1" style="padding:1.25rem;">
+    <form method="get" style="display:flex;flex-direction:column;gap:.75rem;">
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end;">
+        <div class="field" style="flex:1;min-width:200px;margin:0;">
+          <label class="field-label">Tipo de cliente</label>
+          <div style="display:flex;gap:.4rem;">
+            <button type="submit" name="tipo" value="estudiante"
+                    class="btn {% if tipo == 'estudiante' %}btn-primary{% else %}btn-ghost{% endif %} btn-sm"
+                    {% if tipo == 'estudiante' %}onclick="this.form.submit()"{% endif %}>
+              <i class="bi bi-mortarboard"></i> Estudiante
+            </button>
+            <button type="submit" name="tipo" value="docente"
+                    class="btn {% if tipo == 'docente' %}btn-primary{% else %}btn-ghost{% endif %} btn-sm">
+              <i class="bi bi-person-badge"></i> Docente
+            </button>
+          </div>
+        </div>
+        <div class="field" style="flex:2;min-width:220px;margin:0;">
+          <label class="field-label">Buscar por nombre{% if tipo == 'estudiante' %} o código{% else %} o documento{% endif %}</label>
+          <input type="text" name="q" value="{{ q }}" class="form-input"
+                 placeholder="{% if tipo == 'estudiante' %}Nombre o código estudiantil…{% else %}Nombre o N° documento…{% endif %}"
+                 autofocus>
+          <input type="hidden" name="tipo" value="{{ tipo }}">
+        </div>
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-search"></i> Buscar
+        </button>
+        {% if q %}<a href="{% url 'app_empleado:clientes' %}?tipo={{ tipo }}" class="btn btn-ghost">Limpiar</a>{% endif %}
+      </div>
+    </form>
+  </div>
+
+  {% if q %}
+    {% if cliente_obj %}
+
+    <!-- Tarjeta del cliente -->
+    <div class="card anim-2" style="padding:1.25rem;">
+      <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+        <div class="perfil-avatar" style="flex-shrink:0;">
+          {{ cliente_obj.perfil.user.get_full_name|slice:":1"|upper }}
+        </div>
+        <div style="flex:1;">
+          <div style="font-family:var(--serif);font-size:1.2rem;color:var(--ink);">
+            {{ cliente_obj.perfil.user.get_full_name|default:cliente_obj.perfil.user.username }}
+          </div>
+          <div style="color:var(--stone);font-size:var(--text-sm);margin-top:.2rem;">
+            {% if tipo == 'estudiante' %}
+              Grado {{ cliente_obj.grado }} &mdash; Cód. {{ cliente_obj.codigo }}
+            {% else %}
+              Docente &mdash; {{ cliente_obj.materia|default:"—" }}
+            {% endif %}
+          </div>
+        </div>
+        <!-- Saldo -->
+        <div style="text-align:right;">
+          {% if tipo == 'estudiante' %}
+            <div style="font-family:var(--serif);font-size:1.5rem;color:var(--emp);">${{ cliente_obj.saldo|floatformat:0 }}</div>
+            <div style="font-size:var(--text-xs);color:var(--stone);">Saldo disponible</div>
+          {% else %}
+            <div style="font-family:var(--serif);font-size:1.4rem;color:var(--emp);">${{ cliente_obj.saldo|floatformat:0 }}</div>
+            <div style="font-size:var(--text-xs);color:var(--stone);">Saldo</div>
+            {% if cliente_obj.credito_disponible > 0 %}
+            <div style="font-size:var(--text-xs);color:var(--violet);font-weight:600;margin-top:.15rem;">
+              + ${{ cliente_obj.credito_disponible|floatformat:0 }} crédito
+            </div>
+            {% endif %}
+            {% if cliente_obj.deuda_fiado > 0 %}
+            <div style="font-size:var(--text-xs);color:var(--red);font-weight:600;margin-top:.1rem;">
+              Fiado: ${{ cliente_obj.deuda_fiado|floatformat:0 }}
+            </div>
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Historial de compras -->
+    <div class="card anim-3">
+      <div class="card-head" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>Últimas compras en caja</span>
+        {% if total_cliente %}
+        <span style="font-size:var(--text-sm);color:var(--stone);">
+          Total mostrado: <strong style="color:var(--emp-dark);">${{ total_cliente|floatformat:0 }}</strong>
+        </span>
+        {% endif %}
+      </div>
+      {% if ventas_list %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Ticket</th>
+              <th>Fecha</th>
+              <th>Hora</th>
+              <th>Productos</th>
+              <th style="text-align:right;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for v in ventas_list %}
+            <tr>
+              <td style="font-family:var(--serif);font-weight:600;color:var(--emp-dark);white-space:nowrap;font-size:var(--text-sm);">
+                {{ v.ticket }}
+              </td>
+              <td style="font-size:var(--text-sm);white-space:nowrap;">{{ v.fecha|date:"d/m/Y" }}</td>
+              <td style="font-size:var(--text-xs);color:var(--ash);">{{ v.fecha|time:"H:i" }}</td>
+              <td style="font-size:var(--text-xs);color:var(--stone);max-width:220px;">
+                {% for d in v.detalles.all %}
+                  {{ d.cantidad }}× {{ d.producto.nombre }}{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+              </td>
+              <td style="text-align:right;font-weight:700;color:var(--emp-dark);">${{ v.total|floatformat:0 }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div style="padding:2.5rem;text-align:center;color:var(--ash);">
+        <i class="bi bi-receipt" style="font-size:2.5rem;display:block;margin-bottom:.5rem;color:var(--fog);"></i>
+        Este cliente no tiene compras registradas en caja.
+      </div>
+      {% endif %}
+    </div>
+
+    {% else %}
+    <!-- No encontrado -->
+    <div class="card anim-2" style="padding:2.5rem;text-align:center;color:var(--ash);">
+      <i class="bi bi-person-x" style="font-size:2.5rem;display:block;margin-bottom:.5rem;color:var(--fog);"></i>
+      No se encontró ningún {{ tipo }} con "<strong>{{ q }}</strong>".
+      <div style="margin-top:.5rem;font-size:var(--text-xs);">Intenta con otro nombre, código o documento.</div>
+    </div>
+    {% endif %}
+  {% else %}
+  <!-- Estado vacío -->
+  <div class="card anim-2" style="padding:3rem;text-align:center;color:var(--ash);">
+    <i class="bi bi-people" style="font-size:3rem;display:block;margin-bottom:.75rem;color:var(--fog);"></i>
+    <div style="font-family:var(--serif);font-size:1.1rem;margin-bottom:.35rem;color:var(--stone);">Consulta el historial de un cliente</div>
+    <div style="font-size:var(--text-sm);">Busca por nombre, código estudiantil o documento.</div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

@@ -1,0 +1,19 @@
+{
+  "name": "Punto Asis — Cafetería Escolar",
+  "short_name": "Punto Asis",
+  "description": "Sistema de cafetería escolar del Colegio San Francisco de Asís",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f3f2ee",
+  "theme_color": "#0f0f0e",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "/static/img/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

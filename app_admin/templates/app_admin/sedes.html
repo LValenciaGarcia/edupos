@@ -1,0 +1,92 @@
+{% extends 'app_admin/base_admin.html' %}
+{% load static %}
+
+{% block title %}Sedes{% endblock %}
+{% block page_title %}Sedes{% endblock %}
+{% block nav_sedes %}active{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'app_admin:empleados' %}" class="btn btn-ghost btn-sm">
+  <i class="bi bi-people"></i> Empleados
+</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 360px;gap:1.25rem;align-items:start;">
+
+  <!-- Lista de sedes -->
+  <div class="card">
+    <div class="card-head">Sedes registradas</div>
+    {% if sedes %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Ciudad</th>
+            <th>Direccion</th>
+            <th>Empleados</th>
+            <th>Estado</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in sedes %}
+          <tr>
+            <td style="font-weight:600;">{{ s.nombre }}</td>
+            <td style="font-size:var(--text-sm);color:var(--stone);">{{ s.ciudad }}</td>
+            <td style="font-size:var(--text-sm);color:var(--stone);">{{ s.direccion|default:"—" }}</td>
+            <td style="text-align:center;">
+              <span class="badge badge-simple">{{ s.num_empleados }}</span>
+            </td>
+            <td>
+              {% if s.activa %}
+                <span class="badge badge-activo">Activa</span>
+              {% else %}
+                <span class="badge badge-inactivo">Inactiva</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{% url 'app_admin:sede_toggle' s.pk %}"
+                 class="btn btn-xs {% if s.activa %}btn-ghost{% else %}btn-amber{% endif %}"
+                 onclick="return confirm('¿Confirmas el cambio de estado de esta sede?')"
+                 title="{% if s.activa %}Desactivar{% else %}Activar{% endif %}">
+                <i class="bi bi-{% if s.activa %}pause-circle{% else %}play-circle{% endif %}"></i>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="padding:2.5rem;text-align:center;color:var(--ash);">
+      <i class="bi bi-geo-alt" style="font-size:2.5rem;display:block;margin-bottom:.5rem;color:var(--fog);"></i>
+      No hay sedes registradas.
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Crear sede -->
+  <div class="card">
+    <div class="card-head">Nueva sede</div>
+    <form method="post" style="padding:1.25rem;display:flex;flex-direction:column;gap:.75rem;">
+      {% csrf_token %}
+      <div class="field">
+        <label class="field-label">Nombre <span style="color:var(--red);">*</span></label>
+        <input type="text" name="nombre" class="form-input" required placeholder="Ej: Sede Principal">
+      </div>
+      <div class="field">
+        <label class="field-label">Ciudad</label>
+        <input type="text" name="ciudad" class="form-input" value="Cali" placeholder="Ciudad">
+      </div>
+      <div class="field">
+        <label class="field-label">Direccion</label>
+        <input type="text" name="direccion" class="form-input" placeholder="Calle 10 # 5-20">
+      </div>
+      <button type="submit" class="btn btn-primary">Crear sede</button>
+    </form>
+  </div>
+
+</div>
+{% endblock %}

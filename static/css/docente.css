@@ -199,3 +199,27 @@
   margin-bottom: 1.25rem;
   box-shadow: 0 1px 2px rgba(0,0,0,0.03);
 }
+
+/* ══ MOBILE (≤ 640px) ════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  /* Hero compacto */
+  .page-hero { padding: 1.2rem 1.25rem; margin-bottom: 1.25rem; }
+  .page-hero-name { font-size: 1.5rem; }
+
+  /* KPI: mínimo 2 columnas */
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+
+  /* FAB: alejado del home indicator */
+  .cart-fab {
+    bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+    right: 1.25rem;
+  }
+
+  /* Filter bar card: apilada */
+  .filter-bar-card { flex-direction: column; align-items: stretch; }
+  .filter-bar-card select,
+  .filter-bar-card input { width: 100%; }
+
+  /* Prod cards: 2 columnas en menú */
+  .prod-img-wrap { height: 80px; }
+}

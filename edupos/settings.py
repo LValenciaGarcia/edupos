@@ -6,7 +6,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ─── Variables de entorno ─────────────────────────────────────────────────────
 env = environ.Env(
     DEBUG=(bool, False),
-    ALLOWED_HOSTS=(list, ['localhost', '127.0.0.1']),
+    ALLOWED_HOSTS=(list, ['localhost', '127.0.0.1', '192.168.1.9']),
 )
 environ.Env.read_env(BASE_DIR / '.env')
 
@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'app_estudiante',
     'app_padre',
     'app_docente',
+    'app_empleado',
 ]
 
 if DEBUG:

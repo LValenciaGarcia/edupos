@@ -39,7 +39,7 @@
   {% endfor %}
   {% endif %}
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;align-items:start">
+  <div class="grid-2" style="align-items:start;">
 
     <!-- Lista de alergias -->
     <div class="card">
@@ -106,9 +106,30 @@
           {% csrf_token %}
           <input type="hidden" name="accion" value="crear">
           <div style="display:flex;flex-direction:column;gap:1rem">
+
+            {% if alergenos_catalogo %}
+            <!-- Selección rápida desde catálogo -->
+            <div class="field">
+              <label>Selección rápida</label>
+              <div style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.3rem;">
+                {% for alerg in alergenos_catalogo %}
+                <button type="button"
+                        onclick="seleccionarAlergeno('{{ alerg.get_codigo_display|escapejs }}')"
+                        style="padding:0.3rem 0.7rem;border:1px solid var(--fog);border-radius:99px;background:var(--ivory);font-size:0.76rem;font-weight:600;cursor:pointer;transition:all 0.14s;"
+                        onmouseover="this.style.borderColor='var(--red)';this.style.background='var(--red-pale)';this.style.color='var(--red)'"
+                        onmouseout="this.style.borderColor='var(--fog)';this.style.background='var(--ivory)';this.style.color=''">
+                  {% if alerg.icono %}{{ alerg.icono }} {% endif %}{{ alerg.get_codigo_display }}
+                </button>
+                {% endfor %}
+              </div>
+              <span class="hint" style="font-size:0.7rem;">Haz clic para rellenar el nombre automáticamente.</span>
+            </div>
+            {% endif %}
+
             <div class="field">
               <label>Alérgeno / nombre *</label>
-              <input type="text" name="nombre" placeholder="Ej: Maní, Lactosa, Gluten, Mariscos…" required>
+              <input type="text" name="nombre" id="input-nombre-alergia"
+                     placeholder="Ej: Maní, Lactosa, Gluten, Mariscos…" required>
             </div>
             <div class="field">
               <label>Tipo</label>
@@ -140,4 +161,13 @@
 
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function seleccionarAlergeno(nombre) {
+  document.getElementById('input-nombre-alergia').value = nombre;
+  document.getElementById('input-nombre-alergia').focus();
+}
+</script>
 {% endblock %}

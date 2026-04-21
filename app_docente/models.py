@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 from authentication.models import Docente
 from authentication.validators import validate_image
@@ -38,10 +38,19 @@ class PedidoDocente(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.ticket:
-            año = timezone.now().year
-            ultimo = PedidoDocente.objects.filter(ticket__startswith=f'PD-{año}-').order_by('-ticket').first()
-            num = (int(ultimo.ticket.split('-')[-1]) + 1) if ultimo else 1
-            self.ticket = f'PD-{año}-{num:05d}'
+            with transaction.atomic():
+                año = timezone.now().year
+                ultimo = (
+                    PedidoDocente.objects
+                    .select_for_update()
+                    .filter(ticket__startswith=f'PD-{año}-')
+                    .order_by('-ticket')
+                    .first()
+                )
+                num = (int(ultimo.ticket.split('-')[-1]) + 1) if ultimo else 1
+                self.ticket = f'PD-{año}-{num:05d}'
+                super().save(*args, **kwargs)
+                return
         super().save(*args, **kwargs)
 
     def recalcular_total(self):

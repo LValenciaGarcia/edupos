@@ -1,4 +1,5 @@
-from django.db import models
+from django.db import models, transaction
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from authentication.models import Estudiante
 from authentication.validators import validate_image
@@ -52,6 +53,37 @@ class Categoria(models.Model):
         verbose_name_plural = 'Categorías'
 
 
+# ─── ALÉRGENO ─────────────────────────────────────────────────────────────────
+
+class Alergeno(models.Model):
+    CODIGO_CHOICES = [
+        ('gluten',    'Gluten'),
+        ('lacteos',   'Lácteos'),
+        ('huevo',     'Huevo'),
+        ('mani',      'Maní / Cacahuate'),
+        ('soya',      'Soya'),
+        ('nueces',    'Frutos secos'),
+        ('mariscos',  'Mariscos / Crustáceos'),
+        ('pescado',   'Pescado'),
+        ('mostaza',   'Mostaza'),
+        ('apio',      'Apio'),
+        ('sesamo',    'Sésamo'),
+        ('sulfitos',  'Sulfitos'),
+        ('moluscos',  'Moluscos'),
+        ('otro',      'Otro'),
+    ]
+    codigo = models.CharField(max_length=20, choices=CODIGO_CHOICES, unique=True)
+    icono  = models.CharField(max_length=10, blank=True, help_text='Emoji o clase Bootstrap Icon')
+
+    def __str__(self):
+        return self.get_codigo_display()
+
+    class Meta:
+        verbose_name = 'Alérgeno'
+        verbose_name_plural = 'Alérgenos'
+        ordering = ['codigo']
+
+
 # ─── INGREDIENTE ──────────────────────────────────────────────────────────────
 
 class Ingrediente(models.Model):
@@ -73,7 +105,19 @@ class Ingrediente(models.Model):
     )
     stock             = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     stock_minimo      = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    stock_maximo      = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text='Alerta de sobrestock si se supera este valor'
+    )
     fecha_vencimiento = models.DateField(null=True, blank=True)
+    porcentaje_merma  = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0,
+        help_text='% de pérdida esperada en preparación (ej: 5.00 = 5%)'
+    )
+    alergenos         = models.ManyToManyField(
+        'Alergeno', blank=True, related_name='ingredientes',
+        verbose_name='Alérgenos que contiene'
+    )
     proveedor         = models.ForeignKey(
         Proveedor, on_delete=models.SET_NULL,
         null=True, blank=True, related_name='ingredientes'
@@ -87,8 +131,22 @@ class Ingrediente(models.Model):
         return float(self.stock) <= float(self.stock_minimo)
 
     @property
+    def stock_sobrepasado(self):
+        if not self.stock_maximo:
+            return False
+        return float(self.stock) > float(self.stock_maximo)
+
+    @property
     def sin_stock(self):
         return float(self.stock) <= 0
+
+    @property
+    def precio_con_merma(self):
+        """Costo efectivo por unidad considerando pérdida esperada en preparación."""
+        if float(self.porcentaje_merma) <= 0:
+            return float(self.precio_unitario)
+        factor = 1 / (1 - float(self.porcentaje_merma) / 100)
+        return round(float(self.precio_unitario) * factor, 4)
 
     @property
     def vence_pronto(self):
@@ -218,6 +276,12 @@ class Producto(models.Model):
         consumo_diario = float(vendidos) / 30
         return round(self.stock / consumo_diario) if consumo_diario > 0 else None
 
+    @property
+    def alergenos(self):
+        """Unión de alérgenos de todos los ingredientes de la receta (derivado, sin redundancia)."""
+        ids = self.receta.values_list('ingrediente__alergenos', flat=True)
+        return Alergeno.objects.filter(pk__in=ids).distinct()
+
     def esta_disponible(self):
         return self.disponible and not self.sin_stock
 
@@ -307,6 +371,14 @@ class DetalleCompra(models.Model):
     cantidad        = models.DecimalField(max_digits=10, decimal_places=2)
     precio_unitario = models.DecimalField(max_digits=10, decimal_places=4)
 
+    def clean(self):
+        tiene_prod = self.producto_id is not None
+        tiene_ing  = self.ingrediente_id is not None
+        if not tiene_prod and not tiene_ing:
+            raise ValidationError('Debes indicar un producto o un ingrediente.')
+        if tiene_prod and tiene_ing:
+            raise ValidationError('Un detalle de compra no puede referenciar producto e ingrediente al mismo tiempo.')
+
     @property
     def subtotal(self):
         return round(float(self.cantidad) * float(self.precio_unitario), 2)
@@ -343,10 +415,19 @@ class Pedido(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.ticket:
-            año = timezone.now().year
-            ultimo = Pedido.objects.filter(ticket__startswith=f'PA-{año}-').order_by('-ticket').first()
-            num = (int(ultimo.ticket.split('-')[-1]) + 1) if ultimo else 1
-            self.ticket = f'PA-{año}-{num:05d}'
+            with transaction.atomic():
+                año = timezone.now().year
+                ultimo = (
+                    Pedido.objects
+                    .select_for_update()
+                    .filter(ticket__startswith=f'PA-{año}-')
+                    .order_by('-ticket')
+                    .first()
+                )
+                num = (int(ultimo.ticket.split('-')[-1]) + 1) if ultimo else 1
+                self.ticket = f'PA-{año}-{num:05d}'
+                super().save(*args, **kwargs)
+                return
         super().save(*args, **kwargs)
 
     def recalcular_totales(self):

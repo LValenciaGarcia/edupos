@@ -1,0 +1,185 @@
+{% extends 'app_admin/base_admin.html' %}
+{% load static %}
+
+{% block title %}{{ empleado.perfil.user.get_full_name|default:empleado.perfil.user.username }}{% endblock %}
+{% block page_title %}Detalle Empleado{% endblock %}
+{% block nav_empleados %}active{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 320px;gap:1.25rem;align-items:start;">
+
+  <!-- Columna principal -->
+  <div style="display:flex;flex-direction:column;gap:1.25rem;">
+
+    <div style="margin-bottom:.25rem;">
+      <a href="{% url 'app_admin:empleados' %}" class="btn btn-ghost btn-sm">
+        <i class="bi bi-arrow-left"></i> Volver a empleados
+      </a>
+    </div>
+
+    <!-- Header empleado -->
+    <div class="card" style="padding:1.25rem 1.5rem;display:flex;align-items:center;gap:1rem;">
+      <div class="sb-avatar" style="width:3rem;height:3rem;font-size:1.2rem;flex-shrink:0;">
+        {{ empleado.perfil.user.username|slice:":1"|upper }}
+      </div>
+      <div style="flex:1;">
+        <div style="font-family:var(--serif);font-size:1.2rem;">{{ empleado.perfil.user.get_full_name|default:empleado.perfil.user.username }}</div>
+        <div style="color:var(--stone);font-size:var(--text-sm);">@{{ empleado.perfil.user.username }}</div>
+      </div>
+      <div>
+        {% if empleado.perfil.activo %}
+          <span class="badge badge-activo">Activo</span>
+        {% else %}
+          <span class="badge badge-inactivo">Inactivo</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Editar -->
+    <div class="card">
+      <div class="card-head">Editar datos</div>
+      <form method="post" style="padding:1.25rem;display:flex;flex-direction:column;gap:.9rem;">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="editar">
+
+        <div class="form-grid">
+          <div class="field">
+            <label class="field-label">Nombre</label>
+            <input type="text" name="first_name" class="form-input" value="{{ empleado.perfil.user.first_name }}">
+          </div>
+          <div class="field">
+            <label class="field-label">Apellido</label>
+            <input type="text" name="last_name" class="form-input" value="{{ empleado.perfil.user.last_name }}">
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label class="field-label">Correo electrónico</label>
+            <input type="email" name="email" class="form-input" value="{{ empleado.perfil.user.email }}">
+          </div>
+          <div class="field">
+            <label class="field-label">Teléfono</label>
+            <input type="tel" name="telefono" class="form-input" value="{{ empleado.perfil.telefono }}">
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label class="field-label">N° Documento</label>
+            <input type="text" name="documento" class="form-input" value="{{ empleado.documento }}">
+          </div>
+          <div class="field">
+            <label class="field-label">Cargo</label>
+            <select name="cargo" class="form-input">
+              {% for val, label in cargos %}
+              <option value="{{ val }}" {% if empleado.cargo == val %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Sedes -->
+        <div class="field">
+          <label class="field-label">Sedes asignadas</label>
+          <div style="display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.25rem;">
+            {% for s in sedes %}
+            <label style="display:flex;align-items:center;gap:.4rem;font-size:var(--text-sm);cursor:pointer;padding:.35rem .75rem;border:1px solid var(--fog);border-radius:var(--radius);background:var(--cream);">
+              <input type="checkbox" name="sedes" value="{{ s.pk }}"
+                     {% if s in empleado.sedes.all %}checked{% endif %}
+                     style="accent-color:var(--leaf);">
+              {{ s.nombre }}
+              {% if not s.activa %}<span style="color:var(--ash);font-size:.65rem;">(inactiva)</span>{% endif %}
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;font-size:var(--text-sm);">
+          <input type="checkbox" name="es_global" {% if empleado.es_global %}checked{% endif %} style="accent-color:var(--sky);width:1rem;height:1rem;">
+          <span><strong>Acceso global</strong> — puede ver información de todas las sedes</span>
+        </label>
+
+        <div style="display:flex;gap:.75rem;">
+          <button type="submit" class="btn btn-primary btn-sm">Guardar cambios</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Ventas recientes -->
+    <div class="card">
+      <div class="card-head">Ventas recientes</div>
+      {% if ventas_recientes %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr><th>Ticket</th><th>Pago</th><th>Total</th><th>Fecha</th></tr>
+          </thead>
+          <tbody>
+            {% for v in ventas_recientes %}
+            <tr>
+              <td style="font-family:var(--serif);font-weight:600;font-size:var(--text-sm);">{{ v.ticket }}</td>
+              <td>
+                {% if v.tipo_pago == 'efectivo' %}<span class="badge badge-ok">Efectivo</span>
+                {% elif v.tipo_pago == 'cuenta_estudiante' %}<span class="badge badge-simple">Estudiante</span>
+                {% else %}<span class="badge" style="background:var(--violet-pale);color:var(--violet-dark);">Docente</span>{% endif %}
+              </td>
+              <td style="font-weight:600;">${{ v.total|floatformat:0 }}</td>
+              <td style="font-size:var(--text-xs);color:var(--ash);">{{ v.fecha|date:"d/m/y H:i" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div style="padding:1.5rem;text-align:center;color:var(--ash);font-size:var(--text-sm);">Sin ventas registradas.</div>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <!-- Columna lateral -->
+  <div style="display:flex;flex-direction:column;gap:1rem;">
+
+    <!-- Acciones -->
+    <div class="card" style="padding:1.25rem;">
+      <div style="font-size:var(--text-sm);font-weight:600;color:var(--stone);margin-bottom:.75rem;text-transform:uppercase;letter-spacing:.05em;">Acciones</div>
+
+      <div style="display:flex;flex-direction:column;gap:.5rem;">
+        <a href="{% url 'app_admin:empleado_toggle' empleado.pk %}"
+           class="btn {% if empleado.perfil.activo %}btn-ghost{% else %}btn-amber{% endif %} btn-sm"
+           onclick="return confirm('¿Confirmas el cambio de estado?')">
+          <i class="bi bi-{% if empleado.perfil.activo %}pause-circle{% else %}play-circle{% endif %}"></i>
+          {% if empleado.perfil.activo %}Desactivar cuenta{% else %}Activar cuenta{% endif %}
+        </a>
+      </div>
+    </div>
+
+    <!-- Reset contraseña -->
+    <div class="card" style="padding:1.25rem;">
+      <div style="font-size:var(--text-sm);font-weight:600;color:var(--stone);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.05em;">Seguridad</div>
+      <p style="font-size:var(--text-xs);color:var(--ash);margin-bottom:.75rem;">
+        Genera una nueva contraseña temporal. La contraseña actual quedará inactiva inmediatamente.
+      </p>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="reset_password">
+        <button type="submit" class="btn btn-danger btn-sm"
+                onclick="return confirm('¿Restablecer la contraseña de este empleado?')">
+          <i class="bi bi-key"></i> Restablecer contraseña
+        </button>
+      </form>
+    </div>
+
+    <!-- Info técnica -->
+    <div class="card" style="padding:1rem 1.25rem;">
+      <div style="font-size:var(--text-xs);color:var(--ash);display:flex;flex-direction:column;gap:.4rem;">
+        <div><span style="color:var(--stone);">ID empleado:</span> #{{ empleado.pk }}</div>
+        <div><span style="color:var(--stone);">Creado:</span> {{ empleado.perfil.created_at|date:"d/m/Y" }}</div>
+        <div><span style="color:var(--stone);">Cargo:</span> {{ empleado.get_cargo_display }}</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

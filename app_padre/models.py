@@ -1,4 +1,5 @@
 from django.db import models, transaction
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from authentication.models import Estudiante, Padre
 from authentication.validators import validate_image
@@ -104,7 +105,7 @@ class LimiteGasto(models.Model):
     activo     = models.BooleanField(default=True)
 
     def gasto_actual(self):
-        """Gasto acumulado del estudiante en el periodo del límite."""
+        """Gasto acumulado del estudiante en el periodo, incluyendo pedidos en curso."""
         from app_admin.models import Pedido
         ahora = timezone.now()
         if self.tipo == 'diario':
@@ -114,9 +115,10 @@ class LimiteGasto(models.Model):
             inicio = inicio.replace(hour=0, minute=0, second=0, microsecond=0)
         else:
             inicio = ahora.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        # Incluye pendiente/preparando/listo para evitar bypass con pedidos simultáneos
         return Pedido.objects.filter(
             estudiante=self.estudiante,
-            estado='entregado',
+            estado__in=['pendiente', 'preparando', 'listo', 'entregado'],
             fecha_pedido__gte=inicio,
         ).aggregate(t=models.Sum('total'))['t'] or 0
 
@@ -172,6 +174,7 @@ class AlergiaEstudiante(models.Model):
         verbose_name = 'Alergia de Estudiante'
         verbose_name_plural = 'Alergias de Estudiantes'
         ordering = ['-gravedad', 'nombre']
+        unique_together = ['estudiante', 'nombre', 'tipo']
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -186,6 +189,14 @@ class RestriccionAlimento(models.Model):
     motivo     = models.CharField(max_length=200, blank=True)
     activo     = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def clean(self):
+        tiene_prod = self.producto_id is not None
+        tiene_cat  = self.categoria_id is not None
+        if not tiene_prod and not tiene_cat:
+            raise ValidationError('Debes indicar un producto o una categoría a restringir.')
+        if tiene_prod and tiene_cat:
+            raise ValidationError('Una restricción no puede referenciar producto y categoría al mismo tiempo.')
 
     def __str__(self):
         obj = self.producto or self.categoria
@@ -315,13 +326,22 @@ class PedidoProgramado(models.Model):
 
 
 class DetalleProgramado(models.Model):
-    pedido_prog = models.ForeignKey(PedidoProgramado, on_delete=models.CASCADE, related_name='detalles')
-    producto    = models.ForeignKey(Producto, on_delete=models.PROTECT)
-    cantidad    = models.PositiveIntegerField(default=1)
+    pedido_prog     = models.ForeignKey(PedidoProgramado, on_delete=models.CASCADE, related_name='detalles')
+    producto        = models.ForeignKey(Producto, on_delete=models.PROTECT)
+    cantidad        = models.PositiveIntegerField(default=1)
+    precio_unitario = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text='Precio congelado al momento de programar el pedido'
+    )
+
+    def save(self, *args, **kwargs):
+        if not self.precio_unitario:
+            self.precio_unitario = self.producto.precio_venta
+        super().save(*args, **kwargs)
 
     @property
     def subtotal(self):
-        return float(self.cantidad) * float(self.producto.precio_venta)
+        return float(self.cantidad) * float(self.precio_unitario)
 
     def __str__(self):
         return f'{self.cantidad}× {self.producto.nombre}'

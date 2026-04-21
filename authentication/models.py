@@ -13,6 +13,7 @@ class Perfil(models.Model):
         ('padre',      'Padre de Familia'),
         ('estudiante', 'Estudiante'),
         ('docente',    'Docente'),
+        ('empleado',   'Empleado'),
     ]
 
     user       = models.OneToOneField(User, on_delete=models.CASCADE, related_name='perfil')
@@ -26,6 +27,7 @@ class Perfil(models.Model):
     def es_padre(self):      return self.rol == 'padre'
     def es_estudiante(self): return self.rol == 'estudiante'
     def es_docente(self):    return self.rol == 'docente'
+    def es_empleado(self):   return self.rol == 'empleado'
 
     def __str__(self):
         return f'{self.user.get_full_name() or self.user.username} [{self.get_rol_display()}]'
@@ -100,3 +102,54 @@ class Docente(models.Model):
     class Meta:
         verbose_name = 'Docente'
         verbose_name_plural = 'Docentes'
+
+
+# ─── SEDE ─────────────────────────────────────────────────────────────────────
+
+class Sede(models.Model):
+    """Sede física (sucursal) de la cafetería."""
+    nombre    = models.CharField(max_length=100, unique=True)
+    direccion = models.CharField(max_length=200, blank=True)
+    ciudad    = models.CharField(max_length=100, default='Cali')
+    activa    = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        verbose_name = 'Sede'
+        verbose_name_plural = 'Sedes'
+        ordering = ['nombre']
+
+
+# ─── EMPLEADO ─────────────────────────────────────────────────────────────────
+
+class Empleado(models.Model):
+    """
+    Perfil extendido del empleado de tienda.
+    Creado exclusivamente por el Administrador; las credenciales se generan automáticamente.
+    """
+    CARGO_CHOICES = [
+        ('cajero',     'Cajero'),
+        ('atencion',   'Atención al Cliente'),
+        ('supervisor', 'Supervisor de Sede'),
+    ]
+
+    perfil    = models.OneToOneField(Perfil, on_delete=models.CASCADE, related_name='empleado')
+    documento = models.CharField(max_length=20, blank=True, verbose_name='N° Documento')
+    cargo     = models.CharField(max_length=20, choices=CARGO_CHOICES, default='cajero')
+    sedes     = models.ManyToManyField(Sede, related_name='empleados', blank=True)
+    es_global = models.BooleanField(
+        default=False,
+        verbose_name='Acceso global',
+        help_text='Puede visualizar información consolidada de todas las sedes'
+    )
+    history = HistoricalRecords()
+
+    def __str__(self):
+        return f'Empleado: {self.perfil}'
+
+    class Meta:
+        verbose_name = 'Empleado'
+        verbose_name_plural = 'Empleados'

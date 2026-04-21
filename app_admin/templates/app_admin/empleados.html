@@ -1,0 +1,112 @@
+{% extends 'app_admin/base_admin.html' %}
+{% load static %}
+
+{% block title %}Empleados{% endblock %}
+{% block page_title %}Empleados{% endblock %}
+{% block nav_empleados %}active{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'app_admin:sedes' %}" class="btn btn-ghost btn-sm">
+  <i class="bi bi-geo-alt"></i> Sedes
+</a>
+<a href="{% url 'app_admin:empleado_nuevo' %}" class="btn btn-primary btn-sm">
+  <i class="bi bi-person-plus"></i> Nuevo empleado
+</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;flex-direction:column;gap:1.25rem;">
+
+  <!-- Filtros -->
+  <div class="card" style="padding:1rem 1.25rem;">
+    <form method="get" style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center;">
+      <input type="text" name="q" value="{{ q }}" class="form-input" placeholder="Buscar por nombre, usuario o documento..." style="flex:1;min-width:200px;">
+      <select name="sede" class="form-input" style="width:auto;">
+        <option value="">Todas las sedes</option>
+        {% for s in sedes %}
+        <option value="{{ s.pk }}" {% if sede_id == s.pk|stringformat:"s" %}selected{% endif %}>{{ s.nombre }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+      {% if q or sede_id %}<a href="{% url 'app_admin:empleados' %}" class="btn btn-ghost btn-sm">Limpiar</a>{% endif %}
+    </form>
+  </div>
+
+  <!-- Lista -->
+  <div class="card">
+    <div class="card-head" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>Empleados registrados</span>
+      <span style="color:var(--ash);font-size:var(--text-sm);">{{ empleados|length }} resultado{{ empleados|length|pluralize:"s" }}</span>
+    </div>
+    {% if empleados %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Usuario</th>
+            <th>Cargo</th>
+            <th>Sedes</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for emp in empleados %}
+          <tr>
+            <td>
+              <div style="font-weight:600;">{{ emp.perfil.user.get_full_name|default:emp.perfil.user.username }}</div>
+              {% if emp.documento %}<div style="font-size:var(--text-xs);color:var(--ash);">{{ emp.documento }}</div>{% endif %}
+            </td>
+            <td style="font-size:var(--text-sm);color:var(--stone);">{{ emp.perfil.user.username }}</td>
+            <td>
+              <span class="badge" style="background:var(--amber-tint);color:var(--amber-dark);border:1px solid var(--amber-tint);">
+                {{ emp.get_cargo_display }}
+              </span>
+            </td>
+            <td style="font-size:var(--text-sm);">
+              {% if emp.es_global %}
+                <span style="color:var(--sky);font-weight:600;font-size:var(--text-xs);">
+                  <i class="bi bi-globe"></i> Global
+                </span>
+              {% else %}
+                {% for s in emp.sedes.all %}{{ s.nombre }}{% if not forloop.last %}, {% endif %}{% empty %}
+                <span style="color:var(--ash);">—</span>{% endfor %}
+              {% endif %}
+            </td>
+            <td>
+              {% if emp.perfil.activo %}
+                <span class="badge badge-activo">Activo</span>
+              {% else %}
+                <span class="badge badge-inactivo">Inactivo</span>
+              {% endif %}
+            </td>
+            <td>
+              <div style="display:flex;gap:.4rem;">
+                <a href="{% url 'app_admin:empleado_detalle' emp.pk %}" class="btn btn-ghost btn-xs" title="Ver detalle">
+                  <i class="bi bi-eye"></i>
+                </a>
+                <a href="{% url 'app_admin:empleado_toggle' emp.pk %}" class="btn btn-xs {% if emp.perfil.activo %}btn-ghost{% else %}btn-amber{% endif %}" title="{% if emp.perfil.activo %}Desactivar{% else %}Activar{% endif %}"
+                   onclick="return confirm('¿Confirmas el cambio de estado de este empleado?')">
+                  <i class="bi bi-{% if emp.perfil.activo %}pause-circle{% else %}play-circle{% endif %}"></i>
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="padding:2.5rem;text-align:center;color:var(--ash);">
+      <i class="bi bi-people" style="font-size:2.5rem;display:block;margin-bottom:.5rem;color:var(--fog);"></i>
+      {% if q or sede_id %}No se encontraron empleados con ese filtro.{% else %}No hay empleados registrados aún.{% endif %}
+      <div style="margin-top:1rem;">
+        <a href="{% url 'app_admin:empleado_nuevo' %}" class="btn btn-primary btn-sm">Crear primer empleado</a>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
