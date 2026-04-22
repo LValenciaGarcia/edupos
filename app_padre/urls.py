@@ -32,6 +32,9 @@ urlpatterns = [
     path('notificaciones/',                         views.notificaciones,       name='notificaciones'),
     path('api/notificaciones/',                     views.api_notificaciones,   name='api_notificaciones'),
 
+    # ── IA APIs ────────────────────────────────────────────────────────────
+    path('api/sugerir-alergia/',                    views.api_sugerir_alergia,  name='api_sugerir_alergia'),
+
     # ── Saldo del padre ────────────────────────────────────────────────────
     path('saldo/',                                  views.saldo_padre,          name='saldo_padre'),
 

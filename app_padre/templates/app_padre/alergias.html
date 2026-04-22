@@ -115,10 +115,11 @@
                 {% for alerg in alergenos_catalogo %}
                 <button type="button"
                         onclick="seleccionarAlergeno('{{ alerg.get_codigo_display|escapejs }}')"
-                        style="padding:0.3rem 0.7rem;border:1px solid var(--fog);border-radius:99px;background:var(--ivory);font-size:0.76rem;font-weight:600;cursor:pointer;transition:all 0.14s;"
+                        style="display:inline-flex;align-items:center;gap:0.3rem;padding:0.3rem 0.7rem;border:1px solid var(--fog);border-radius:99px;background:var(--ivory);font-size:0.76rem;font-weight:600;cursor:pointer;transition:all 0.14s;"
                         onmouseover="this.style.borderColor='var(--red)';this.style.background='var(--red-pale)';this.style.color='var(--red)'"
                         onmouseout="this.style.borderColor='var(--fog)';this.style.background='var(--ivory)';this.style.color=''">
-                  {% if alerg.icono %}{{ alerg.icono }} {% endif %}{{ alerg.get_codigo_display }}
+                  <i class="bi {% if alerg.icono %}{{ alerg.icono }}{% else %}bi-exclamation-triangle-fill{% endif %}" style="font-size:0.72rem;"></i>
+                  {{ alerg.get_codigo_display }}
                 </button>
                 {% endfor %}
               </div>
@@ -129,11 +130,12 @@
             <div class="field">
               <label>Alérgeno / nombre *</label>
               <input type="text" name="nombre" id="input-nombre-alergia"
-                     placeholder="Ej: Maní, Lactosa, Gluten, Mariscos…" required>
+                     placeholder="Ej: Maní, Lactosa, Gluten, Mariscos…" required
+                     autocomplete="off">
             </div>
             <div class="field">
               <label>Tipo</label>
-              <select name="tipo">
+              <select name="tipo" id="select-tipo-alergia">
                 {% for val, lbl in TIPO_CHOICES %}
                   <option value="{{ val }}">{{ lbl }}</option>
                 {% endfor %}
@@ -141,7 +143,7 @@
             </div>
             <div class="field">
               <label>Gravedad</label>
-              <select name="gravedad">
+              <select name="gravedad" id="select-gravedad-alergia">
                 {% for val, lbl in GRAVEDAD_CHOICES %}
                   <option value="{{ val }}">{{ lbl }}</option>
                 {% endfor %}
@@ -149,8 +151,27 @@
             </div>
             <div class="field">
               <label>Notas / síntomas</label>
-              <textarea name="notas" rows="3" placeholder="Síntomas, medicación disponible, instrucciones de emergencia…"></textarea>
+              <textarea name="notas" id="textarea-notas-alergia" rows="3"
+                        placeholder="Síntomas, medicación disponible, instrucciones de emergencia…"></textarea>
             </div>
+
+            <!-- Panel de sugerencia IA -->
+            <div id="ia-sugerencia-panel" style="display:none;padding:0.75rem 1rem;background:var(--violet-pale);border:1px solid #e9d5ff;border-radius:8px;font-size:0.78rem;">
+              <div style="font-size:0.62rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--violet);margin-bottom:0.45rem;">
+                <i class="bi bi-stars"></i> Sugerencia IA
+              </div>
+              <div id="ia-nombre-norm" style="font-weight:600;color:var(--ink);margin-bottom:0.2rem;"></div>
+              <div id="ia-alerta" style="color:var(--stone);font-style:italic;margin-bottom:0.35rem;"></div>
+              <button type="button" id="btn-aplicar-ia"
+                      style="padding:0.22rem 0.65rem;border:1px solid var(--violet);border-radius:6px;background:var(--violet);color:#fff;font-size:0.7rem;font-weight:600;cursor:pointer;font-family:var(--sans);">
+                Aplicar sugerencia
+              </button>
+              <button type="button" onclick="ocultarSugerencia()"
+                      style="margin-left:0.4rem;padding:0.22rem 0.65rem;border:1px solid var(--fog);border-radius:6px;background:transparent;font-size:0.7rem;font-weight:600;cursor:pointer;font-family:var(--sans);color:var(--stone);">
+                Ignorar
+              </button>
+            </div>
+
             <button type="submit" class="btn btn-primary btn-full">
               <i class="bi bi-plus-lg"></i> Registrar alergia
             </button>
@@ -165,9 +186,72 @@
 
 {% block extra_js %}
 <script>
+const CSRF_TOKEN = '{{ csrf_token }}';
+let _iaData = null;
+
 function seleccionarAlergeno(nombre) {
   document.getElementById('input-nombre-alergia').value = nombre;
   document.getElementById('input-nombre-alergia').focus();
+  ocultarSugerencia();
 }
+
+function ocultarSugerencia() {
+  document.getElementById('ia-sugerencia-panel').style.display = 'none';
+  _iaData = null;
+}
+
+// Debounce: consulta IA 800ms después de que el usuario deja de escribir
+let _timer = null;
+document.getElementById('input-nombre-alergia').addEventListener('input', function () {
+  clearTimeout(_timer);
+  ocultarSugerencia();
+  const val = this.value.trim();
+  if (val.length < 3) return;
+  _timer = setTimeout(() => consultarIA(val), 800);
+});
+
+async function consultarIA(nombre) {
+  const notas = document.getElementById('textarea-notas-alergia').value.trim();
+  try {
+    const res = await fetch('{% url "app_padre:api_sugerir_alergia" %}', {
+      method:  'POST',
+      headers: { 'X-CSRFToken': CSRF_TOKEN, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body:    new URLSearchParams({ nombre, notas }).toString(),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.error || !data.nombre_normalizado) return;
+    _iaData = data;
+
+    document.getElementById('ia-nombre-norm').textContent =
+      data.nombre_normalizado + ' — ' + capitalizarGravedad(data.gravedad_sugerida || '');
+    document.getElementById('ia-alerta').textContent =
+      data.alerta_caja ? 'Alerta cajero: "' + data.alerta_caja + '"' : '';
+    document.getElementById('ia-sugerencia-panel').style.display = '';
+  } catch { /* falla silenciosa */ }
+}
+
+function capitalizarGravedad(g) {
+  const map = { leve: 'Leve', moderada: 'Moderada', severa: 'Severa', anafilaxia: 'Anafilaxia' };
+  return map[g] || g;
+}
+
+document.getElementById('btn-aplicar-ia').addEventListener('click', function () {
+  if (!_iaData) return;
+  // Sobrescribir nombre con el normalizado
+  document.getElementById('input-nombre-alergia').value = _iaData.nombre_normalizado || '';
+  // Aplicar gravedad sugerida
+  const selGrav = document.getElementById('select-gravedad-alergia');
+  if (selGrav && _iaData.gravedad_sugerida) {
+    const opt = selGrav.querySelector(`option[value="${_iaData.gravedad_sugerida}"]`);
+    if (opt) selGrav.value = _iaData.gravedad_sugerida;
+  }
+  // Agregar alerta al campo notas si está vacío
+  const notas = document.getElementById('textarea-notas-alergia');
+  if (notas && !notas.value.trim() && _iaData.alerta_caja) {
+    notas.value = _iaData.alerta_caja;
+  }
+  ocultarSugerencia();
+});
 </script>
 {% endblock %}

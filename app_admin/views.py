@@ -5,10 +5,11 @@ from django.db import transaction
 from django.http import JsonResponse, HttpResponse
 from django.db.models import Sum, Count, F, Q
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 from datetime import date, timedelta
 import json
 
-from authentication.models import Perfil, Estudiante, Padre
+from authentication.models import Perfil, Estudiante, Padre, Docente
 from .models import (
     Producto, Categoria, Ingrediente, RecetaIngrediente,
     Proveedor, CompraProveedor, DetalleCompra,
@@ -17,6 +18,7 @@ from .models import (
     Insumo, MovimientoInsumo,
     PerfilAdmin, Alergeno,
 )
+from app_docente.models import PedidoDocente, DetallePedidoDocente
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -44,7 +46,7 @@ def admin_required(view_func):
 def _get_alertas():
     """Devuelve conteo de alertas activas para el topbar."""
     stock_prod = Producto.objects.filter(tipo='simple', stock__lte=F('stock_minimo')).count()
-    stock_ing  = Ingrediente.objects.filter(activo=True, stock__lte=F('stock_minimo')).count()
+    stock_ing  = Ingrediente.objects.filter(activo=True, stock_unidades__lte=F('stock_minimo')).count()
     vencidos   = Ingrediente.objects.filter(
         activo=True, fecha_vencimiento__lt=date.today()
     ).count()
@@ -100,8 +102,8 @@ def dashboard(request):
     ).select_related('proveedor').order_by('stock')[:8]
 
     ings_criticos = Ingrediente.objects.filter(
-        activo=True, stock__lte=F('stock_minimo')
-    ).select_related('proveedor').order_by('stock')[:8]
+        activo=True, stock_unidades__lte=F('stock_minimo')
+    ).order_by('stock_unidades')[:8]
 
     ultimos_pedidos = Pedido.objects.select_related(
         'estudiante__perfil__user'
@@ -363,8 +365,8 @@ def inventario(request):
     if tipo_f: qs = qs.filter(tipo=tipo_f)
     if q:      qs = qs.filter(Q(nombre__icontains=q) | Q(proveedor__nombre__icontains=q))
 
-    ings = Ingrediente.objects.select_related('proveedor').filter(activo=True)
-    if q: ings = ings.filter(Q(nombre__icontains=q) | Q(proveedor__nombre__icontains=q))
+    ings = Ingrediente.objects.filter(activo=True)
+    if q: ings = ings.filter(nombre__icontains=q)
 
     insumos_qs = Insumo.objects.select_related('proveedor').filter(activo=True)
     if q: insumos_qs = insumos_qs.filter(Q(nombre__icontains=q) | Q(proveedor__nombre__icontains=q))
@@ -436,7 +438,7 @@ def entrada_stock(request, pk=None):
     """
     proveedores  = Proveedor.objects.filter(activo=True)
     productos    = Producto.objects.filter(tipo='simple').select_related('proveedor')
-    ingredientes = Ingrediente.objects.filter(activo=True).select_related('proveedor')
+    ingredientes = Ingrediente.objects.filter(activo=True)
     producto_sel    = get_object_or_404(Producto, pk=pk) if pk else None
     ing_pk          = request.GET.get('ing', '').strip()
     ingrediente_sel = get_object_or_404(Ingrediente, pk=ing_pk) if ing_pk else None
@@ -503,8 +505,8 @@ def entrada_stock(request, pk=None):
                 else:
                     ing = get_object_or_404(Ingrediente, pk=id_)
                     det.ingrediente_id = ing.pk
-                    ing.stock = float(ing.stock) + cant_f
-                    ing.save(update_fields=['stock'])
+                    ing.stock_unidades = float(ing.stock_unidades) + cant_f
+                    ing.save(update_fields=['stock_unidades'])
                     MovimientoIngrediente.objects.create(
                         ingrediente=ing, tipo='entrada',
                         cantidad=cant_f,
@@ -520,12 +522,10 @@ def entrada_stock(request, pk=None):
         messages.success(request, f'Entrada registrada. Compra #{compra.pk} — Total: ${total:,.0f}')
         return redirect('app_admin:proveedor_compras', pk=prov_id)
 
-    # Auto-select proveedor: producto_sel o ingrediente_sel tienen proveedor asociado
+    # Auto-select proveedor desde el producto seleccionado
     prov_autosel = ''
     if producto_sel and producto_sel.proveedor:
         prov_autosel = str(producto_sel.proveedor.pk)
-    elif ingrediente_sel and ingrediente_sel.proveedor:
-        prov_autosel = str(ingrediente_sel.proveedor.pk)
 
     return render(request, 'app_admin/entrada_stock.html', _ctx({
         'proveedores':     proveedores,
@@ -541,7 +541,7 @@ def entrada_stock(request, pk=None):
 def salida_stock(request):
     """Registrar salida/merma de stock para productos o ingredientes."""
     productos    = Producto.objects.filter(tipo='simple').select_related('proveedor')
-    ingredientes = Ingrediente.objects.filter(activo=True).select_related('proveedor')
+    ingredientes = Ingrediente.objects.filter(activo=True)
 
     # Pre-selección via GET params: ?tipo=ingrediente&item=<pk>
     item_tipo_sel = request.GET.get('tipo', 'ingrediente')
@@ -576,14 +576,13 @@ def salida_stock(request):
                     messages.success(request, f'Salida de "{prod.nombre}" registrada. Stock actual: {prod.stock}')
                 else:
                     ing = get_object_or_404(Ingrediente, pk=item_id)
-                    # Para ingredientes: usar decimales
-                    ing.stock = max(0, float(ing.stock) - cantidad)
-                    ing.save(update_fields=['stock'])
+                    ing.stock_unidades = max(0, float(ing.stock_unidades) - cantidad)
+                    ing.save(update_fields=['stock_unidades'])
                     MovimientoIngrediente.objects.create(
                         ingrediente=ing, tipo=motivo,
                         cantidad=cantidad, nota=nota
                     )
-                    messages.success(request, f'Salida de "{ing.nombre}" registrada. Stock actual: {ing.stock}')
+                    messages.success(request, f'Salida de "{ing.nombre}" registrada. Stock real: {ing.stock_real:.2f} {ing.unidad_base}')
                 return redirect('app_admin:inventario')
             except Exception as e:
                 messages.error(request, f'Error al registrar la salida: {str(e)}')
@@ -593,7 +592,11 @@ def salida_stock(request):
         for p in productos
     ])
     ingredientes_json = json.dumps([
-        {'id': ing.pk, 'nombre': ing.nombre, 'stock': float(ing.stock), 'unidad': ing.get_unidad_display()}
+        {
+            'id': ing.pk, 'nombre': ing.nombre,
+            'stock': ing.stock_real,
+            'unidad': ing.get_unidad_base_display(),
+        }
         for ing in ingredientes
     ])
 
@@ -622,55 +625,58 @@ def ingrediente_eliminar(request, pk):
 
 @admin_required
 def ingredientes(request):
-    qs  = Ingrediente.objects.select_related('proveedor').prefetch_related('alergenos').filter(activo=True)
-    q   = request.GET.get('q', '').strip()
-    if q: qs = qs.filter(Q(nombre__icontains=q) | Q(proveedor__nombre__icontains=q))
+    qs = Ingrediente.objects.prefetch_related('alergenos').filter(activo=True)
+    q  = request.GET.get('q', '').strip()
+    if q:
+        qs = qs.filter(nombre__icontains=q)
 
     movimientos = MovimientoIngrediente.objects.select_related(
         'ingrediente', 'compra__proveedor'
     ).order_by('-fecha')[:50]
 
-    todos = Ingrediente.objects.filter(activo=True)
+    todos = list(Ingrediente.objects.filter(activo=True))
     kpi = {
-        'sin_stock':      sum(1 for i in todos if i.sin_stock),
-        'stock_bajo':     sum(1 for i in todos if i.stock_bajo and not i.sin_stock),
-        'con_proveedor':  todos.filter(proveedor__isnull=False).count(),
-        'sobrestock':     sum(1 for i in todos if i.stock_sobrepasado),
+        'sin_stock':  sum(1 for i in todos if i.sin_stock),
+        'stock_bajo': sum(1 for i in todos if i.stock_bajo and not i.sin_stock),
+        'total':      len(todos),
     }
 
     return render(request, 'app_admin/ingredientes.html', _ctx({
         'ingredientes': qs,
         'movimientos':  movimientos,
-        'q':  q,
-        'kpi': kpi,
+        'q':            q,
+        'kpi':          kpi,
     }))
 
 
 @admin_required
 def ingrediente_nuevo(request):
-    proveedores    = Proveedor.objects.filter(activo=True)
     alergenos_todos = Alergeno.objects.all()
     if request.method == 'POST':
-        nombre       = request.POST.get('nombre', '').strip()
-        unidad       = request.POST.get('unidad')
-        precio       = request.POST.get('precio_unitario')
-        stock        = request.POST.get('stock', 0)
-        stock_min    = request.POST.get('stock_minimo', 0)
-        stock_max    = request.POST.get('stock_maximo') or None
-        merma        = request.POST.get('porcentaje_merma', 0)
-        prov_id      = request.POST.get('proveedor') or None
-        f_venc       = request.POST.get('fecha_vencimiento') or None
-        imagen       = request.FILES.get('imagen')
-        alerg_ids    = request.POST.getlist('alergenos')
+        nombre               = request.POST.get('nombre', '').strip()
+        unidad_compra        = request.POST.get('unidad_compra', 'und').strip()
+        contenido_por_unidad = request.POST.get('contenido_por_unidad', 1)
+        unidad_base          = request.POST.get('unidad_base', 'und')
+        precio_compra        = request.POST.get('precio_compra')
+        stock_unidades       = request.POST.get('stock_unidades', 0)
+        stock_min            = request.POST.get('stock_minimo', 0)
+        f_venc               = request.POST.get('fecha_vencimiento') or None
+        imagen               = request.FILES.get('imagen')
+        alerg_ids            = request.POST.getlist('alergenos')
 
-        if not nombre or not precio:
-            messages.error(request, 'Nombre y precio son obligatorios.')
+        if not nombre or not precio_compra:
+            messages.error(request, 'Nombre y precio de compra son obligatorios.')
         else:
             ing = Ingrediente.objects.create(
-                nombre=nombre, unidad=unidad, precio_unitario=precio,
-                stock=stock, stock_minimo=stock_min, stock_maximo=stock_max,
-                porcentaje_merma=merma, proveedor_id=prov_id,
-                fecha_vencimiento=f_venc, imagen=imagen,
+                nombre=nombre,
+                unidad_compra=unidad_compra,
+                contenido_por_unidad=contenido_por_unidad,
+                unidad_base=unidad_base,
+                precio_compra=precio_compra,
+                stock_unidades=stock_unidades,
+                stock_minimo=stock_min,
+                fecha_vencimiento=f_venc,
+                imagen=imagen,
             )
             if alerg_ids:
                 ing.alergenos.set(alerg_ids)
@@ -678,25 +684,39 @@ def ingrediente_nuevo(request):
             return redirect('app_admin:ingredientes')
 
     return render(request, 'app_admin/ingrediente_form.html', _ctx({
-        'proveedores': proveedores, 'alergenos_todos': alergenos_todos,
+        'alergenos_todos': alergenos_todos,
         'accion': 'Nuevo ingrediente',
     }))
 
 
 @admin_required
+@admin_required
 def ingrediente_editar(request, pk):
-    ing            = get_object_or_404(Ingrediente, pk=pk)
-    proveedores    = Proveedor.objects.filter(activo=True)
+    ing             = get_object_or_404(Ingrediente, pk=pk)
     alergenos_todos = Alergeno.objects.all()
     if request.method == 'POST':
-        ing.nombre            = request.POST.get('nombre', ing.nombre).strip()
-        ing.unidad            = request.POST.get('unidad', ing.unidad)
-        ing.precio_unitario   = request.POST.get('precio_unitario', ing.precio_unitario)
-        ing.stock_minimo      = request.POST.get('stock_minimo', ing.stock_minimo)
-        ing.stock_maximo      = request.POST.get('stock_maximo') or None
-        ing.porcentaje_merma  = request.POST.get('porcentaje_merma', 0)
-        ing.proveedor_id      = request.POST.get('proveedor') or None
-        ing.fecha_vencimiento = request.POST.get('fecha_vencimiento') or None
+        ing.nombre               = request.POST.get('nombre', ing.nombre).strip()
+        ing.unidad_compra        = request.POST.get('unidad_compra', ing.unidad_compra).strip()
+        ing.unidad_base          = request.POST.get('unidad_base', ing.unidad_base)
+        ing.fecha_vencimiento    = request.POST.get('fecha_vencimiento') or None
+
+        # Campos decimales: solo asignar si vienen con valor
+        stock_unidades = request.POST.get('stock_unidades', '').strip()
+        if stock_unidades:
+            ing.stock_unidades = stock_unidades
+
+        contenido = request.POST.get('contenido_por_unidad', '').strip()
+        if contenido:
+            ing.contenido_por_unidad = contenido
+
+        precio = request.POST.get('precio_compra', '').strip()
+        if precio:
+            ing.precio_compra = precio
+
+        stock_minimo = request.POST.get('stock_minimo', '').strip()
+        if stock_minimo:
+            ing.stock_minimo = stock_minimo
+
         if request.FILES.get('imagen'):
             ing.imagen = request.FILES['imagen']
         ing.save()
@@ -705,12 +725,11 @@ def ingrediente_editar(request, pk):
         return redirect('app_admin:ingredientes')
 
     return render(request, 'app_admin/ingrediente_form.html', _ctx({
-        'ingrediente': ing, 'proveedores': proveedores,
-        'alergenos_todos': alergenos_todos,
+        'ingrediente':             ing,
+        'alergenos_todos':         alergenos_todos,
         'alergenos_seleccionados': set(ing.alergenos.values_list('pk', flat=True)),
         'accion': 'Editar ingrediente',
     }))
-
 
 @admin_required
 def ingrediente_ajuste(request, pk):
@@ -721,13 +740,13 @@ def ingrediente_ajuste(request, pk):
         nota     = request.POST.get('nota', '').strip()
 
         if tipo == 'entrada':
-            ing.stock = float(ing.stock) + cantidad
+            ing.stock_unidades = float(ing.stock_unidades) + cantidad
         elif tipo in ['salida', 'merma']:
-            ing.stock = max(0, float(ing.stock) - cantidad)
+            ing.stock_unidades = max(0, float(ing.stock_unidades) - cantidad)
         elif tipo == 'ajuste':
-            ing.stock = cantidad
+            ing.stock_unidades = cantidad
 
-        ing.save(update_fields=['stock'])
+        ing.save(update_fields=['stock_unidades'])
         MovimientoIngrediente.objects.create(ingrediente=ing, tipo=tipo, cantidad=cantidad, nota=nota)
         messages.success(request, f'Stock de "{ing.nombre}" actualizado.')
     return redirect('app_admin:ingredientes')
@@ -759,7 +778,7 @@ def exportar_ingredientes_excel(request):
     header_fill = PatternFill(start_color='1a3d2b', end_color='1a3d2b', fill_type='solid')
     header_font = Font(color='FFFFFF', bold=True)
 
-    headers = ['Nombre', 'Unidad', 'Stock', 'Stock mínimo', 'Precio unitario', 'Proveedor', 'Vencimiento']
+    headers = ['Nombre', 'Unidad compra', 'Stock (uds)', 'Contenido/ud', 'Unidad base', 'Stock real', 'Mínimo (base)', 'Precio compra', 'Costo unitario', 'Vencimiento']
     ws.append(headers)
     for col_num, _ in enumerate(headers, 1):
         cell = ws.cell(row=1, column=col_num)
@@ -767,14 +786,17 @@ def exportar_ingredientes_excel(request):
         cell.font = header_font
         cell.alignment = Alignment(horizontal='center')
 
-    for ing in Ingrediente.objects.select_related('proveedor').filter(activo=True).order_by('nombre'):
+    for ing in Ingrediente.objects.filter(activo=True).order_by('nombre'):
         ws.append([
             ing.nombre,
-            ing.get_unidad_display(),
-            float(ing.stock),
+            ing.unidad_compra,
+            float(ing.stock_unidades),
+            float(ing.contenido_por_unidad),
+            ing.get_unidad_base_display(),
+            ing.stock_real,
             float(ing.stock_minimo),
-            float(ing.precio_unitario),
-            ing.proveedor or '—',
+            float(ing.precio_compra),
+            ing.costo_unitario_real,
             ing.fecha_vencimiento.strftime('%d/%m/%Y') if ing.fecha_vencimiento else '—',
         ])
 
@@ -812,16 +834,19 @@ def exportar_ingredientes_pdf(request):
     elements.append(Paragraph(f'Generado: {date.today().strftime("%d/%m/%Y")}', styles['Normal']))
     elements.append(Spacer(1, 0.5*cm))
 
-    headers = ['Nombre', 'Unidad', 'Stock', 'Mínimo', 'Precio/u', 'Proveedor', 'Vencimiento']
+    headers = ['Nombre', 'Ud. compra', 'Stock uds', 'Cont./ud', 'Ud. base', 'Stock real', 'Mínimo', 'Precio compra', 'Costo/ud base', 'Vencimiento']
     data = [headers]
-    for ing in Ingrediente.objects.select_related('proveedor').filter(activo=True).order_by('nombre'):
+    for ing in Ingrediente.objects.filter(activo=True).order_by('nombre'):
         data.append([
-            ing.nombre[:30],
-            ing.get_unidad_display(),
-            str(float(ing.stock)),
-            str(float(ing.stock_minimo)),
-            f'${float(ing.precio_unitario):,.2f}',
-            str(ing.proveedor)[:18] if ing.proveedor else '—',
+            ing.nombre[:28],
+            ing.unidad_compra,
+            f'{float(ing.stock_unidades):g}',
+            f'{float(ing.contenido_por_unidad):g}',
+            ing.get_unidad_base_display(),
+            f'{ing.stock_real:g}',
+            f'{float(ing.stock_minimo):g}',
+            f'${float(ing.precio_compra):,.0f}',
+            f'${ing.costo_unitario_real:,.4f}',
             ing.fecha_vencimiento.strftime('%d/%m/%Y') if ing.fecha_vencimiento else '—',
         ])
 
@@ -1025,7 +1050,6 @@ def proveedores(request):
     q  = request.GET.get('q', '').strip()
     qs = Proveedor.objects.annotate(
         num_productos=Count('productos', distinct=True),
-        num_ingredientes=Count('ingredientes', distinct=True),
         num_insumos=Count('insumos', distinct=True),
         num_compras=Count('compras', distinct=True),
     ).order_by('nombre')
@@ -1038,8 +1062,7 @@ def proveedores(request):
         items = []
         for p in Producto.objects.filter(proveedor=prov, tipo='simple'):
             items.append({'tipo': 'Producto', 'nombre': p.nombre, 'stock': str(p.stock), 'unidad': 'und'})
-        for ing in Ingrediente.objects.filter(proveedor=prov, activo=True):
-            items.append({'tipo': 'Ingrediente', 'nombre': ing.nombre, 'stock': str(ing.stock), 'unidad': ing.get_unidad_display()})
+        # Ingredientes ya no tienen proveedor directo — omitidos aquí
         for ins in Insumo.objects.filter(proveedor=prov, activo=True):
             items.append({'tipo': 'Insumo', 'nombre': ins.nombre, 'stock': str(ins.stock), 'unidad': ins.get_unidad_display()})
         proveedores_data.append({'prov': prov, 'items_json': json.dumps(items)})
@@ -1235,9 +1258,10 @@ def pedido_estado(request, pk):
                     if detalle.producto.tipo == 'elaborado':
                         for r in detalle.producto.receta.select_related('ingrediente').all():
                             ing = Ingrediente.objects.select_for_update().get(pk=r.ingrediente.pk)
-                            consumo = float(r.cantidad) * detalle.cantidad
-                            ing.stock = max(0, float(ing.stock) - consumo)
-                            ing.save(update_fields=['stock'])
+                            consumo_base = float(r.cantidad) * detalle.cantidad
+                            consumo_unidades = consumo_base / float(ing.contenido_por_unidad) if float(ing.contenido_por_unidad) else 0
+                            ing.stock_unidades = max(0, float(ing.stock_unidades) - consumo_unidades)
+                            ing.save(update_fields=['stock_unidades'])
                             MovimientoIngrediente.objects.create(
                                 ingrediente=ing, tipo='salida',
                                 cantidad=consumo,
@@ -1255,6 +1279,98 @@ def pedido_estado(request, pk):
             pedido_locked.save(update_fields=['estado', 'fecha_entrega'])
 
         messages.success(request, f'Pedido {pedido.ticket} → {dict(Pedido.ESTADO_CHOICES).get(nuevo)}')
+    return redirect(next_url)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PEDIDOS DOCENTES
+# ══════════════════════════════════════════════════════════════════════════════
+
+@admin_required
+def pedidos_docentes(request):
+    hoy = date.today()
+    fecha = request.GET.get('fecha', str(hoy))
+    q = request.GET.get('q', '').strip()
+
+    qs = PedidoDocente.objects.filter(
+        fecha_pedido__date=fecha
+    ).select_related('docente__perfil__user').prefetch_related('detalles__producto')
+
+    if q:
+        qs = qs.filter(
+            Q(ticket__icontains=q) |
+            Q(docente__perfil__user__first_name__icontains=q) |
+            Q(docente__perfil__user__last_name__icontains=q)
+        )
+
+    kanban = {
+        'pendiente':  qs.filter(estado='pendiente'),
+        'preparando': qs.filter(estado='preparando'),
+        'listo':      qs.filter(estado='listo'),
+        'entregado':  qs.filter(estado='entregado'),
+        'cancelado':  qs.filter(estado='cancelado'),
+    }
+    return render(request, 'app_admin/pedidos_docentes.html', _ctx({
+        'kanban':    kanban,
+        'pedidos':   qs,
+        'estados':   PedidoDocente.ESTADO_CHOICES,
+        'fecha':     fecha,
+        'fecha_hoy': hoy,
+        'q':         q,
+    }))
+
+
+@admin_required
+def pedido_docente_detalle(request, pk):
+    pedido = get_object_or_404(
+        PedidoDocente.objects.select_related('docente__perfil__user')
+                            .prefetch_related('detalles__producto'),
+        pk=pk
+    )
+    return render(request, 'app_admin/pedido_docente_detalle.html', _ctx({'pedido': pedido}))
+
+
+TRANSICIONES_VALIDAS_DOCENTE = {
+    'pendiente':  ['preparando', 'cancelado'],
+    'preparando': ['listo', 'pendiente', 'cancelado'],
+    'listo':      ['entregado', 'pendiente'],
+    'entregado':  [],
+    'cancelado':  [],
+}
+
+
+@admin_required
+def pedido_docente_estado(request, pk):
+    pedido = get_object_or_404(PedidoDocente, pk=pk)
+    next_url = request.POST.get('next', 'app_admin:pedidos_docentes')
+    if request.method == 'POST':
+        nuevo = request.POST.get('estado')
+        estados_validos = [e[0] for e in PedidoDocente.ESTADO_CHOICES]
+        if nuevo not in estados_validos:
+            messages.error(request, 'Estado no válido.')
+            return redirect(next_url)
+
+        if nuevo not in TRANSICIONES_VALIDAS_DOCENTE.get(pedido.estado, []):
+            messages.error(
+                request,
+                f'No se puede cambiar de "{pedido.get_estado_display()}" a "{dict(PedidoDocente.ESTADO_CHOICES).get(nuevo)}".'
+            )
+            return redirect(next_url)
+
+        with transaction.atomic():
+            pedido_locked = PedidoDocente.objects.select_for_update().get(pk=pk)
+
+            if nuevo not in TRANSICIONES_VALIDAS_DOCENTE.get(pedido_locked.estado, []):
+                messages.error(request, 'Transición de estado inválida.')
+                return redirect(next_url)
+
+            pedido_locked.estado = nuevo
+            if nuevo == 'entregado':
+                pedido_locked.fecha_pedido = timezone.now()
+
+            pedido_locked.save(update_fields=['estado', 'fecha_pedido'])
+
+        messages.success(request, f'Pedido {pedido.ticket} → {dict(PedidoDocente.ESTADO_CHOICES).get(nuevo)}')
     return redirect(next_url)
 
 
@@ -2134,11 +2250,11 @@ def api_alertas(request):
             'color': 'amber',
         })
 
-    for i in Ingrediente.objects.filter(activo=True, stock__lte=F('stock_minimo')).select_related('proveedor')[:5]:
+    for i in [x for x in Ingrediente.objects.filter(activo=True) if x.stock_bajo][:5]:
         detalle.append({
             'tipo': 'stock_ingrediente',
-            'texto': f'{i.nombre} — {i.stock} {i.unidad} (mín: {i.stock_minimo})',
-            'url': f'/admin-panel/inventario/ingredientes/',
+            'texto': f'{i.nombre} — {i.stock_real:.2g} {i.get_unidad_base_display()} (mín: {i.stock_minimo})',
+            'url': '/admin-panel/inventario/ingredientes/',
             'color': 'amber',
         })
 
@@ -2167,38 +2283,182 @@ def api_alertas(request):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# IA — GENERADOR DE DESCRIPCIÓN DE PRODUCTO
+# ══════════════════════════════════════════════════════════════════════════════
+
+@admin_required
+@require_POST
+def api_generar_descripcion(request):
+    """AJAX: recibe nombre + categoría + ingredientes y devuelve descripción generada por Claude."""
+    from edupos.ai_client import get_client
+    import anthropic as _anthropic
+
+    nombre      = request.POST.get('nombre', '').strip()
+    categoria   = request.POST.get('categoria', '').strip()
+    ingredientes = request.POST.getlist('ingredientes[]')
+
+    if not nombre:
+        return JsonResponse({'error': 'El nombre del producto es obligatorio.'}, status=400)
+
+    cat_label = dict(Categoria.NOMBRE_CHOICES).get(categoria, categoria) or 'cafetería'
+    ings_str  = ', '.join(ingredientes[:6]) if ingredientes else 'ingredientes frescos'
+
+    prompt = (
+        f'Eres el redactor de menú de una cafetería escolar colombiana llamada "Punto Asis".\n'
+        f'Escribe una descripción apetitosa y corta (máximo 25 palabras) para este producto.\n'
+        f'Usa lenguaje cercano y fresco, apto para niños y jóvenes. Sin comillas ni punto final.\n\n'
+        f'Producto: "{nombre}"\n'
+        f'Categoría: "{cat_label}"\n'
+        f'Ingredientes principales: "{ings_str}"\n\n'
+        f'Responde SOLO con la descripción.'
+    )
+
+    try:
+        msg = get_client().messages.create(
+            model='claude-haiku-4-5-20251001',
+            max_tokens=80,
+            messages=[{'role': 'user', 'content': prompt}],
+        )
+        return JsonResponse({'descripcion': msg.content[0].text.strip()})
+    except RuntimeError as e:
+        return JsonResponse({'error': str(e)}, status=503)
+    except _anthropic.APIError:
+        return JsonResponse({'error': 'Servicio de IA no disponible en este momento.'}, status=503)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# IA — EXTRACTOR DE INFORMACIÓN DE PAGO EN RECARGAS
+# ══════════════════════════════════════════════════════════════════════════════
+
+@admin_required
+def api_info_pago(request, pk):
+    """AJAX GET: analiza la nota libre del padre y extrae datos de pago estructurados."""
+    from app_padre.models import RecargaSaldo
+    from edupos.ai_client import get_client
+    import anthropic as _anthropic
+
+    recarga = get_object_or_404(RecargaSaldo, pk=pk)
+
+    if not recarga.nota or len(recarga.nota.strip()) < 4:
+        return JsonResponse({'sin_nota': True})
+
+    prompt = (
+        f'Extrae información de pago de esta nota escrita por un padre de familia colombiano.\n'
+        f'La nota acompaña a una solicitud de recarga de saldo en una cafetería escolar.\n\n'
+        f'Nota del padre: "{recarga.nota}"\n'
+        f'Monto solicitado: ${float(recarga.monto):,.0f} COP\n\n'
+        f'Responde SOLO con JSON válido:\n'
+        f'{{\n'
+        f'  "banco": "nombre del banco o null",\n'
+        f'  "numero_referencia": "número de transacción/referencia o null",\n'
+        f'  "medio_pago": "transferencia|nequi|daviplata|efectivo|otro|no_especificado",\n'
+        f'  "fecha_mencionada": "fecha en texto o null",\n'
+        f'  "resumen": "frase de máximo 10 palabras resumiendo el pago"\n'
+        f'}}'
+    )
+
+    try:
+        msg = get_client().messages.create(
+            model='claude-haiku-4-5-20251001',
+            max_tokens=150,
+            messages=[{'role': 'user', 'content': prompt}],
+        )
+        import json as _json
+        data = _json.loads(msg.content[0].text.strip())
+        return JsonResponse(data)
+    except RuntimeError as e:
+        return JsonResponse({'error': str(e)}, status=503)
+    except (_anthropic.APIError, ValueError):
+        return JsonResponse({'error': 'No disponible'}, status=503)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # GESTIÓN DE RECARGAS (validación de comprobantes)
 # ══════════════════════════════════════════════════════════════════════════════
 
 @admin_required
 def recargas(request):
-    from app_padre.models import RecargaSaldo
-    estado = request.GET.get('estado', 'pendiente')
-    recargas_qs = RecargaSaldo.objects.select_related(
-        'estudiante__perfil__user', 'padre__perfil__user'
-    ).order_by('-fecha')
-    if estado:
-        recargas_qs = recargas_qs.filter(estado=estado)
+    import types as _types
+    from app_padre.models import RecargaSaldo, RecargaPadre
+    from app_docente.models import RecargaDocente
 
-    n_pendientes = RecargaSaldo.objects.filter(estado='pendiente').count()
+    estado = request.GET.get('estado', 'pendiente')
+
+    qs_est = RecargaSaldo.objects.select_related('estudiante__perfil__user', 'padre__perfil__user')
+    qs_doc = RecargaDocente.objects.select_related('docente__perfil__user')
+    qs_pad = RecargaPadre.objects.select_related('padre__perfil__user')
+    if estado:
+        qs_est = qs_est.filter(estado=estado)
+        qs_doc = qs_doc.filter(estado=estado)
+        qs_pad = qs_pad.filter(estado=estado)
+
+    lista = []
+    for r in qs_est:
+        lista.append(_types.SimpleNamespace(
+            pk=r.pk, tipo='estudiante',
+            nombre=r.estudiante.perfil.user.get_full_name(),
+            subtitulo=f'Padre: {r.padre.perfil.user.get_full_name() if r.padre else "–"}',
+            rol_badge='Estudiante',
+            monto=r.monto, comprobante=r.comprobante,
+            nota=r.nota, nota_admin=r.nota_admin,
+            estado=r.estado, get_estado_display=r.get_estado_display,
+            fecha=r.fecha, fecha_resolucion=r.fecha_resolucion,
+        ))
+    for r in qs_doc:
+        lista.append(_types.SimpleNamespace(
+            pk=r.pk, tipo='docente',
+            nombre=r.docente.perfil.user.get_full_name(),
+            subtitulo='Docente — saldo propio',
+            rol_badge='Docente',
+            monto=r.monto, comprobante=r.comprobante,
+            nota=r.nota, nota_admin=r.nota_admin,
+            estado=r.estado, get_estado_display=r.get_estado_display,
+            fecha=r.fecha, fecha_resolucion=r.fecha_resolucion,
+        ))
+    for r in qs_pad:
+        lista.append(_types.SimpleNamespace(
+            pk=r.pk, tipo='padre',
+            nombre=r.padre.perfil.user.get_full_name(),
+            subtitulo='Padre — saldo propio',
+            rol_badge='Padre',
+            monto=r.monto, comprobante=r.comprobante,
+            nota=r.nota, nota_admin=r.nota_admin,
+            estado=r.estado, get_estado_display=r.get_estado_display,
+            fecha=r.fecha, fecha_resolucion=r.fecha_resolucion,
+        ))
+
+    lista.sort(key=lambda r: r.fecha, reverse=True)
+
+    n_pendientes = (
+        RecargaSaldo.objects.filter(estado='pendiente').count()
+        + RecargaDocente.objects.filter(estado='pendiente').count()
+        + RecargaPadre.objects.filter(estado='pendiente').count()
+    )
     return render(request, 'app_admin/recargas.html', _ctx({
-        'recargas': recargas_qs,
+        'recargas': lista,
         'estado_activo': estado,
         'n_pendientes': n_pendientes,
-        'ESTADO_CHOICES': RecargaSaldo.ESTADO_CHOICES,
     }))
 
 
 @admin_required
-def recarga_resolver(request, pk):
-    from app_padre.models import RecargaSaldo
-    recarga = get_object_or_404(RecargaSaldo, pk=pk, estado='pendiente')
+def recarga_resolver(request, tipo, pk):
+    from app_padre.models import RecargaSaldo, RecargaPadre
+    from app_docente.models import RecargaDocente
+
+    _MODELS = {'estudiante': RecargaSaldo, 'docente': RecargaDocente, 'padre': RecargaPadre}
+    Model = _MODELS.get(tipo)
+    if not Model:
+        messages.error(request, 'Tipo de recarga inválido.')
+        return redirect('app_admin:recargas')
+
+    recarga = get_object_or_404(Model, pk=pk, estado='pendiente')
     if request.method == 'POST':
         accion     = request.POST.get('accion', '')
         nota_admin = request.POST.get('nota_admin', '').strip()
         if accion == 'aprobar':
             recarga.aprobar()
-            messages.success(request, f'Recarga #{recarga.pk} de ${recarga.monto:,.0f} aprobada. Saldo acreditado a {recarga.estudiante.perfil.user.get_full_name()}.')
+            messages.success(request, f'Recarga #{recarga.pk} de ${recarga.monto:,.0f} aprobada.')
         elif accion == 'rechazar':
             recarga.rechazar(nota=nota_admin)
             messages.warning(request, f'Recarga #{recarga.pk} rechazada.')
@@ -2550,11 +2810,15 @@ def empleados(request):
 
     sedes = Sede.objects.filter(activa=True)
 
+    all_emp = Empleado.objects.all()
     return render(request, 'app_admin/empleados.html', _ctx({
-        'empleados': qs,
-        'sedes':     sedes,
-        'q':         q,
-        'sede_id':   sede_id,
+        'empleados':          qs,
+        'sedes':              sedes,
+        'q':                  q,
+        'sede_id':            sede_id,
+        'total_empleados':    all_emp.count(),
+        'empleados_activos':  all_emp.filter(perfil__activo=True).count(),
+        'empleados_inactivos':all_emp.filter(perfil__activo=False).count(),
     }))
 
 

@@ -61,6 +61,11 @@ urlpatterns = [
     path('pedidos/<int:pk>/factura/',           views.factura_vista,            name='factura_vista'),
     path('pedidos/<int:pk>/factura/pdf/',       views.factura_pdf,              name='factura_pdf'),
 
+    # ── Pedidos Docentes ───────────────────────────────────────────────────
+    path('pedidos-docentes/',                   views.pedidos_docentes,         name='pedidos_docentes'),
+    path('pedidos-docentes/<int:pk>/',          views.pedido_docente_detalle,   name='pedido_docente_detalle'),
+    path('pedidos-docentes/<int:pk>/estado/',   views.pedido_docente_estado,    name='pedido_docente_estado'),
+
     # ── Usuarios ───────────────────────────────────────────────────────────
     path('usuarios/',                           views.usuarios,                 name='usuarios'),
     path('usuarios/bulk/',                      views.usuario_bulk,             name='usuario_bulk'),
@@ -87,9 +92,13 @@ urlpatterns = [
     # ── Alertas API ────────────────────────────────────────────────────────
     path('api/alertas/',                        views.api_alertas,              name='api_alertas'),
 
+    # ── IA APIs ────────────────────────────────────────────────────────────
+    path('api/generar-descripcion/',            views.api_generar_descripcion,  name='api_generar_descripcion'),
+    path('api/info-pago/<int:pk>/',             views.api_info_pago,            name='api_info_pago'),
+
     # ── Recargas (validación de comprobantes) ─────────────────────────────
     path('recargas/',                           views.recargas,                 name='recargas'),
-    path('recargas/<int:pk>/resolver/',         views.recarga_resolver,         name='recarga_resolver'),
+    path('recargas/<str:tipo>/<int:pk>/resolver/', views.recarga_resolver,       name='recarga_resolver'),
 
     # ── Insumos ────────────────────────────────────────────────────────────
     path('insumos/',                            views.insumos,                  name='insumos'),

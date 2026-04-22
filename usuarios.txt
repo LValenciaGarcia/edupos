@@ -1,0 +1,13 @@
+USUARIOS EDUPOS
+- ADMIN:
+  - USER: admin
+  - PASS: admin1234
+- Padre:
+  - USER: angel.ariza
+  - PASS: Salchipapa
+- Estudiante:
+  - USER: leonardo.valencia
+  - PASS: Salchipapa
+- Docente:
+  - USER: juan.jaramillo1
+  - PASS: Salchipapa

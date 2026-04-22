@@ -5,6 +5,115 @@
 {% block page_title %}Empleados{% endblock %}
 {% block nav_empleados %}active{% endblock %}
 
+{% block extra_css %}
+<style>
+/* ── Empleados page ──────────────────────────────────────────────────────── */
+.emp-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+@media (max-width: 800px) { .emp-stats { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .emp-stats { grid-template-columns: 1fr 1fr; } }
+
+.emp-stat {
+  background: var(--ivory);
+  border: 1px solid var(--mist);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+}
+.emp-stat-icon {
+  width: 2.1rem; height: 2.1rem;
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .95rem;
+  margin-bottom: .55rem;
+}
+.emp-stat-num { font-family: var(--serif); font-size: 1.9rem; line-height: 1; }
+.emp-stat-lbl { font-size: var(--text-xs); color: var(--ash); }
+
+/* ── Filter bar ──────────────────────────────────────────────────────────── */
+.emp-filter {
+  background: var(--ivory);
+  border: 1px solid var(--mist);
+  border-radius: var(--radius);
+  padding: .85rem 1.15rem;
+  display: flex; gap: .65rem; flex-wrap: wrap; align-items: center;
+}
+.emp-filter .form-input { background: var(--cream); }
+.emp-filter .form-input:focus { border-color: var(--leaf); background: var(--ivory); }
+
+/* ── Employee card list ──────────────────────────────────────────────────── */
+.emp-list { display: flex; flex-direction: column; gap: .45rem; }
+
+.emp-card {
+  background: var(--ivory);
+  border: 1px solid var(--mist);
+  border-radius: var(--radius);
+  padding: .85rem 1.15rem;
+  display: flex; align-items: center; gap: 1rem;
+  transition: border-color .14s, box-shadow .14s, transform .14s;
+}
+.emp-card:hover {
+  border-color: var(--fog);
+  box-shadow: 0 2px 14px rgba(0,0,0,.06);
+  transform: translateX(3px);
+}
+
+/* Avatar */
+.emp-av {
+  width: 2.6rem; height: 2.6rem; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--serif); font-size: 1rem; font-weight: 700;
+  flex-shrink: 0; user-select: none;
+}
+.av-cajero    { background: var(--amber-tint); color: var(--amber-dark); }
+.av-atencion  { background: var(--sky-tint);   color: var(--sky-dark); }
+.av-supervisor{ background: var(--violet-tint); color: var(--violet-dark); }
+.av-default   { background: var(--leaf-tint);  color: var(--leaf-dark); }
+
+/* Info */
+.emp-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 18ch; }
+.emp-sub  { font-size: var(--text-xs); color: var(--ash); margin-top: .08rem; }
+
+/* Cargo pill */
+.cargo-pill {
+  display: inline-flex; align-items: center;
+  padding: .22rem .65rem; border-radius: 99px;
+  font-size: var(--text-2xs); font-weight: 700;
+  letter-spacing: .07em; text-transform: uppercase; flex-shrink: 0;
+}
+.cp-cajero    { background: var(--amber-tint); color: var(--amber-dark); }
+.cp-atencion  { background: var(--sky-tint);   color: var(--sky-dark); }
+.cp-supervisor{ background: var(--violet-tint); color: var(--violet-dark); }
+.cp-default   { background: var(--leaf-tint);  color: var(--leaf-dark); }
+
+/* Sede pills */
+.sede-pills    { display: flex; flex-wrap: wrap; gap: .3rem; max-width: 180px; }
+.sede-pill     { font-size: var(--text-2xs); padding: .17rem .5rem; background: var(--cream); border: 1px solid var(--mist); border-radius: 99px; color: var(--stone); white-space: nowrap; }
+.global-pill   { font-size: var(--text-2xs); padding: .17rem .5rem; background: var(--sky-tint); color: var(--sky-dark); border-radius: 99px; white-space: nowrap; }
+
+/* Status dot */
+.status-dot { width: .48rem; height: .48rem; border-radius: 50%; flex-shrink: 0; }
+.dot-on     { background: var(--leaf); box-shadow: 0 0 0 2.5px var(--leaf-tint); }
+.dot-off    { background: var(--fog); }
+
+/* Empty state */
+.emp-empty {
+  padding: 3rem 1rem; text-align: center; color: var(--ash);
+  display: flex; flex-direction: column; align-items: center; gap: .75rem;
+}
+.emp-empty-ico {
+  width: 4rem; height: 4rem; background: var(--cream); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.75rem; color: var(--fog);
+}
+</style>
+{% endblock %}
+
 {% block topbar_actions %}
 <a href="{% url 'app_admin:sedes' %}" class="btn btn-ghost btn-sm">
   <i class="bi bi-geo-alt"></i> Sedes
@@ -17,92 +126,160 @@
 {% block content %}
 <div style="display:flex;flex-direction:column;gap:1.25rem;">
 
+  <!-- Stats -->
+  <div class="emp-stats">
+    <div class="emp-stat">
+      <div class="emp-stat-icon" style="background:var(--cream);color:var(--stone);">
+        <i class="bi bi-people"></i>
+      </div>
+      <div class="emp-stat-num">{{ total_empleados }}</div>
+      <div class="emp-stat-lbl">Total empleados</div>
+    </div>
+    <div class="emp-stat">
+      <div class="emp-stat-icon" style="background:var(--leaf-tint);color:var(--leaf);">
+        <i class="bi bi-person-check"></i>
+      </div>
+      <div class="emp-stat-num">{{ empleados_activos }}</div>
+      <div class="emp-stat-lbl">Activos</div>
+    </div>
+    <div class="emp-stat">
+      <div class="emp-stat-icon" style="background:var(--red-tint);color:var(--red);">
+        <i class="bi bi-person-dash"></i>
+      </div>
+      <div class="emp-stat-num">{{ empleados_inactivos }}</div>
+      <div class="emp-stat-lbl">Inactivos</div>
+    </div>
+    <div class="emp-stat">
+      <div class="emp-stat-icon" style="background:var(--sky-tint);color:var(--sky);">
+        <i class="bi bi-geo-alt"></i>
+      </div>
+      <div class="emp-stat-num">{{ sedes|length }}</div>
+      <div class="emp-stat-lbl">Sedes activas</div>
+    </div>
+  </div>
+
   <!-- Filtros -->
-  <div class="card" style="padding:1rem 1.25rem;">
-    <form method="get" style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center;">
-      <input type="text" name="q" value="{{ q }}" class="form-input" placeholder="Buscar por nombre, usuario o documento..." style="flex:1;min-width:200px;">
-      <select name="sede" class="form-input" style="width:auto;">
+  <div class="emp-filter">
+    <form method="get" style="display:contents;">
+      <i class="bi bi-search" style="color:var(--ash);font-size:.9rem;"></i>
+      <input type="text" name="q" value="{{ q }}" class="form-input"
+             placeholder="Buscar por nombre, usuario o documento..."
+             style="flex:1;min-width:200px;">
+      <select name="sede" class="form-input" style="width:auto;min-width:160px;">
         <option value="">Todas las sedes</option>
         {% for s in sedes %}
-        <option value="{{ s.pk }}" {% if sede_id == s.pk|stringformat:"s" %}selected{% endif %}>{{ s.nombre }}</option>
+        <option value="{{ s.pk }}" {% if sede_id == s.pk|stringformat:"s" %}selected{% endif %}>
+          {{ s.nombre }}
+        </option>
         {% endfor %}
       </select>
       <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
-      {% if q or sede_id %}<a href="{% url 'app_admin:empleados' %}" class="btn btn-ghost btn-sm">Limpiar</a>{% endif %}
+      {% if q or sede_id %}
+      <a href="{% url 'app_admin:empleados' %}" class="btn btn-ghost btn-sm">
+        <i class="bi bi-x"></i> Limpiar
+      </a>
+      {% endif %}
     </form>
   </div>
 
   <!-- Lista -->
-  <div class="card">
-    <div class="card-head" style="display:flex;align-items:center;justify-content:space-between;">
-      <span>Empleados registrados</span>
-      <span style="color:var(--ash);font-size:var(--text-sm);">{{ empleados|length }} resultado{{ empleados|length|pluralize:"s" }}</span>
+  <div>
+    <div style="display:flex;align-items:center;margin-bottom:.75rem;padding:0 .1rem;">
+      <span style="font-size:var(--text-sm);color:var(--stone);">
+        <strong>{{ empleados|length }}</strong> resultado{{ empleados|length|pluralize:",s" }}
+        {% if q or sede_id %}
+          <span style="color:var(--ash);"> · filtro activo</span>
+        {% endif %}
+      </span>
     </div>
+
     {% if empleados %}
-    <div class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Nombre</th>
-            <th>Usuario</th>
-            <th>Cargo</th>
-            <th>Sedes</th>
-            <th>Estado</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for emp in empleados %}
-          <tr>
-            <td>
-              <div style="font-weight:600;">{{ emp.perfil.user.get_full_name|default:emp.perfil.user.username }}</div>
-              {% if emp.documento %}<div style="font-size:var(--text-xs);color:var(--ash);">{{ emp.documento }}</div>{% endif %}
-            </td>
-            <td style="font-size:var(--text-sm);color:var(--stone);">{{ emp.perfil.user.username }}</td>
-            <td>
-              <span class="badge" style="background:var(--amber-tint);color:var(--amber-dark);border:1px solid var(--amber-tint);">
-                {{ emp.get_cargo_display }}
-              </span>
-            </td>
-            <td style="font-size:var(--text-sm);">
-              {% if emp.es_global %}
-                <span style="color:var(--sky);font-weight:600;font-size:var(--text-xs);">
-                  <i class="bi bi-globe"></i> Global
-                </span>
-              {% else %}
-                {% for s in emp.sedes.all %}{{ s.nombre }}{% if not forloop.last %}, {% endif %}{% empty %}
-                <span style="color:var(--ash);">—</span>{% endfor %}
-              {% endif %}
-            </td>
-            <td>
-              {% if emp.perfil.activo %}
-                <span class="badge badge-activo">Activo</span>
-              {% else %}
-                <span class="badge badge-inactivo">Inactivo</span>
-              {% endif %}
-            </td>
-            <td>
-              <div style="display:flex;gap:.4rem;">
-                <a href="{% url 'app_admin:empleado_detalle' emp.pk %}" class="btn btn-ghost btn-xs" title="Ver detalle">
-                  <i class="bi bi-eye"></i>
-                </a>
-                <a href="{% url 'app_admin:empleado_toggle' emp.pk %}" class="btn btn-xs {% if emp.perfil.activo %}btn-ghost{% else %}btn-amber{% endif %}" title="{% if emp.perfil.activo %}Desactivar{% else %}Activar{% endif %}"
-                   onclick="return confirm('¿Confirmas el cambio de estado de este empleado?')">
-                  <i class="bi bi-{% if emp.perfil.activo %}pause-circle{% else %}play-circle{% endif %}"></i>
-                </a>
-              </div>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="emp-list">
+      {% for emp in empleados %}
+      {% with cargo=emp.cargo %}
+      <div class="emp-card">
+
+        <!-- Avatar coloreado por cargo -->
+        <div class="emp-av
+          {% if cargo == 'cajero' %}av-cajero
+          {% elif cargo == 'atencion' %}av-atencion
+          {% elif cargo == 'supervisor' %}av-supervisor
+          {% else %}av-default{% endif %}">
+          {{ emp.perfil.user.get_full_name|default:emp.perfil.user.username|slice:":1"|upper }}
+        </div>
+
+        <!-- Nombre + usuario -->
+        <div style="flex:1;min-width:0;">
+          <div class="emp-name">
+            {{ emp.perfil.user.get_full_name|default:emp.perfil.user.username }}
+          </div>
+          <div class="emp-sub">
+            @{{ emp.perfil.user.username }}{% if emp.documento %} · {{ emp.documento }}{% endif %}
+          </div>
+        </div>
+
+        <!-- Cargo -->
+        <span class="cargo-pill
+          {% if cargo == 'cajero' %}cp-cajero
+          {% elif cargo == 'atencion' %}cp-atencion
+          {% elif cargo == 'supervisor' %}cp-supervisor
+          {% else %}cp-default{% endif %}">
+          {{ emp.get_cargo_display }}
+        </span>
+
+        <!-- Sedes -->
+        <div class="sede-pills">
+          {% if emp.es_global %}
+            <span class="global-pill"><i class="bi bi-globe"></i> Global</span>
+          {% else %}
+            {% for s in emp.sedes.all %}
+              <span class="sede-pill">{{ s.nombre }}</span>
+            {% empty %}
+              <span style="color:var(--fog);font-size:var(--text-xs);">—</span>
+            {% endfor %}
+          {% endif %}
+        </div>
+
+        <!-- Estado dot -->
+        <div class="status-dot {% if emp.perfil.activo %}dot-on{% else %}dot-off{% endif %}"
+             title="{% if emp.perfil.activo %}Activo{% else %}Inactivo{% endif %}"></div>
+
+        <!-- Acciones -->
+        <div style="display:flex;gap:.4rem;flex-shrink:0;">
+          <a href="{% url 'app_admin:empleado_detalle' emp.pk %}"
+             class="btn btn-ghost btn-xs" title="Ver detalle">
+            <i class="bi bi-arrow-right"></i>
+          </a>
+          <a href="{% url 'app_admin:empleado_toggle' emp.pk %}"
+             class="btn btn-xs {% if emp.perfil.activo %}btn-ghost{% else %}btn-amber{% endif %}"
+             title="{% if emp.perfil.activo %}Desactivar{% else %}Activar{% endif %}"
+             onclick="return confirm('¿Confirmas el cambio de estado de este empleado?')">
+            <i class="bi bi-{% if emp.perfil.activo %}pause-circle{% else %}play-circle{% endif %}"></i>
+          </a>
+        </div>
+
+      </div>
+      {% endwith %}
+      {% endfor %}
     </div>
+
     {% else %}
-    <div style="padding:2.5rem;text-align:center;color:var(--ash);">
-      <i class="bi bi-people" style="font-size:2.5rem;display:block;margin-bottom:.5rem;color:var(--fog);"></i>
-      {% if q or sede_id %}No se encontraron empleados con ese filtro.{% else %}No hay empleados registrados aún.{% endif %}
-      <div style="margin-top:1rem;">
-        <a href="{% url 'app_admin:empleado_nuevo' %}" class="btn btn-primary btn-sm">Crear primer empleado</a>
+    <div class="card">
+      <div class="emp-empty">
+        <div class="emp-empty-ico"><i class="bi bi-people"></i></div>
+        <div style="font-weight:600;font-size:var(--text-base);">
+          {% if q or sede_id %}No hay empleados con ese filtro
+          {% else %}Sin empleados registrados{% endif %}
+        </div>
+        <div style="font-size:var(--text-sm);">
+          {% if q or sede_id %}Ajusta los criterios de búsqueda.
+          {% else %}Agrega el primer empleado para comenzar.{% endif %}
+        </div>
+        {% if not q and not sede_id %}
+        <a href="{% url 'app_admin:empleado_nuevo' %}" class="btn btn-primary btn-sm">
+          <i class="bi bi-person-plus"></i> Crear empleado
+        </a>
+        {% endif %}
       </div>
     </div>
     {% endif %}

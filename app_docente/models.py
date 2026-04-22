@@ -166,13 +166,22 @@ class FavoritoDocente(models.Model):
 # ══════════════════════════════════════════════════════════════════════════════
 
 class ReseñaProducto(models.Model):
+    SENTIMIENTO_CHOICES = [
+        ('positivo', 'Positivo'),
+        ('neutro',   'Neutro'),
+        ('negativo', 'Negativo'),
+    ]
+
     docente    = models.ForeignKey(Docente, on_delete=models.CASCADE, related_name='reseñas')
     producto   = models.ForeignKey(Producto, on_delete=models.CASCADE, related_name='reseñas_docente')
     calificacion = models.PositiveSmallIntegerField(
         choices=[(i, f'{i} estrella{"s" if i > 1 else ""}') for i in range(1, 6)],
         default=5,
     )
-    comentario = models.TextField(blank=True, max_length=500)
+    comentario     = models.TextField(blank=True, max_length=500)
+    sentimiento    = models.CharField(max_length=10, choices=SENTIMIENTO_CHOICES, default='neutro')
+    visible        = models.BooleanField(default=True)
+    razon_rechazo  = models.CharField(max_length=200, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -271,6 +280,33 @@ class RecargaDocente(models.Model):
     nota_admin       = models.CharField(max_length=300, blank=True, verbose_name='Nota del administrador')
     fecha            = models.DateTimeField(auto_now_add=True)
     fecha_resolucion = models.DateTimeField(null=True, blank=True)
+
+    @transaction.atomic
+    def aprobar(self):
+        from decimal import Decimal
+        recarga = RecargaDocente.objects.select_for_update().get(pk=self.pk)
+        if recarga.estado != 'pendiente':
+            return
+        docente = Docente.objects.select_for_update().get(pk=recarga.docente.pk)
+        recarga.estado = 'aprobada'
+        recarga.fecha_resolucion = timezone.now()
+        recarga.save(update_fields=['estado', 'fecha_resolucion'])
+        docente.saldo += Decimal(str(recarga.monto))
+        docente.save(update_fields=['saldo'])
+        self.estado = recarga.estado
+        self.fecha_resolucion = recarga.fecha_resolucion
+
+    @transaction.atomic
+    def rechazar(self, nota=''):
+        recarga = RecargaDocente.objects.select_for_update().get(pk=self.pk)
+        if recarga.estado != 'pendiente':
+            return
+        recarga.estado = 'rechazada'
+        recarga.nota_admin = nota
+        recarga.fecha_resolucion = timezone.now()
+        recarga.save(update_fields=['estado', 'nota_admin', 'fecha_resolucion'])
+        self.estado = recarga.estado
+        self.fecha_resolucion = recarga.fecha_resolucion
 
     def __str__(self):
         return f'Recarga ${self.monto} → {self.docente} [{self.get_estado_display()}]'

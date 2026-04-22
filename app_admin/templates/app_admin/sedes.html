@@ -5,6 +5,93 @@
 {% block page_title %}Sedes{% endblock %}
 {% block nav_sedes %}active{% endblock %}
 
+{% block extra_css %}
+<style>
+/* ── Sedes page ──────────────────────────────────────────────────────────── */
+.sedes-layout {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 1.25rem;
+  align-items: start;
+}
+@media (max-width: 900px) { .sedes-layout { grid-template-columns: 1fr; } }
+
+/* ── Sede cards ──────────────────────────────────────────────────────────── */
+.sede-grid { display: flex; flex-direction: column; gap: .6rem; }
+
+.sede-card {
+  background: var(--ivory);
+  border: 1px solid var(--mist);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.25rem;
+  display: flex; align-items: center; gap: 1rem;
+  transition: border-color .14s, box-shadow .14s;
+}
+.sede-card:hover { border-color: var(--fog); box-shadow: 0 2px 14px rgba(0,0,0,.06); }
+.sede-card.inactiva { opacity: .65; }
+
+.sede-icon {
+  width: 2.75rem; height: 2.75rem;
+  border-radius: var(--radius);
+  background: var(--sky-tint); color: var(--sky-dark);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem; flex-shrink: 0;
+}
+.sede-card.inactiva .sede-icon { background: var(--cream); color: var(--ash); }
+
+.sede-name { font-weight: 700; font-size: var(--text-base); }
+.sede-addr { font-size: var(--text-xs); color: var(--ash); margin-top: .1rem; }
+
+.sede-emp-count {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 0 1.1rem;
+  border-left: 1px solid var(--mist);
+  border-right: 1px solid var(--mist);
+  flex-shrink: 0;
+}
+.sede-emp-num { font-family: var(--serif); font-size: 1.55rem; line-height: 1; }
+.sede-emp-lbl { font-size: var(--text-2xs); color: var(--ash); margin-top: .1rem; }
+
+.sede-actions {
+  display: flex; flex-direction: column; align-items: flex-end;
+  gap: .5rem; flex-shrink: 0;
+}
+
+/* ── Form card ───────────────────────────────────────────────────────────── */
+.sede-form-wrap {
+  background: var(--ivory);
+  border: 1px solid var(--mist);
+  border-radius: var(--radius);
+  overflow: hidden;
+  position: sticky;
+  top: calc(var(--topbar-h) + 1rem);
+}
+.sede-form-head {
+  padding: .85rem 1.25rem;
+  border-bottom: 1px solid var(--mist);
+  font-size: var(--text-2xs); font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase;
+  color: var(--stone);
+  display: flex; align-items: center; gap: .5rem;
+}
+.sede-form-body {
+  padding: 1.25rem;
+  display: flex; flex-direction: column; gap: .85rem;
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+.sede-empty {
+  padding: 3rem 1rem; text-align: center; color: var(--ash);
+  display: flex; flex-direction: column; align-items: center; gap: .75rem;
+}
+.sede-empty-ico {
+  width: 4rem; height: 4rem; background: var(--cream); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.75rem; color: var(--fog);
+}
+</style>
+{% endblock %}
+
 {% block topbar_actions %}
 <a href="{% url 'app_admin:empleados' %}" class="btn btn-ghost btn-sm">
   <i class="bi bi-people"></i> Empleados
@@ -12,65 +99,79 @@
 {% endblock %}
 
 {% block content %}
-<div style="display:grid;grid-template-columns:1fr 360px;gap:1.25rem;align-items:start;">
+<div class="sedes-layout">
 
   <!-- Lista de sedes -->
-  <div class="card">
-    <div class="card-head">Sedes registradas</div>
-    {% if sedes %}
-    <div class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Nombre</th>
-            <th>Ciudad</th>
-            <th>Direccion</th>
-            <th>Empleados</th>
-            <th>Estado</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for s in sedes %}
-          <tr>
-            <td style="font-weight:600;">{{ s.nombre }}</td>
-            <td style="font-size:var(--text-sm);color:var(--stone);">{{ s.ciudad }}</td>
-            <td style="font-size:var(--text-sm);color:var(--stone);">{{ s.direccion|default:"—" }}</td>
-            <td style="text-align:center;">
-              <span class="badge badge-simple">{{ s.num_empleados }}</span>
-            </td>
-            <td>
-              {% if s.activa %}
-                <span class="badge badge-activo">Activa</span>
-              {% else %}
-                <span class="badge badge-inactivo">Inactiva</span>
-              {% endif %}
-            </td>
-            <td>
-              <a href="{% url 'app_admin:sede_toggle' s.pk %}"
-                 class="btn btn-xs {% if s.activa %}btn-ghost{% else %}btn-amber{% endif %}"
-                 onclick="return confirm('¿Confirmas el cambio de estado de esta sede?')"
-                 title="{% if s.activa %}Desactivar{% else %}Activar{% endif %}">
-                <i class="bi bi-{% if s.activa %}pause-circle{% else %}play-circle{% endif %}"></i>
-              </a>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+  <div>
+    <div style="display:flex;align-items:center;margin-bottom:.85rem;padding:0 .1rem;">
+      <span style="font-size:var(--text-sm);color:var(--stone);">
+        <strong>{{ sedes|length }}</strong>
+        sede{{ sedes|length|pluralize:",s" }}
+        registrada{{ sedes|length|pluralize:",s" }}
+      </span>
     </div>
+
+    {% if sedes %}
+    <div class="sede-grid">
+      {% for s in sedes %}
+      <div class="sede-card {% if not s.activa %}inactiva{% endif %}">
+
+        <!-- Icono -->
+        <div class="sede-icon">
+          <i class="bi bi-geo-alt-fill"></i>
+        </div>
+
+        <!-- Info -->
+        <div style="flex:1;min-width:0;">
+          <div class="sede-name">{{ s.nombre }}</div>
+          <div class="sede-addr">
+            {{ s.ciudad }}{% if s.direccion %} · {{ s.direccion }}{% endif %}
+          </div>
+        </div>
+
+        <!-- Conteo empleados -->
+        <div class="sede-emp-count">
+          <div class="sede-emp-num">{{ s.num_empleados }}</div>
+          <div class="sede-emp-lbl">emp.</div>
+        </div>
+
+        <!-- Estado + acción -->
+        <div class="sede-actions">
+          {% if s.activa %}
+            <span class="badge badge-activo">Activa</span>
+          {% else %}
+            <span class="badge badge-inactivo">Inactiva</span>
+          {% endif %}
+          <a href="{% url 'app_admin:sede_toggle' s.pk %}"
+             class="btn btn-xs {% if s.activa %}btn-ghost{% else %}btn-amber{% endif %}"
+             onclick="return confirm('¿Confirmas el cambio de estado de «{{ s.nombre }}»?')"
+             title="{% if s.activa %}Desactivar{% else %}Activar{% endif %}">
+            <i class="bi bi-{% if s.activa %}pause-circle{% else %}play-circle{% endif %}"></i>
+          </a>
+        </div>
+
+      </div>
+      {% endfor %}
+    </div>
+
     {% else %}
-    <div style="padding:2.5rem;text-align:center;color:var(--ash);">
-      <i class="bi bi-geo-alt" style="font-size:2.5rem;display:block;margin-bottom:.5rem;color:var(--fog);"></i>
-      No hay sedes registradas.
+    <div class="card">
+      <div class="sede-empty">
+        <div class="sede-empty-ico"><i class="bi bi-geo-alt"></i></div>
+        <div style="font-weight:600;">Sin sedes registradas</div>
+        <div style="font-size:var(--text-sm);">Crea la primera sede usando el formulario.</div>
+      </div>
     </div>
     {% endif %}
   </div>
 
   <!-- Crear sede -->
-  <div class="card">
-    <div class="card-head">Nueva sede</div>
-    <form method="post" style="padding:1.25rem;display:flex;flex-direction:column;gap:.75rem;">
+  <div class="sede-form-wrap">
+    <div class="sede-form-head">
+      <i class="bi bi-plus-circle" style="color:var(--leaf);"></i>
+      Nueva sede
+    </div>
+    <form method="post" class="sede-form-body">
       {% csrf_token %}
       <div class="field">
         <label class="field-label">Nombre <span style="color:var(--red);">*</span></label>
@@ -81,10 +182,12 @@
         <input type="text" name="ciudad" class="form-input" value="Cali" placeholder="Ciudad">
       </div>
       <div class="field">
-        <label class="field-label">Direccion</label>
+        <label class="field-label">Dirección</label>
         <input type="text" name="direccion" class="form-input" placeholder="Calle 10 # 5-20">
       </div>
-      <button type="submit" class="btn btn-primary">Crear sede</button>
+      <button type="submit" class="btn btn-primary" style="width:100%;">
+        <i class="bi bi-plus-lg"></i> Crear sede
+      </button>
     </form>
   </div>
 

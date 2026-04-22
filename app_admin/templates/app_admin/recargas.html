@@ -56,9 +56,17 @@
     <div class="recarga-row">
       <div class="recarga-monto">+${{ r.monto|floatformat:0 }}</div>
       <div class="recarga-info">
-        <div class="recarga-nombre">{{ r.estudiante.perfil.user.get_full_name }} — {{ r.estudiante.codigo }}</div>
+        <div class="recarga-nombre">
+          {{ r.nombre }}
+          <span style="font-size:0.68rem;font-weight:600;padding:0.1rem 0.45rem;border-radius:99px;margin-left:0.35rem;
+            {% if r.tipo == 'docente' %}background:#ede9fe;color:#6d28d9;
+            {% elif r.tipo == 'padre' %}background:#fef3c7;color:#92400e;
+            {% else %}background:#dcfce7;color:#166534;{% endif %}">
+            {{ r.rol_badge }}
+          </span>
+        </div>
         <div class="recarga-meta">
-          Padre: {{ r.padre.perfil.user.get_full_name|default:"–" }} &nbsp;·&nbsp; {{ r.fecha|date:"d M Y, H:i" }}
+          {{ r.subtitulo }} &nbsp;·&nbsp; {{ r.fecha|date:"d M Y, H:i" }}
         </div>
         {% if r.nota %}<div class="recarga-nota">Nota: {{ r.nota }}</div>{% endif %}
         {% if r.nota_admin %}<div class="recarga-nota" style="color:var(--red);">Resp. admin: {{ r.nota_admin }}</div>{% endif %}
@@ -70,9 +78,10 @@
       <!-- Comprobante -->
       <div class="recarga-comprobante">
         {% if r.comprobante %}
-        <a href="{{ r.comprobante.url }}" target="_blank" class="btn btn-sky btn-xs">
+        <button class="btn btn-sky btn-xs"
+                onclick="openComprobante('{{ r.comprobante.url }}', {{ r.pk }}, '{{ r.tipo }}', '{{ r.nombre|escapejs }}', {{ r.monto }}, '{{ r.nota|escapejs }}', '{{ r.estado }}')">
           <i class="bi bi-file-image"></i> Ver comprobante
-        </a>
+        </button>
         {% else %}
         <span style="font-size:0.72rem;color:var(--ash);">Sin comprobante</span>
         {% endif %}
@@ -82,10 +91,12 @@
       <div class="recarga-actions">
         <span class="badge badge-{{ r.estado }}">{{ r.get_estado_display }}</span>
         {% if r.estado == 'pendiente' %}
-        <button class="btn btn-primary btn-xs" onclick="openModal('aprobar', {{ r.pk }}, '{{ r.estudiante.perfil.user.get_full_name }}', {{ r.monto }})">
+        <button class="btn btn-primary btn-xs"
+                onclick="openModal('aprobar', {{ r.pk }}, '{{ r.tipo }}', '{{ r.nombre|escapejs }}', {{ r.monto }}, '{{ r.nota|escapejs }}')">
           <i class="bi bi-check-circle"></i> Aprobar
         </button>
-        <button class="btn btn-danger btn-xs" onclick="openModal('rechazar', {{ r.pk }}, '{{ r.estudiante.perfil.user.get_full_name }}', {{ r.monto }})">
+        <button class="btn btn-danger btn-xs"
+                onclick="openModal('rechazar', {{ r.pk }}, '{{ r.tipo }}', '{{ r.nombre|escapejs }}', {{ r.monto }}, '{{ r.nota|escapejs }}')">
           <i class="bi bi-x-circle"></i> Rechazar
         </button>
         {% endif %}
@@ -105,6 +116,20 @@
   <div class="modal-box">
     <div class="modal-title" id="modalTitle">Confirmar acción</div>
     <div class="modal-sub" id="modalSub"></div>
+
+    <!-- Panel de análisis IA del pago -->
+    <div id="ia-pago-panel" style="display:none;margin-bottom:1rem;padding:0.75rem 1rem;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:0.78rem;">
+      <div style="font-size:0.6rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#166534;margin-bottom:0.4rem;">
+        <i class="bi bi-stars"></i> Análisis IA de la nota
+      </div>
+      <div id="ia-pago-resumen" style="font-weight:600;color:#166534;margin-bottom:0.3rem;"></div>
+      <div id="ia-pago-detalles" style="display:grid;grid-template-columns:1fr 1fr;gap:0.25rem 0.75rem;"></div>
+    </div>
+    <div id="ia-pago-loading" style="display:none;font-size:0.75rem;color:var(--ash);margin-bottom:0.8rem;">
+      <i class="bi bi-arrow-repeat" style="animation:spin 1s linear infinite;display:inline-block;"></i>
+      Analizando nota del padre…
+    </div>
+
     <form method="post" id="modalForm">
       {% csrf_token %}
       <input type="hidden" name="accion" id="modalAccion">
@@ -120,10 +145,76 @@
   </div>
 </div>
 
+<!-- Modal Comprobante -->
+<div class="modal-overlay" id="modalComprobante" onclick="closeComprobante(event)">
+  <div class="modal-box" style="max-width:38rem;padding:0;overflow:hidden;">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--mist);">
+      <div>
+        <div class="modal-title" style="margin-bottom:0;" id="comprobanteTitulo">Comprobante de pago</div>
+        <div style="font-size:0.75rem;color:var(--stone);margin-top:0.15rem;" id="comprobanteSub"></div>
+      </div>
+      <button onclick="closeComprobante()" style="background:none;border:none;cursor:pointer;color:var(--ash);font-size:1.3rem;line-height:1;padding:0.2rem;">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <!-- Imagen -->
+    <div style="background:#1a1a1a;text-align:center;max-height:68vh;overflow:auto;">
+      <img id="comprobanteImg" src="" alt="Comprobante"
+           style="max-width:100%;max-height:65vh;object-fit:contain;display:block;margin:auto;">
+    </div>
+    <!-- Acciones (solo pendientes) -->
+    <div id="comprobanteAcciones" style="display:none;padding:0.85rem 1.25rem;border-top:1px solid var(--mist);gap:0.65rem;align-items:center;background:var(--ivory);">
+      <button class="btn btn-primary btn-xs" id="comprobanteBtnAprobar" onclick="comprobanteAprobar()">
+        <i class="bi bi-check-circle"></i> Aprobar
+      </button>
+      <button class="btn btn-danger btn-xs" id="comprobanteBtnRechazar" onclick="comprobanteRechazar()">
+        <i class="bi bi-x-circle"></i> Rechazar
+      </button>
+      <span style="margin-left:auto;font-size:0.7rem;color:var(--ash);">Acción pendiente de resolución</span>
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+</style>
+
 <script>
-  function openModal(accion, pk, nombre, monto) {
+  const CSRF_TOKEN = '{{ csrf_token }}';
+  let _cPk, _cTipo, _cNombre, _cMonto, _cNota;
+
+  function openComprobante(url, pk, tipo, nombre, monto, nota, estado) {
+    _cPk = pk; _cTipo = tipo; _cNombre = nombre; _cMonto = monto; _cNota = nota;
+    document.getElementById('comprobanteImg').src = url;
+    document.getElementById('comprobanteTitulo').textContent = 'Comprobante de pago';
+    document.getElementById('comprobanteSub').textContent =
+      `${nombre} · $${Math.floor(monto).toLocaleString('es-CO').replace(/,/g,'.')}`;
+    const acciones = document.getElementById('comprobanteAcciones');
+    acciones.style.display = estado === 'pendiente' ? 'flex' : 'none';
+    document.getElementById('modalComprobante').classList.add('open');
+  }
+
+  function closeComprobante(e) {
+    if (!e || e.target === document.getElementById('modalComprobante')) {
+      document.getElementById('modalComprobante').classList.remove('open');
+      document.getElementById('comprobanteImg').src = '';
+    }
+  }
+
+  function comprobanteAprobar() {
+    closeComprobante();
+    openModal('aprobar', _cPk, _cTipo, _cNombre, _cMonto, _cNota);
+  }
+
+  function comprobanteRechazar() {
+    closeComprobante();
+    openModal('rechazar', _cPk, _cTipo, _cNombre, _cMonto, _cNota);
+  }
+
+  async function openModal(accion, pk, tipo, nombre, monto, nota) {
     document.getElementById('modalAccion').value = accion;
-    document.getElementById('modalForm').action = `/admin-panel/recargas/${pk}/resolver/`;
+    document.getElementById('modalForm').action = `/admin-panel/recargas/${tipo}/${pk}/resolver/`;
     const titulo = accion === 'aprobar' ? 'Aprobar recarga' : 'Rechazar recarga';
     const color  = accion === 'aprobar' ? 'var(--leaf-dark)' : 'var(--red)';
     document.getElementById('modalTitle').textContent = titulo;
@@ -132,7 +223,51 @@
     const btn = document.getElementById('modalSubmitBtn');
     btn.textContent = titulo;
     btn.style.background = accion === 'aprobar' ? 'var(--leaf)' : 'var(--red)';
+
+    // Ocultar panel IA anterior
+    document.getElementById('ia-pago-panel').style.display = 'none';
+    document.getElementById('ia-pago-loading').style.display = 'none';
+
     document.getElementById('modalOverlay').classList.add('open');
+
+    // Consultar IA si hay nota (solo para recargas de estudiante)
+    if (tipo === 'estudiante' && nota && nota.trim().length >= 4) {
+      document.getElementById('ia-pago-loading').style.display = '';
+      try {
+        const res = await fetch(`/admin-panel/api/info-pago/${pk}/`, {
+          headers: { 'X-CSRFToken': CSRF_TOKEN },
+        });
+        document.getElementById('ia-pago-loading').style.display = 'none';
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.sin_nota || data.error) return;
+
+        document.getElementById('ia-pago-resumen').textContent = data.resumen || '';
+
+        const detalles = [];
+        if (data.medio_pago && data.medio_pago !== 'no_especificado')
+          detalles.push(['Medio', capitalizar(data.medio_pago)]);
+        if (data.banco)
+          detalles.push(['Banco', data.banco]);
+        if (data.numero_referencia)
+          detalles.push(['Referencia', data.numero_referencia]);
+        if (data.fecha_mencionada)
+          detalles.push(['Fecha', data.fecha_mencionada]);
+
+        const grid = document.getElementById('ia-pago-detalles');
+        grid.innerHTML = detalles.map(([k, v]) =>
+          `<div><span style="color:#6b7280;font-size:0.65rem;font-weight:700;text-transform:uppercase;">${k}</span><br><span style="font-weight:600;">${v}</span></div>`
+        ).join('');
+
+        document.getElementById('ia-pago-panel').style.display = '';
+      } catch {
+        document.getElementById('ia-pago-loading').style.display = 'none';
+      }
+    }
+  }
+
+  function capitalizar(s) {
+    return s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' ');
   }
 
   function closeModal(e) {

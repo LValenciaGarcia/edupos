@@ -5,110 +5,253 @@
 {% block page_title %}Detalle Empleado{% endblock %}
 {% block nav_empleados %}active{% endblock %}
 
+{% block extra_css %}
+<style>
+/* ── Detalle empleado ────────────────────────────────────────────────────── */
+
+/* Profile header */
+.emp-hero {
+  background: var(--ivory); border: 1px solid var(--mist);
+  border-radius: var(--radius); padding: 1.4rem 1.5rem;
+  display: flex; align-items: center; gap: 1.25rem;
+}
+.emp-hero-av {
+  width: 3.75rem; height: 3.75rem; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--serif); font-size: 1.5rem; font-weight: 700;
+  flex-shrink: 0; user-select: none;
+}
+.av-cajero    { background: var(--amber-tint); color: var(--amber-dark); }
+.av-atencion  { background: var(--sky-tint);   color: var(--sky-dark); }
+.av-supervisor{ background: var(--violet-tint); color: var(--violet-dark); }
+.av-default   { background: var(--leaf-tint);  color: var(--leaf-dark); }
+
+.emp-hero-name { font-family: var(--serif); font-size: 1.3rem; line-height: 1.2; }
+.emp-hero-sub  { font-size: var(--text-sm); color: var(--ash); margin-top: .2rem; }
+.emp-hero-tags { margin-top: .65rem; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+
+/* Cargo pill */
+.cargo-pill {
+  display: inline-flex; align-items: center;
+  padding: .22rem .65rem; border-radius: 99px;
+  font-size: var(--text-2xs); font-weight: 700;
+  letter-spacing: .07em; text-transform: uppercase;
+}
+.cp-cajero    { background: var(--amber-tint); color: var(--amber-dark); }
+.cp-atencion  { background: var(--sky-tint);   color: var(--sky-dark); }
+.cp-supervisor{ background: var(--violet-tint); color: var(--violet-dark); }
+.cp-default   { background: var(--leaf-tint);  color: var(--leaf-dark); }
+
+/* Form sections */
+.form-section { background: var(--ivory); border: 1px solid var(--mist); border-radius: var(--radius); overflow: hidden; }
+.form-section-head {
+  padding: .75rem 1.25rem; border-bottom: 1px solid var(--mist);
+  font-size: var(--text-2xs); font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--stone);
+  display: flex; align-items: center; gap: .45rem;
+}
+.form-section-body { padding: 1.25rem; display: flex; flex-direction: column; gap: .9rem; }
+
+/* Sede toggles */
+.sede-toggle {
+  display: flex; align-items: center; gap: .75rem;
+  padding: .55rem .9rem;
+  border: 1px solid var(--mist); border-radius: var(--radius);
+  cursor: pointer; background: var(--cream);
+  transition: background .11s, border-color .11s;
+  font-size: var(--text-sm);
+}
+.sede-toggle:hover { border-color: var(--leaf); background: var(--leaf-pale); }
+.sede-toggle input[type="checkbox"] { accent-color: var(--leaf); width: 1rem; height: 1rem; flex-shrink: 0; }
+.sede-toggle .sede-badge-inactive { font-size: var(--text-2xs); color: var(--ash); margin-left: .35rem; }
+
+/* Sidebar cards */
+.sb-card {
+  background: var(--ivory); border: 1px solid var(--mist);
+  border-radius: var(--radius); padding: 1.1rem 1.25rem;
+}
+.sb-card-head {
+  font-size: var(--text-2xs); font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--stone); margin-bottom: .75rem;
+}
+
+/* Info rows */
+.info-row {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: var(--text-xs); padding: .22rem 0;
+  border-bottom: 1px solid var(--cream);
+}
+.info-row:last-child { border-bottom: none; }
+.info-row-label { color: var(--ash); }
+.info-row-val   { color: var(--stone); font-weight: 500; }
+
+/* Empty ventas */
+.ventas-empty {
+  padding: 1.75rem; text-align: center;
+  color: var(--ash); font-size: var(--text-sm);
+}
+</style>
+{% endblock %}
+
 {% block content %}
-<div style="display:grid;grid-template-columns:1fr 320px;gap:1.25rem;align-items:start;">
+<div style="display:grid;grid-template-columns:1fr 296px;gap:1.25rem;align-items:start;">
 
   <!-- Columna principal -->
-  <div style="display:flex;flex-direction:column;gap:1.25rem;">
+  <div style="display:flex;flex-direction:column;gap:1.1rem;">
 
-    <div style="margin-bottom:.25rem;">
+    <div>
       <a href="{% url 'app_admin:empleados' %}" class="btn btn-ghost btn-sm">
         <i class="bi bi-arrow-left"></i> Volver a empleados
       </a>
     </div>
 
-    <!-- Header empleado -->
-    <div class="card" style="padding:1.25rem 1.5rem;display:flex;align-items:center;gap:1rem;">
-      <div class="sb-avatar" style="width:3rem;height:3rem;font-size:1.2rem;flex-shrink:0;">
-        {{ empleado.perfil.user.username|slice:":1"|upper }}
+    <!-- Hero del perfil -->
+    <div class="emp-hero">
+      {% with cargo=empleado.cargo %}
+      <div class="emp-hero-av
+        {% if cargo == 'cajero' %}av-cajero
+        {% elif cargo == 'atencion' %}av-atencion
+        {% elif cargo == 'supervisor' %}av-supervisor
+        {% else %}av-default{% endif %}">
+        {{ empleado.perfil.user.get_full_name|default:empleado.perfil.user.username|slice:":1"|upper }}
       </div>
-      <div style="flex:1;">
-        <div style="font-family:var(--serif);font-size:1.2rem;">{{ empleado.perfil.user.get_full_name|default:empleado.perfil.user.username }}</div>
-        <div style="color:var(--stone);font-size:var(--text-sm);">@{{ empleado.perfil.user.username }}</div>
-      </div>
-      <div>
-        {% if empleado.perfil.activo %}
-          <span class="badge badge-activo">Activo</span>
-        {% else %}
-          <span class="badge badge-inactivo">Inactivo</span>
-        {% endif %}
+      {% endwith %}
+
+      <div style="flex:1;min-width:0;">
+        <div class="emp-hero-name">
+          {{ empleado.perfil.user.get_full_name|default:empleado.perfil.user.username }}
+        </div>
+        <div class="emp-hero-sub">
+          @{{ empleado.perfil.user.username }}
+          {% if empleado.documento %} · {{ empleado.documento }}{% endif %}
+        </div>
+        <div class="emp-hero-tags">
+          {% with cargo=empleado.cargo %}
+          <span class="cargo-pill
+            {% if cargo == 'cajero' %}cp-cajero
+            {% elif cargo == 'atencion' %}cp-atencion
+            {% elif cargo == 'supervisor' %}cp-supervisor
+            {% else %}cp-default{% endif %}">
+            {{ empleado.get_cargo_display }}
+          </span>
+          {% endwith %}
+          {% if empleado.perfil.activo %}
+            <span class="badge badge-activo">Activo</span>
+          {% else %}
+            <span class="badge badge-inactivo">Inactivo</span>
+          {% endif %}
+          {% if empleado.es_global %}
+          <span style="font-size:var(--text-xs);color:var(--sky);font-weight:600;">
+            <i class="bi bi-globe"></i> Acceso global
+          </span>
+          {% endif %}
+        </div>
       </div>
     </div>
 
-    <!-- Editar -->
-    <div class="card">
-      <div class="card-head">Editar datos</div>
-      <form method="post" style="padding:1.25rem;display:flex;flex-direction:column;gap:.9rem;">
-        {% csrf_token %}
-        <input type="hidden" name="accion" value="editar">
+    <!-- Formulario edición -->
+    <form method="post" style="display:flex;flex-direction:column;gap:1rem;">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="editar">
 
-        <div class="form-grid">
-          <div class="field">
-            <label class="field-label">Nombre</label>
-            <input type="text" name="first_name" class="form-input" value="{{ empleado.perfil.user.first_name }}">
+      <!-- Datos personales -->
+      <div class="form-section">
+        <div class="form-section-head">
+          <i class="bi bi-person" style="color:var(--ash);"></i>
+          Datos personales
+        </div>
+        <div class="form-section-body">
+          <div class="form-grid">
+            <div class="field">
+              <label class="field-label">Nombre</label>
+              <input type="text" name="first_name" class="form-input" value="{{ empleado.perfil.user.first_name }}">
+            </div>
+            <div class="field">
+              <label class="field-label">Apellido</label>
+              <input type="text" name="last_name" class="form-input" value="{{ empleado.perfil.user.last_name }}">
+            </div>
           </div>
-          <div class="field">
-            <label class="field-label">Apellido</label>
-            <input type="text" name="last_name" class="form-input" value="{{ empleado.perfil.user.last_name }}">
+          <div class="form-grid">
+            <div class="field">
+              <label class="field-label">Correo electrónico</label>
+              <input type="email" name="email" class="form-input" value="{{ empleado.perfil.user.email }}">
+            </div>
+            <div class="field">
+              <label class="field-label">Teléfono</label>
+              <input type="tel" name="telefono" class="form-input" value="{{ empleado.perfil.telefono }}">
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="field">
+              <label class="field-label">N° Documento</label>
+              <input type="text" name="documento" class="form-input" value="{{ empleado.documento }}">
+            </div>
+            <div class="field">
+              <label class="field-label">Cargo</label>
+              <select name="cargo" class="form-input">
+                {% for val, label in cargos %}
+                <option value="{{ val }}" {% if empleado.cargo == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
           </div>
         </div>
+      </div>
 
-        <div class="form-grid">
-          <div class="field">
-            <label class="field-label">Correo electrónico</label>
-            <input type="email" name="email" class="form-input" value="{{ empleado.perfil.user.email }}">
-          </div>
-          <div class="field">
-            <label class="field-label">Teléfono</label>
-            <input type="tel" name="telefono" class="form-input" value="{{ empleado.perfil.telefono }}">
-          </div>
+      <!-- Sedes y acceso -->
+      <div class="form-section">
+        <div class="form-section-head">
+          <i class="bi bi-geo-alt" style="color:var(--ash);"></i>
+          Sedes y acceso
         </div>
-
-        <div class="form-grid">
+        <div class="form-section-body">
           <div class="field">
-            <label class="field-label">N° Documento</label>
-            <input type="text" name="documento" class="form-input" value="{{ empleado.documento }}">
-          </div>
-          <div class="field">
-            <label class="field-label">Cargo</label>
-            <select name="cargo" class="form-input">
-              {% for val, label in cargos %}
-              <option value="{{ val }}" {% if empleado.cargo == val %}selected{% endif %}>{{ label }}</option>
+            <label class="field-label" style="margin-bottom:.5rem;">Sedes asignadas</label>
+            <div style="display:flex;flex-direction:column;gap:.4rem;">
+              {% for s in sedes %}
+              <label class="sede-toggle">
+                <input type="checkbox" name="sedes" value="{{ s.pk }}"
+                       {% if s in empleado.sedes.all %}checked{% endif %}>
+                <i class="bi bi-geo-alt" style="color:var(--sky);font-size:.9rem;"></i>
+                {{ s.nombre }}
+                {% if not s.activa %}
+                  <span class="sede-badge-inactive">(inactiva)</span>
+                {% endif %}
+                <span style="margin-left:auto;font-size:var(--text-xs);color:var(--ash);">{{ s.ciudad }}</span>
+              </label>
               {% endfor %}
-            </select>
+            </div>
           </div>
-        </div>
 
-        <!-- Sedes -->
-        <div class="field">
-          <label class="field-label">Sedes asignadas</label>
-          <div style="display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.25rem;">
-            {% for s in sedes %}
-            <label style="display:flex;align-items:center;gap:.4rem;font-size:var(--text-sm);cursor:pointer;padding:.35rem .75rem;border:1px solid var(--fog);border-radius:var(--radius);background:var(--cream);">
-              <input type="checkbox" name="sedes" value="{{ s.pk }}"
-                     {% if s in empleado.sedes.all %}checked{% endif %}
-                     style="accent-color:var(--leaf);">
-              {{ s.nombre }}
-              {% if not s.activa %}<span style="color:var(--ash);font-size:.65rem;">(inactiva)</span>{% endif %}
-            </label>
-            {% endfor %}
-          </div>
+          <label style="display:flex;align-items:flex-start;gap:.75rem;cursor:pointer;
+                        padding:.65rem .9rem;border:1px solid var(--mist);
+                        border-radius:var(--radius);background:var(--cream);">
+            <input type="checkbox" name="es_global"
+                   {% if empleado.es_global %}checked{% endif %}
+                   style="accent-color:var(--sky);width:1rem;height:1rem;flex-shrink:0;margin-top:.12rem;">
+            <div>
+              <div style="font-size:var(--text-sm);font-weight:600;">Acceso global</div>
+              <div style="font-size:var(--text-xs);color:var(--ash);margin-top:.1rem;">
+                Puede ver información consolidada de todas las sedes
+              </div>
+            </div>
+          </label>
         </div>
+      </div>
 
-        <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;font-size:var(--text-sm);">
-          <input type="checkbox" name="es_global" {% if empleado.es_global %}checked{% endif %} style="accent-color:var(--sky);width:1rem;height:1rem;">
-          <span><strong>Acceso global</strong> — puede ver información de todas las sedes</span>
-        </label>
-
-        <div style="display:flex;gap:.75rem;">
-          <button type="submit" class="btn btn-primary btn-sm">Guardar cambios</button>
-        </div>
-      </form>
-    </div>
+      <div>
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-check-lg"></i> Guardar cambios
+        </button>
+      </div>
+    </form>
 
     <!-- Ventas recientes -->
-    <div class="card">
-      <div class="card-head">Ventas recientes</div>
+    <div class="form-section">
+      <div class="form-section-head">
+        <i class="bi bi-receipt" style="color:var(--ash);"></i>
+        Ventas recientes
+      </div>
       {% if ventas_recientes %}
       <div class="table-wrap">
         <table class="table">
@@ -120,9 +263,13 @@
             <tr>
               <td style="font-family:var(--serif);font-weight:600;font-size:var(--text-sm);">{{ v.ticket }}</td>
               <td>
-                {% if v.tipo_pago == 'efectivo' %}<span class="badge badge-ok">Efectivo</span>
-                {% elif v.tipo_pago == 'cuenta_estudiante' %}<span class="badge badge-simple">Estudiante</span>
-                {% else %}<span class="badge" style="background:var(--violet-pale);color:var(--violet-dark);">Docente</span>{% endif %}
+                {% if v.tipo_pago == 'efectivo' %}
+                  <span class="badge badge-ok">Efectivo</span>
+                {% elif v.tipo_pago == 'cuenta_estudiante' %}
+                  <span class="badge badge-simple">Estudiante</span>
+                {% else %}
+                  <span class="badge" style="background:var(--violet-pale);color:var(--violet-dark);">Docente</span>
+                {% endif %}
               </td>
               <td style="font-weight:600;">${{ v.total|floatformat:0 }}</td>
               <td style="font-size:var(--text-xs);color:var(--ash);">{{ v.fecha|date:"d/m/y H:i" }}</td>
@@ -132,19 +279,21 @@
         </table>
       </div>
       {% else %}
-      <div style="padding:1.5rem;text-align:center;color:var(--ash);font-size:var(--text-sm);">Sin ventas registradas.</div>
+      <div class="ventas-empty">
+        <i class="bi bi-receipt" style="display:block;font-size:1.5rem;margin-bottom:.5rem;color:var(--fog);"></i>
+        Sin ventas registradas para este empleado.
+      </div>
       {% endif %}
     </div>
 
   </div>
 
-  <!-- Columna lateral -->
+  <!-- Sidebar -->
   <div style="display:flex;flex-direction:column;gap:1rem;">
 
     <!-- Acciones -->
-    <div class="card" style="padding:1.25rem;">
-      <div style="font-size:var(--text-sm);font-weight:600;color:var(--stone);margin-bottom:.75rem;text-transform:uppercase;letter-spacing:.05em;">Acciones</div>
-
+    <div class="sb-card">
+      <div class="sb-card-head">Acciones</div>
       <div style="display:flex;flex-direction:column;gap:.5rem;">
         <a href="{% url 'app_admin:empleado_toggle' empleado.pk %}"
            class="btn {% if empleado.perfil.activo %}btn-ghost{% else %}btn-amber{% endif %} btn-sm"
@@ -155,16 +304,16 @@
       </div>
     </div>
 
-    <!-- Reset contraseña -->
-    <div class="card" style="padding:1.25rem;">
-      <div style="font-size:var(--text-sm);font-weight:600;color:var(--stone);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.05em;">Seguridad</div>
-      <p style="font-size:var(--text-xs);color:var(--ash);margin-bottom:.75rem;">
-        Genera una nueva contraseña temporal. La contraseña actual quedará inactiva inmediatamente.
+    <!-- Seguridad -->
+    <div class="sb-card">
+      <div class="sb-card-head">Seguridad</div>
+      <p style="font-size:var(--text-xs);color:var(--ash);margin-bottom:.85rem;line-height:1.5;">
+        Genera una nueva contraseña temporal. La contraseña actual quedará inactiva de inmediato.
       </p>
       <form method="post">
         {% csrf_token %}
         <input type="hidden" name="accion" value="reset_password">
-        <button type="submit" class="btn btn-danger btn-sm"
+        <button type="submit" class="btn btn-danger btn-sm" style="width:100%;"
                 onclick="return confirm('¿Restablecer la contraseña de este empleado?')">
           <i class="bi bi-key"></i> Restablecer contraseña
         </button>
@@ -172,11 +321,27 @@
     </div>
 
     <!-- Info técnica -->
-    <div class="card" style="padding:1rem 1.25rem;">
-      <div style="font-size:var(--text-xs);color:var(--ash);display:flex;flex-direction:column;gap:.4rem;">
-        <div><span style="color:var(--stone);">ID empleado:</span> #{{ empleado.pk }}</div>
-        <div><span style="color:var(--stone);">Creado:</span> {{ empleado.perfil.created_at|date:"d/m/Y" }}</div>
-        <div><span style="color:var(--stone);">Cargo:</span> {{ empleado.get_cargo_display }}</div>
+    <div class="sb-card">
+      <div class="sb-card-head">Información</div>
+      <div>
+        <div class="info-row">
+          <span class="info-row-label">ID empleado</span>
+          <span class="info-row-val">#{{ empleado.pk }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-row-label">Registrado</span>
+          <span class="info-row-val">{{ empleado.perfil.created_at|date:"d/m/Y" }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-row-label">Cargo</span>
+          <span class="info-row-val">{{ empleado.get_cargo_display }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-row-label">Sedes</span>
+          <span class="info-row-val">
+            {% if empleado.es_global %}Global{% else %}{{ empleado.sedes.count }}{% endif %}
+          </span>
+        </div>
       </div>
     </div>
 

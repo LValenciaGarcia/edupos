@@ -25,8 +25,10 @@ class IngredienteForm(forms.ModelForm):
     class Meta:
         model  = Ingrediente
         fields = [
-            'nombre', 'imagen', 'unidad', 'precio_unitario',
-            'stock', 'stock_minimo', 'fecha_vencimiento', 'proveedor',
+            'nombre', 'imagen',
+            'stock_unidades', 'unidad_compra', 'contenido_por_unidad',
+            'unidad_base', 'precio_compra',
+            'stock_minimo', 'fecha_vencimiento',
         ]
         widgets = {
             'fecha_vencimiento': forms.DateInput(attrs={'type': 'date'}),

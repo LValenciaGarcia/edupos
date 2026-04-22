@@ -50,8 +50,17 @@
         <input type="text" name="precio_venta" value="{{ producto.precio_venta|default:'' }}" required placeholder="3.500" class="fmt-miles" inputmode="numeric">
       </div>
       <div class="field full">
-        <label>Descripción</label>
-        <textarea name="descripcion" placeholder="Descripción breve del producto…">{{ producto.descripcion|default:'' }}</textarea>
+        <label style="display:flex;align-items:center;justify-content:space-between;">
+          Descripción
+          <button type="button" id="btn-generar-desc"
+                  style="display:inline-flex;align-items:center;gap:0.3rem;padding:0.22rem 0.6rem;border:1px solid var(--leaf);border-radius:6px;background:var(--leaf-pale);color:var(--leaf-dark);font-size:0.7rem;font-weight:600;cursor:pointer;transition:all 0.14s;font-family:var(--sans);"
+                  onmouseover="this.style.background='var(--leaf)';this.style.color='#fff'"
+                  onmouseout="this.style.background='var(--leaf-pale)';this.style.color='var(--leaf-dark)'">
+            <i class="bi bi-stars"></i> Generar con IA
+          </button>
+        </label>
+        <textarea name="descripcion" id="campo-descripcion" placeholder="Descripción breve del producto…">{{ producto.descripcion|default:'' }}</textarea>
+        <span id="desc-ia-status" style="font-size:0.7rem;color:var(--ash);margin-top:0.2rem;display:none;"></span>
       </div>
     </div>
 
@@ -102,7 +111,7 @@
             <select name="ingrediente_id">
               <option value="">— Ingrediente —</option>
               {% for ing in ingredientes %}
-              <option value="{{ ing.pk }}" {% if ing.pk == r.ingrediente_id %}selected{% endif %}>{{ ing.nombre }} ({{ ing.get_unidad_display }})</option>
+              <option value="{{ ing.pk }}" {% if ing.pk == r.ingrediente_id %}selected{% endif %}>{{ ing.nombre }} ({{ ing.get_unidad_base_display }})</option>
               {% endfor %}
             </select>
             <input type="number" name="ingrediente_cant" value="{{ r.cantidad }}" min="0.01" step="0.01" placeholder="Cantidad">
@@ -155,7 +164,7 @@
 <script>
 const ingredientesData = [
   {% for ing in ingredientes %}
-  { id: {{ ing.pk }}, nombre: "{{ ing.nombre }}", unidad: "{{ ing.get_unidad_display }}" },
+  { id: {{ ing.pk }}, nombre: "{{ ing.nombre }}", unidad: "{{ ing.get_unidad_base_display }}" },
   {% endfor %}
 ];
 
@@ -188,5 +197,57 @@ function previewImg(input) {
     preview.style.display = 'block';
   }
 }
+
+// ── Generador de descripción con IA ────────────────────────────────────────
+document.getElementById('btn-generar-desc').addEventListener('click', async function () {
+  const nombre    = document.querySelector('[name=nombre]').value.trim();
+  const catSelect = document.querySelector('[name=categoria]');
+  const categoria = catSelect ? catSelect.value : '';
+  const status    = document.getElementById('desc-ia-status');
+  const textarea  = document.getElementById('campo-descripcion');
+
+  if (!nombre) {
+    status.textContent = 'Escribe primero el nombre del producto.';
+    status.style.color = 'var(--red)';
+    status.style.display = '';
+    return;
+  }
+
+  // Recoger ingredientes visibles en la receta
+  const ingSelects = document.querySelectorAll('#receta-container select[name=ingrediente_id]');
+  const params = new URLSearchParams({ nombre, categoria });
+  ingSelects.forEach(s => {
+    if (s.selectedOptions[0] && s.selectedOptions[0].value) {
+      params.append('ingredientes[]', s.selectedOptions[0].text.split(' (')[0]);
+    }
+  });
+
+  this.disabled = true;
+  status.textContent = 'Generando…';
+  status.style.color = 'var(--ash)';
+  status.style.display = '';
+
+  try {
+    const res = await fetch('{% url "app_admin:api_generar_descripcion" %}', {
+      method:  'POST',
+      headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/x-www-form-urlencoded' },
+      body:    params.toString(),
+    });
+    const data = await res.json();
+    if (data.descripcion) {
+      textarea.value = data.descripcion;
+      status.textContent = 'Descripcion generada. Puedes editarla antes de guardar.';
+      status.style.color = 'var(--leaf-dark)';
+    } else {
+      status.textContent = data.error || 'No se pudo generar la descripción.';
+      status.style.color = 'var(--red)';
+    }
+  } catch {
+    status.textContent = 'Error de conexión.';
+    status.style.color = 'var(--red)';
+  } finally {
+    this.disabled = false;
+  }
+});
 </script>
 {% endblock %}

@@ -91,9 +91,9 @@
         <td style="font-weight:600;font-size:.85rem;">{{ i.nombre }}</td>
         <td>
           {% if i.sin_stock %}<span class="stock-out">Sin stock</span>
-          {% else %}<span class="stock-low">{{ i.stock }} {{ i.unidad }}</span>{% endif %}
+          {% else %}<span class="stock-low">{{ i.stock_real|floatformat:"-2" }} {{ i.get_unidad_base_display }}</span>{% endif %}
         </td>
-        <td style="font-size:.78rem;color:var(--gray-500);">{{ i.proveedor|default:"—" }}</td>
+        <td style="font-size:.78rem;color:var(--gray-500);">{{ i.unidad_compra }}</td>
         <td>
           <a href="{% url 'app_admin:entrada_stock' %}"
              class="btn btn-ghost btn-xs" title="Registrar entrada">

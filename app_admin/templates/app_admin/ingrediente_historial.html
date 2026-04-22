@@ -95,10 +95,7 @@
   <div>
     <div class="hist-name">{{ ingrediente.nombre }}</div>
     <div class="hist-meta">
-      {{ ingrediente.get_unidad_display }}
-      {% if ingrediente.proveedor %}
-        · <i class="bi bi-truck"></i> {{ ingrediente.proveedor.nombre }}
-      {% endif %}
+      {{ ingrediente.stock_unidades|floatformat:"-2" }} {{ ingrediente.unidad_compra }}(s) · {{ ingrediente.get_unidad_base_display }}
       {% if ingrediente.fecha_vencimiento %}
         ·
         {% if ingrediente.vencido %}
@@ -122,9 +119,9 @@
     <div class="hist-stat">
       <div class="hist-stat-val"
            style="color:{% if ingrediente.sin_stock %}var(--red){% elif ingrediente.stock_bajo %}var(--amber){% else %}var(--leaf){% endif %};">
-        {{ ingrediente.stock }}
+        {{ ingrediente.stock_real|floatformat:"-2" }}
       </div>
-      <div class="hist-stat-label">Stock actual</div>
+      <div class="hist-stat-label">Stock real ({{ ingrediente.get_unidad_base_display }})</div>
     </div>
     <div class="hist-stat">
       <div class="hist-stat-val" style="color:var(--ash);">{{ ingrediente.stock_minimo }}</div>
@@ -176,7 +173,7 @@
           color:{% if m.tipo == 'entrada' %}var(--leaf){% elif m.tipo == 'merma' %}var(--red){% else %}var(--ink){% endif %};">
           {% if m.tipo == 'entrada' %}+{% elif m.tipo in 'salida,merma' %}-{% endif %}{{ m.cantidad }}
         </span>
-        <span style="font-size:0.73rem;color:var(--ash);margin-left:0.2rem;">{{ ingrediente.get_unidad_display }}</span>
+        <span style="font-size:0.73rem;color:var(--ash);margin-left:0.2rem;">{{ ingrediente.get_unidad_base_display }}</span>
       </td>
       <td style="font-size:0.8rem;color:var(--stone);">
         {% if m.compra %}
@@ -185,8 +182,6 @@
             {{ m.compra.proveedor.nombre }}
           </a>
           <span style="color:var(--ash);font-size:0.73rem;"> · Compra #{{ m.compra.pk }}</span>
-        {% elif ingrediente.proveedor %}
-          <span style="color:var(--stone);">{{ ingrediente.proveedor.nombre }}</span>
         {% else %}
           <span style="color:var(--fog);">—</span>
         {% endif %}

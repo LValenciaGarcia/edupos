@@ -66,7 +66,13 @@
       <a href="{% url 'app_admin:pedidos' %}" class="sb-link {% block nav_pedidos %}{% endblock %}">
         <i class="bi bi-receipt"></i><span class="sb-label">Pedidos</span>
       </a>
-      <span class="sb-tip">Pedidos</span>
+      <span class="sb-tip">Pedidos de Estudiantes</span>
+    </div>
+    <div class="sb-item">
+      <a href="{% url 'app_admin:pedidos_docentes' %}" class="sb-link {% block nav_pedidos_docentes %}{% endblock %}">
+        <i class="bi bi-receipt"></i><span class="sb-label">Pedidos Docentes</span>
+      </a>
+      <span class="sb-tip">Pedidos de Docentes</span>
     </div>
 
     <span class="sb-section-label">Gestión</span>

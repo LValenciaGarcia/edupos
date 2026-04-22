@@ -1,0 +1,154 @@
+{% extends 'app_admin/base_admin.html' %}
+{% load filtros %}
+{% block title %}{{ pedido.ticket }}{% endblock %}
+{% block page_title %}{{ pedido.ticket }}{% endblock %}
+{% block nav_pedidos_docentes %}active{% endblock %}
+{% block topbar_actions %}
+  <a href="{% url 'app_admin:pedidos_docentes' %}" class="btn btn-ghost btn-sm"><i class="bi bi-arrow-left"></i> Volver a pedidos</a>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:52rem;">
+<div class="grid-sidebar" style="gap:1.2rem;">
+
+  <!-- Detalle principal -->
+  <div>
+    <div class="card" style="margin-bottom:1.2rem;">
+      <div class="card-head">
+        <span class="card-title">Detalle del pedido</span>
+        <span class="badge badge-{{ pedido.estado }}">{{ pedido.get_estado_display }}</span>
+      </div>
+      <div class="card-body">
+        <div class="grid-2" style="gap:1rem;margin-bottom:1rem;">
+          <div>
+            <div style="font-size:0.7rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.2rem;">Docente</div>
+            <div style="font-weight:600;">{{ pedido.docente.perfil.user.get_full_name|default:pedido.docente.perfil.user.username }}</div>
+            <div style="font-size:0.82rem;color:var(--gray-500);">{{ pedido.docente.materia }}</div>
+          </div>
+          <div>
+            <div style="font-size:0.7rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.2rem;">Fecha y hora</div>
+            <div style="font-weight:600;">{{ pedido.fecha_pedido|date:"d/m/Y" }}</div>
+            <div style="font-size:0.82rem;color:var(--gray-500);">{{ pedido.fecha_pedido|time:"H:i" }}</div>
+          </div>
+        </div>
+        {% if pedido.nota %}
+        <div style="background:var(--amber-pale);border:1px solid #f5d0a8;border-radius:8px;padding:0.7rem 0.9rem;font-size:0.85rem;color:var(--amber);">
+          <i class="bi bi-chat-left-text"></i> <strong>Nota:</strong> {{ pedido.nota }}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-title">Productos ({{ pedido.detalles.count }})</span></div>
+      <table class="tbl">
+        <thead>
+          <tr><th>Producto</th><th>Cant.</th><th>Precio unit.</th><th>Subtotal</th></tr>
+        </thead>
+        <tbody>
+        {% for d in pedido.detalles.all %}
+        <tr>
+          <td style="font-weight:600;">{{ d.producto.nombre }}</td>
+          <td>{{ d.cantidad }}</td>
+          <td>${{ d.precio_unitario|miles }}</td>
+          <td style="font-weight:700;">${{ d.subtotal|miles }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr style="background:var(--gray-50);">
+            <td colspan="3" style="font-weight:700;text-align:right;padding:0.8rem 1.1rem;">Total</td>
+            <td style="font-weight:700;font-size:1rem;">${{ pedido.total|miles }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div>
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="card-head"><span class="card-title">Resumen</span></div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:0.7rem;">
+        <div style="display:flex;justify-content:space-between;font-size:0.85rem;">
+          <span style="color:var(--gray-500);">Ticket</span>
+          <span style="font-family:monospace;font-weight:700;color:var(--leaf);">{{ pedido.ticket }}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.85rem;">
+          <span style="color:var(--gray-500);">Tipo de pago</span>
+          <span style="font-weight:600;">{{ pedido.get_tipo_pago_display }}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.85rem;">
+          <span style="color:var(--gray-500);">Saldo docente</span>
+          <span style="font-weight:600;{% if pedido.docente.saldo > 0 %}color:var(--green-mid);{% else %}color:var(--red);{% endif %}">
+            ${{ pedido.docente.saldo|miles }}
+          </span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.9rem;padding-top:0.5rem;border-top:1px solid var(--gray-200);">
+          <span style="font-weight:700;">Total pedido</span>
+          <span style="font-weight:700;color:var(--green-mid);">${{ pedido.total|miles }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cambiar estado -->
+    {% if pedido.estado != 'entregado' and pedido.estado != 'cancelado' %}
+    <div class="card">
+      <div class="card-head"><span class="card-title">Cambiar estado</span></div>
+      <div class="card-body">
+        <div style="display:flex;flex-direction:column;gap:0.5rem;">
+          {% if pedido.estado == 'pendiente' %}
+            <form method="post" action="{% url 'app_admin:pedido_docente_estado' pedido.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="estado" value="preparando">
+              <input type="hidden" name="next" value="{% url 'app_admin:pedido_docente_detalle' pedido.pk %}">
+              <button type="submit" class="btn btn-primary btn-full"><i class="bi bi-fire"></i> Preparando</button>
+            </form>
+            <form method="post" action="{% url 'app_admin:pedido_docente_estado' pedido.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="estado" value="cancelado">
+              <input type="hidden" name="next" value="{% url 'app_admin:pedido_docente_detalle' pedido.pk %}">
+              <button type="submit" class="btn btn-danger btn-full" onclick="return confirm('¿Cancelar este pedido?')"><i class="bi bi-x"></i> Cancelar pedido</button>
+            </form>
+          {% elif pedido.estado == 'preparando' %}
+            <form method="post" action="{% url 'app_admin:pedido_docente_estado' pedido.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="estado" value="listo">
+              <input type="hidden" name="next" value="{% url 'app_admin:pedido_docente_detalle' pedido.pk %}">
+              <button type="submit" class="btn btn-primary btn-full"><i class="bi bi-check-circle"></i> Marcar listo</button>
+            </form>
+            <form method="post" action="{% url 'app_admin:pedido_docente_estado' pedido.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="estado" value="pendiente">
+              <input type="hidden" name="next" value="{% url 'app_admin:pedido_docente_detalle' pedido.pk %}">
+              <button type="submit" class="btn btn-ghost btn-full"><i class="bi bi-arrow-left"></i> Volver a pendiente</button>
+            </form>
+            <form method="post" action="{% url 'app_admin:pedido_docente_estado' pedido.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="estado" value="cancelado">
+              <input type="hidden" name="next" value="{% url 'app_admin:pedido_docente_detalle' pedido.pk %}">
+              <button type="submit" class="btn btn-danger btn-full" onclick="return confirm('¿Cancelar este pedido?')"><i class="bi bi-x"></i> Cancelar pedido</button>
+            </form>
+          {% elif pedido.estado == 'listo' %}
+            <form method="post" action="{% url 'app_admin:pedido_docente_estado' pedido.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="estado" value="entregado">
+              <input type="hidden" name="next" value="{% url 'app_admin:pedido_docente_detalle' pedido.pk %}">
+              <button type="submit" class="btn btn-primary btn-full" onclick="return confirm('¿Marcar como entregado?')"><i class="bi bi-check-lg"></i> Entregar</button>
+            </form>
+            <form method="post" action="{% url 'app_admin:pedido_docente_estado' pedido.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="estado" value="pendiente">
+              <input type="hidden" name="next" value="{% url 'app_admin:pedido_docente_detalle' pedido.pk %}">
+              <button type="submit" class="btn btn-ghost btn-full"><i class="bi bi-arrow-left"></i> Volver a pendiente</button>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+</div>
+{% endblock %}

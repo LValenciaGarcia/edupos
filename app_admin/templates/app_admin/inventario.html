@@ -543,24 +543,19 @@
             {% endif %}
             <div>
               <div style="font-weight:600;font-size:0.85rem;">{{ ing.nombre }}</div>
-              {% if ing.proveedor %}
               <div style="font-size:0.71rem;color:var(--ash);margin-top:0.1rem;">
-                <i class="bi bi-truck" style="font-size:0.65rem;"></i> {{ ing.proveedor.nombre }}
+                {{ ing.stock_unidades|floatformat:"-2" }} {{ ing.unidad_compra }} · {{ ing.get_unidad_base_display }}
               </div>
-              {% endif %}
             </div>
           </div>
         </td>
         <td>
-          <span style="font-size:0.78rem;color:var(--stone);">{{ ing.get_unidad_display }}</span>
-        </td>
-        <td>
-          {% if ing.stock == 0 %}
-            <span class="stock-pill out"><i class="bi bi-x-circle-fill"></i> 0</span>
-          {% elif ing.stock <= ing.stock_minimo %}
-            <span class="stock-pill low"><i class="bi bi-exclamation-triangle-fill"></i> {{ ing.stock }}</span>
+          {% if ing.sin_stock %}
+            <span class="stock-pill out"><i class="bi bi-x-circle-fill"></i> {{ ing.stock_real|floatformat:"-2" }} {{ ing.get_unidad_base_display }}</span>
+          {% elif ing.stock_bajo %}
+            <span class="stock-pill low"><i class="bi bi-exclamation-triangle-fill"></i> {{ ing.stock_real|floatformat:"-2" }} {{ ing.get_unidad_base_display }}</span>
           {% else %}
-            <span class="stock-pill ok"><i class="bi bi-check-circle-fill"></i> {{ ing.stock }}</span>
+            <span class="stock-pill ok"><i class="bi bi-check-circle-fill"></i> {{ ing.stock_real|floatformat:"-2" }} {{ ing.get_unidad_base_display }}</span>
           {% endif %}
         </td>
         <td style="color:var(--ash);font-size:0.8rem;">{{ ing.stock_minimo }}</td>
@@ -582,8 +577,8 @@
           {% endif %}
         </td>
         <td>
-          {% if ing.stock == 0 %}<span class="badge badge-out">Sin stock</span>
-          {% elif ing.stock <= ing.stock_minimo %}<span class="badge badge-low">Stock bajo</span>
+          {% if ing.sin_stock %}<span class="badge badge-out">Sin stock</span>
+          {% elif ing.stock_bajo %}<span class="badge badge-low">Stock bajo</span>
           {% else %}<span class="badge badge-ok">OK</span>{% endif %}
         </td>
         <td>

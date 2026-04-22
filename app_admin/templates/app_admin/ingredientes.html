@@ -265,7 +265,7 @@
 <div class="ing-kpi">
   <div class="ing-kpi-card green">
     <div class="ing-kpi-label">Total</div>
-    <div class="ing-kpi-val">{{ ingredientes.count }}</div>
+    <div class="ing-kpi-val">{{ kpi.total|default:"0" }}</div>
     <div class="ing-kpi-sub">ingredientes activos</div>
   </div>
   <div class="ing-kpi-card red">
@@ -278,18 +278,6 @@
     <div class="ing-kpi-val">{{ kpi.stock_bajo|default:"0" }}</div>
     <div class="ing-kpi-sub">bajo el mínimo</div>
   </div>
-  <div class="ing-kpi-card blue">
-    <div class="ing-kpi-label">Con proveedor</div>
-    <div class="ing-kpi-val">{{ kpi.con_proveedor|default:"0" }}</div>
-    <div class="ing-kpi-sub">con proveedor asignado</div>
-  </div>
-  {% if kpi.sobrestock %}
-  <div class="ing-kpi-card amber">
-    <div class="ing-kpi-label">Sobrestock</div>
-    <div class="ing-kpi-val">{{ kpi.sobrestock }}</div>
-    <div class="ing-kpi-sub">superan el máximo</div>
-  </div>
-  {% endif %}
 </div>
 
 <div class="ing-layout">
@@ -338,10 +326,9 @@
             <input type="checkbox" id="ing-check-all" title="Seleccionar todos" style="accent-color:var(--amber);cursor:pointer;">
           </th>
           <th>Ingrediente</th>
-          <th>Unidad</th>
-          <th>Stock</th>
-          <th>Mínimo</th>
-          <th>Precio/u</th>
+          <th>Compra</th>
+          <th>Stock real</th>
+          <th>Costo/ud base</th>
           <th>Alérgenos</th>
           <th>Vencimiento</th>
           <th>Proyección</th>
@@ -365,41 +352,44 @@
               <i class="bi bi-basket" style="font-size:0.68rem;color:var(--fog);"></i>
             </div>
             {% endif %}
-            <div>
-              <div style="font-weight:600;font-size:0.85rem;">{{ ing.nombre }}</div>
-              {% if ing.proveedor %}
-              <div style="font-size:0.7rem;color:var(--ash);margin-top:0.08rem;">
-                <i class="bi bi-truck" style="font-size:0.62rem;"></i>
-                {{ ing.proveedor }}
-              </div>
-              {% endif %}
-            </div>
+            <div style="font-weight:600;font-size:0.85rem;">{{ ing.nombre }}</div>
           </div>
         </td>
+        <!-- Unidad de compra -->
         <td>
-          <span style="font-size:0.78rem;color:var(--stone);">{{ ing.get_unidad_display }}</span>
+          <div style="font-size:0.8rem;font-weight:600;color:var(--ink);">
+            {{ ing.stock_unidades|floatformat:"-2" }} {{ ing.unidad_compra }}
+          </div>
+          <div style="font-size:0.68rem;color:var(--ash);margin-top:0.05rem;">
+            {{ ing.contenido_por_unidad|floatformat:"-4" }} {{ ing.get_unidad_base_display }} c/u
+          </div>
         </td>
+        <!-- Stock real -->
         <td>
           {% if ing.sin_stock %}
-            <span class="stock-pill out"><i class="bi bi-x-circle-fill"></i> {{ ing.stock|floatformat:"-2" }}</span>
+            <span class="stock-pill out"><i class="bi bi-x-circle-fill"></i> {{ ing.stock_real|floatformat:"-2" }} {{ ing.get_unidad_base_display }}</span>
           {% elif ing.stock_bajo %}
-            <span class="stock-pill low"><i class="bi bi-exclamation-triangle-fill"></i> {{ ing.stock|floatformat:"-2" }}</span>
-          {% elif ing.stock_sobrepasado %}
-            <span class="stock-pill" style="background:var(--sky-pale);color:var(--sky);"><i class="bi bi-arrow-up-circle-fill"></i> {{ ing.stock|floatformat:"-2" }}</span>
+            <span class="stock-pill low"><i class="bi bi-exclamation-triangle-fill"></i> {{ ing.stock_real|floatformat:"-2" }} {{ ing.get_unidad_base_display }}</span>
           {% else %}
-            <span class="stock-pill ok"><i class="bi bi-check-circle-fill"></i> {{ ing.stock|floatformat:"-2" }}</span>
+            <span class="stock-pill ok"><i class="bi bi-check-circle-fill"></i> {{ ing.stock_real|floatformat:"-2" }} {{ ing.get_unidad_base_display }}</span>
+          {% endif %}
+          {% if ing.stock_minimo %}
+          <div style="font-size:0.67rem;color:var(--ash);margin-top:0.15rem;">mín: {{ ing.stock_minimo|floatformat:"-2" }}</div>
           {% endif %}
         </td>
-        <td style="color:var(--ash);font-size:0.8rem;">{{ ing.stock_minimo|floatformat:"-2" }}</td>
-        <td style="font-size:0.8rem;color:var(--stone);">${{ ing.precio_unitario|miles }}</td>
+        <!-- Costo unitario real -->
+        <td style="font-size:0.8rem;color:var(--stone);">
+          ${{ ing.costo_unitario_real|floatformat:4 }}<span style="color:var(--ash);font-size:0.68rem;"> / {{ ing.get_unidad_base_display }}</span>
+        </td>
+        <!-- Alérgenos -->
         <td>
           {% with alerg_list=ing.alergenos.all %}
           {% if alerg_list %}
             <div style="display:flex;flex-wrap:wrap;gap:0.25rem;">
               {% for a in alerg_list %}
               <span title="{{ a.get_codigo_display }}"
-                    style="display:inline-flex;align-items:center;padding:0.12rem 0.45rem;background:var(--red-pale);color:var(--red);border-radius:99px;font-size:0.62rem;font-weight:700;white-space:nowrap;">
-                {% if a.icono %}{{ a.icono }}{% else %}<i class="bi bi-exclamation-triangle-fill" style="font-size:0.58rem;"></i>{% endif %}
+                    style="display:inline-flex;align-items:center;gap:0.22rem;padding:0.12rem 0.45rem;background:var(--red-pale);color:var(--red);border-radius:99px;font-size:0.62rem;font-weight:700;white-space:nowrap;">
+                <i class="bi {% if a.icono %}{{ a.icono }}{% else %}bi-exclamation-triangle-fill{% endif %}" style="font-size:0.58rem;"></i>
                 {{ a.get_codigo_display }}
               </span>
               {% endfor %}
@@ -409,6 +399,7 @@
           {% endif %}
           {% endwith %}
         </td>
+        <!-- Vencimiento -->
         <td>
           {% if ing.fecha_vencimiento %}
             {% if ing.vencido %}
@@ -422,6 +413,7 @@
             <span style="color:var(--fog);font-size:0.8rem;">—</span>
           {% endif %}
         </td>
+        <!-- Proyección -->
         <td>
           {% if ing.dias_restantes %}
             <span class="proy-pill"><i class="bi bi-clock" style="font-size:0.65rem;"></i> ~{{ ing.dias_restantes }}d</span>
@@ -429,6 +421,7 @@
             <span style="color:var(--fog);font-size:0.8rem;">—</span>
           {% endif %}
         </td>
+        <!-- Acciones -->
         <td>
           <div class="action-group">
             <a href="{% url 'app_admin:entrada_stock' %}?ing={{ ing.pk }}" class="action-btn entrada" title="Registrar entrada">
@@ -455,23 +448,22 @@
             <!-- Data JSON oculta para modal de info -->
             <script type="application/json" id="ing-data-{{ ing.pk }}">
             {
-              "nombre":    "{{ ing.nombre|escapejs }}",
-              "unidad":    "{{ ing.get_unidad_display }}",
-              "stock":     "{{ ing.stock }}",
-              "stock_minimo": "{{ ing.stock_minimo }}",
-              "stock_maximo": "{% if ing.stock_maximo %}{{ ing.stock_maximo }}{% endif %}",
-              "precio_unitario": "${{ ing.precio_unitario|miles }}",
-              "precio_con_merma": "${{ ing.precio_con_merma|floatformat:4 }}",
-              "porcentaje_merma": "{{ ing.porcentaje_merma }}",
-              "proveedor": "{{ ing.proveedor|default:'—' }}",
+              "nombre":            "{{ ing.nombre|escapejs }}",
+              "unidad_compra":     "{{ ing.unidad_compra|escapejs }}",
+              "stock_unidades":    "{{ ing.stock_unidades|floatformat:'-2' }}",
+              "contenido":         "{{ ing.contenido_por_unidad|floatformat:'-4' }}",
+              "unidad_base":       "{{ ing.get_unidad_base_display }}",
+              "stock_real":        "{{ ing.stock_real|floatformat:'-2' }}",
+              "stock_minimo":      "{{ ing.stock_minimo|floatformat:'-2' }}",
+              "precio_compra":     "${{ ing.precio_compra|miles }}",
+              "costo_unitario":    "${{ ing.costo_unitario_real|floatformat:4 }}",
               "fecha_vencimiento": "{% if ing.fecha_vencimiento %}{{ ing.fecha_vencimiento|date:'d/m/Y' }}{% endif %}",
-              "vencido":    {{ ing.vencido|yesno:"true,false" }},
-              "vence_pronto": {{ ing.vence_pronto|yesno:"true,false" }},
-              "sin_stock":  {{ ing.sin_stock|yesno:"true,false" }},
-              "stock_bajo": {{ ing.stock_bajo|yesno:"true,false" }},
-              "sobrestock": {{ ing.stock_sobrepasado|yesno:"true,false" }},
-              "dias_restantes": "{% if ing.dias_restantes %}~{{ ing.dias_restantes }}d{% endif %}",
-              "imagen_url": "{% if ing.imagen %}{{ ing.imagen.url }}{% endif %}",
+              "vencido":           {{ ing.vencido|yesno:"true,false" }},
+              "vence_pronto":      {{ ing.vence_pronto|yesno:"true,false" }},
+              "sin_stock":         {{ ing.sin_stock|yesno:"true,false" }},
+              "stock_bajo":        {{ ing.stock_bajo|yesno:"true,false" }},
+              "dias_restantes":    "{% if ing.dias_restantes %}~{{ ing.dias_restantes }}d{% endif %}",
+              "imagen_url":        "{% if ing.imagen %}{{ ing.imagen.url }}{% endif %}",
               "alergenos": [{% for a in ing.alergenos.all %}"{{ a.get_codigo_display }}"{% if not forloop.last %},{% endif %}{% endfor %}]
             }
             </script>
@@ -594,7 +586,8 @@ function abrirInfoIngrediente(pk) {
   const d = JSON.parse(raw.textContent);
 
   document.getElementById('info-ing-nombre').textContent = d.nombre;
-  document.getElementById('info-ing-unidad').textContent = d.unidad;
+  document.getElementById('info-ing-unidad').textContent =
+    d.stock_unidades + ' ' + d.unidad_compra + '(s) · ' + d.unidad_base;
 
   // Icono y color según estado
   const iconEl = document.getElementById('info-ing-icon');
@@ -617,23 +610,15 @@ function abrirInfoIngrediente(pk) {
     imgWrap.style.display = 'none';
   }
 
-  // Icono sobrestock override
-  if (d.sobrestock && !d.sin_stock && !d.stock_bajo) {
-    iconEl.style.background = 'var(--sky-pale)'; iconEl.style.color = 'var(--sky)';
-  }
-
   // Grid de datos
   const grid = document.getElementById('info-ing-grid');
   const fields = [
-    { label: 'Stock actual',  value: d.stock + ' ' + d.unidad },
-    { label: 'Stock mínimo',  value: d.stock_minimo + ' ' + d.unidad },
-    ...(d.stock_maximo ? [{ label: 'Stock máximo', value: d.stock_maximo + ' ' + d.unidad }] : []),
-    { label: 'Precio/unidad', value: d.precio_unitario },
-    ...(parseFloat(d.porcentaje_merma) > 0 ? [
-      { label: 'Merma estimada', value: d.porcentaje_merma + '%' },
-      { label: 'Costo con merma', value: d.precio_con_merma },
-    ] : []),
-    { label: 'Proveedor',     value: d.proveedor },
+    { label: 'Stock (uds compra)',  value: d.stock_unidades + ' ' + d.unidad_compra },
+    { label: 'Contenido por ud.',   value: d.contenido + ' ' + d.unidad_base },
+    { label: 'Stock real',          value: d.stock_real + ' ' + d.unidad_base },
+    { label: 'Stock mínimo',        value: d.stock_minimo + ' ' + d.unidad_base },
+    { label: 'Precio de compra',    value: d.precio_compra + ' / ' + d.unidad_compra },
+    { label: 'Costo unitario real', value: d.costo_unitario + ' / ' + d.unidad_base },
     ...(d.dias_restantes ? [{ label: 'Proyección', value: d.dias_restantes }] : []),
   ];
   grid.innerHTML = fields.map(f => `

@@ -87,7 +87,7 @@ class Alergeno(models.Model):
 # ─── INGREDIENTE ──────────────────────────────────────────────────────────────
 
 class Ingrediente(models.Model):
-    UNIDAD_CHOICES = [
+    UNIDAD_BASE_CHOICES = [
         ('g',        'Gramos (g)'),
         ('kg',       'Kilogramos (kg)'),
         ('ml',       'Mililitros (ml)'),
@@ -96,57 +96,66 @@ class Ingrediente(models.Model):
         ('porciones','Porciones'),
     ]
 
-    nombre            = models.CharField(max_length=100)
-    imagen            = models.ImageField(upload_to='ingredientes/', blank=True, null=True, validators=[validate_image])
-    unidad            = models.CharField(max_length=10, choices=UNIDAD_CHOICES, default='g')
-    precio_unitario   = models.DecimalField(
-        max_digits=10, decimal_places=4,
-        help_text='Precio por unidad de medida (ej: precio por gramo)'
+    nombre               = models.CharField(max_length=100)
+    imagen               = models.ImageField(upload_to='ingredientes/', blank=True, null=True, validators=[validate_image])
+    # ── Unidad de compra (cómo se adquiere) ──────────────────────────────────
+    stock_unidades       = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text='Cantidad de unidades de compra disponibles (ej: 10 bandejas)'
     )
-    stock             = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    stock_minimo      = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    stock_maximo      = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True,
-        help_text='Alerta de sobrestock si se supera este valor'
+    unidad_compra        = models.CharField(
+        max_length=50, default='und',
+        help_text='Nombre de la unidad de compra (ej: bandeja, paquete, bolsa)'
     )
-    fecha_vencimiento = models.DateField(null=True, blank=True)
-    porcentaje_merma  = models.DecimalField(
-        max_digits=5, decimal_places=2, default=0,
-        help_text='% de pérdida esperada en preparación (ej: 5.00 = 5%)'
+    contenido_por_unidad = models.DecimalField(
+        max_digits=10, decimal_places=4, default=1,
+        help_text='Cuántas unidades base contiene cada unidad de compra (ej: 12 huevos por bandeja)'
     )
-    alergenos         = models.ManyToManyField(
+    # ── Unidad base (cómo se consume en recetas) ─────────────────────────────
+    unidad_base          = models.CharField(
+        max_length=10, choices=UNIDAD_BASE_CHOICES, default='und',
+        help_text='Unidad en la que se mide para recetas (ej: und, g, ml)'
+    )
+    precio_compra        = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        help_text='Precio pagado por cada unidad de compra (ej: $8.000 por bandeja)'
+    )
+    # ── Alertas ───────────────────────────────────────────────────────────────
+    stock_minimo         = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text='Alerta cuando stock_real baje de este valor (en unidades base)'
+    )
+    fecha_vencimiento    = models.DateField(null=True, blank=True)
+    alergenos            = models.ManyToManyField(
         'Alergeno', blank=True, related_name='ingredientes',
         verbose_name='Alérgenos que contiene'
     )
-    proveedor         = models.ForeignKey(
-        Proveedor, on_delete=models.SET_NULL,
-        null=True, blank=True, related_name='ingredientes'
-    )
-    activo            = models.BooleanField(default=True)
-    created_at        = models.DateTimeField(auto_now_add=True)
-    updated_at        = models.DateTimeField(auto_now=True)
+    activo               = models.BooleanField(default=True)
+    created_at           = models.DateTimeField(auto_now_add=True)
+    updated_at           = models.DateTimeField(auto_now=True)
+
+    # ── Propiedades derivadas ─────────────────────────────────────────────────
+
+    @property
+    def stock_real(self):
+        """Stock disponible expresado en unidades base."""
+        return round(float(self.stock_unidades) * float(self.contenido_por_unidad), 4)
+
+    @property
+    def costo_unitario_real(self):
+        """Costo por unidad base — base para cálculo de recetas."""
+        cpd = float(self.contenido_por_unidad)
+        if cpd == 0:
+            return 0
+        return round(float(self.precio_compra) / cpd, 6)
 
     @property
     def stock_bajo(self):
-        return float(self.stock) <= float(self.stock_minimo)
-
-    @property
-    def stock_sobrepasado(self):
-        if not self.stock_maximo:
-            return False
-        return float(self.stock) > float(self.stock_maximo)
+        return self.stock_real <= float(self.stock_minimo)
 
     @property
     def sin_stock(self):
-        return float(self.stock) <= 0
-
-    @property
-    def precio_con_merma(self):
-        """Costo efectivo por unidad considerando pérdida esperada en preparación."""
-        if float(self.porcentaje_merma) <= 0:
-            return float(self.precio_unitario)
-        factor = 1 / (1 - float(self.porcentaje_merma) / 100)
-        return round(float(self.precio_unitario) * factor, 4)
+        return self.stock_real <= 0
 
     @property
     def vence_pronto(self):
@@ -169,10 +178,10 @@ class Ingrediente(models.Model):
         if consumido == 0:
             return None
         consumo_diario = float(consumido) / 30
-        return round(float(self.stock) / consumo_diario) if consumo_diario > 0 else None
+        return round(self.stock_real / consumo_diario) if consumo_diario > 0 else None
 
     def __str__(self):
-        return f'{self.nombre} ({self.get_unidad_display()})'
+        return f'{self.nombre} ({self.get_unidad_base_display()})'
 
     class Meta:
         verbose_name = 'Ingrediente'
@@ -200,7 +209,7 @@ class MovimientoIngrediente(models.Model):
     fecha       = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f'{self.get_tipo_display()} {self.cantidad} {self.ingrediente.unidad} — {self.ingrediente.nombre}'
+        return f'{self.get_tipo_display()} {self.cantidad} {self.ingrediente.unidad_base} — {self.ingrediente.nombre}'
 
     class Meta:
         verbose_name = 'Movimiento de Ingrediente'
@@ -237,7 +246,7 @@ class Producto(models.Model):
     def costo_calculado(self):
         if self.tipo == 'simple':
             return self.precio_costo or 0
-        total = sum(r.cantidad * r.ingrediente.precio_unitario for r in self.receta.all())
+        total = sum(float(r.cantidad) * r.ingrediente.costo_unitario_real for r in self.receta.all())
         return round(total, 2)
 
     @property
@@ -259,7 +268,7 @@ class Producto(models.Model):
         if self.tipo == 'simple':
             return self.stock <= 0
         for r in self.receta.all():
-            if r.ingrediente.stock < r.cantidad:
+            if r.ingrediente.stock_real < float(r.cantidad):
                 return True
         return False
 
@@ -303,10 +312,10 @@ class RecetaIngrediente(models.Model):
 
     @property
     def costo_linea(self):
-        return round(float(self.cantidad) * float(self.ingrediente.precio_unitario), 4)
+        return round(float(self.cantidad) * self.ingrediente.costo_unitario_real, 4)
 
     def __str__(self):
-        return f'{self.cantidad} {self.ingrediente.unidad} de {self.ingrediente.nombre} → {self.producto.nombre}'
+        return f'{self.cantidad} {self.ingrediente.unidad_base} de {self.ingrediente.nombre} → {self.producto.nombre}'
 
     class Meta:
         verbose_name = 'Ingrediente de Receta'

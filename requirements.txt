@@ -28,5 +28,8 @@ django-widget-tweaks==1.5.0  # Añadir clases CSS a widgets Django en templates
 # ─── Desarrollo ───────────────────────────────────────────────────────────────
 django-debug-toolbar==6.3.0  # Panel SQL/queries en desarrollo (solo DEBUG=True)
 
+# ─── Inteligencia Artificial ──────────────────────────────────────────────────
+anthropic>=0.40.0            # SDK oficial de Claude (Anthropic)
+
 # ─── Despliegue ───────────────────────────────────────────────────────────────
 gunicorn==25.3.0             # Servidor WSGI de producción

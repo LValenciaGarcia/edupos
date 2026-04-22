@@ -12,13 +12,13 @@ from django.db import transaction
 from django.db.models import Sum, Count, Avg, Q, F
 from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_GET
 
 from authentication.models import Perfil, Padre, Estudiante
 from authentication.utils import generar_username as _generar_username
 from app_admin.models import Producto, Categoria, Pedido, DetallePedido, Alergeno
 from .models import (
-    RecargaSaldo, LimiteGasto, RestriccionAlimento,
+    RecargaSaldo, RecargaPadre, LimiteGasto, RestriccionAlimento,
     Notificacion, HorarioCompra, PedidoPadre,
     PedidoProgramado, DetalleProgramado,
     AlergiaEstudiante,
@@ -1032,9 +1032,12 @@ def saldo_padre(request):
         elif monto > 2_000_000:
             messages.error(request, 'El monto máximo por recarga es $2.000.000.')
         else:
-            # Recarga de saldo del PADRE (vinculada al primer hijo para compatibilidad)
-            # Se crea como RecargaSaldo pendiente pero apuntando a un estudiante dummy
-            # En su lugar generamos una notificación interna
+            RecargaPadre.objects.create(
+                padre=padre,
+                monto=monto,
+                nota=nota,
+                comprobante=comprobante,
+            )
             Notificacion.objects.create(
                 padre=padre,
                 tipo='recarga_pendiente',
@@ -1130,6 +1133,51 @@ def api_notificaciones(request):
     for item in ultimas:
         item['fecha'] = item['fecha'].strftime('%d/%m %H:%M')
     return JsonResponse({'n': n, 'items': ultimas})
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# IA — SUGERENCIA DE CLASIFICACIÓN DE ALERGIA
+# ══════════════════════════════════════════════════════════════════════════════
+
+@padre_required
+@require_POST
+def api_sugerir_alergia(request):
+    """AJAX: recibe texto libre del padre y devuelve clasificación sugerida por Claude."""
+    from edupos.ai_client import get_client
+    import anthropic as _anthropic
+
+    nombre = request.POST.get('nombre', '').strip()
+    notas  = request.POST.get('notas',  '').strip()
+
+    if not nombre:
+        return JsonResponse({'error': 'Nombre requerido.'}, status=400)
+
+    prompt = (
+        'Eres un asistente de salud escolar para una cafetería en Colombia. '
+        'Un padre registra la siguiente alergia de su hijo.\n\n'
+        f'Texto del padre: "{nombre}"\n'
+        f'Notas adicionales: "{notas}"\n\n'
+        'Responde SOLO con JSON válido, sin texto extra:\n'
+        '{\n'
+        '  "nombre_normalizado": "nombre estándar en español (ej: Maní, Gluten, Lácteos)",\n'
+        '  "gravedad_sugerida": "leve|moderada|severa|anafilaxia",\n'
+        '  "alerta_caja": "frase corta máximo 12 palabras para el cajero",\n'
+        '  "confianza": "alta|media|baja"\n'
+        '}'
+    )
+
+    try:
+        msg = get_client().messages.create(
+            model='claude-haiku-4-5-20251001',
+            max_tokens=150,
+            messages=[{'role': 'user', 'content': prompt}],
+        )
+        data = json.loads(msg.content[0].text.strip())
+        return JsonResponse(data)
+    except RuntimeError as e:
+        return JsonResponse({'error': str(e)}, status=503)
+    except (_anthropic.APIError, ValueError):
+        return JsonResponse({'error': 'Servicio no disponible.'}, status=503)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

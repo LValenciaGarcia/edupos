@@ -179,7 +179,7 @@
           <div style="display:flex;flex-wrap:wrap;gap:0.2rem;margin-top:0.25rem;">
             {% for a in alergenos_prod %}
             <span class="alerg-badge" title="{{ a.get_codigo_display }}">
-              {% if a.icono %}{{ a.icono }}{% else %}<i class="bi bi-exclamation-triangle-fill"></i>{% endif %}
+              <i class="bi {% if a.icono %}{{ a.icono }}{% else %}bi-exclamation-triangle-fill{% endif %}" style="font-size:0.6rem;"></i>
               {{ a.get_codigo_display }}
             </span>
             {% endfor %}

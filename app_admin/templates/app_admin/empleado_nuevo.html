@@ -5,95 +5,199 @@
 {% block page_title %}Nuevo Empleado{% endblock %}
 {% block nav_empleados %}active{% endblock %}
 
-{% block content %}
-<div style="max-width:640px;">
+{% block extra_css %}
+<style>
+/* ── Nuevo empleado ──────────────────────────────────────────────────────── */
+.new-emp-wrap { max-width: 640px; display: flex; flex-direction: column; gap: 1.1rem; }
 
-  <div style="margin-bottom:1rem;">
+/* Hero banner */
+.new-emp-hero {
+  background: var(--ivory); border: 1px solid var(--mist);
+  border-radius: var(--radius); padding: 1.25rem 1.5rem;
+  display: flex; align-items: center; gap: 1rem;
+}
+.new-emp-hero-ico {
+  width: 3rem; height: 3rem; background: var(--leaf-tint); color: var(--leaf);
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 1.25rem; flex-shrink: 0;
+}
+.new-emp-hero h2 { font-family: var(--serif); font-size: 1.2rem; }
+.new-emp-hero p  { font-size: var(--text-sm); color: var(--ash); margin-top: .2rem; }
+
+/* Form sections */
+.form-section {
+  background: var(--ivory);
+  border: 1px solid var(--mist);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.form-section-head {
+  padding: .75rem 1.25rem;
+  border-bottom: 1px solid var(--mist);
+  font-size: var(--text-2xs); font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--stone);
+  display: flex; align-items: center; gap: .45rem;
+}
+.form-section-body {
+  padding: 1.25rem;
+  display: flex; flex-direction: column; gap: .9rem;
+}
+
+/* Sede toggles */
+.sede-toggle {
+  display: flex; align-items: center; gap: .75rem;
+  padding: .6rem .9rem;
+  border: 1px solid var(--mist); border-radius: var(--radius);
+  cursor: pointer; background: var(--cream);
+  transition: background .11s, border-color .11s;
+  font-size: var(--text-sm);
+}
+.sede-toggle:hover { border-color: var(--leaf); background: var(--leaf-pale); }
+.sede-toggle input[type="checkbox"] { accent-color: var(--leaf); width: 1rem; height: 1rem; flex-shrink: 0; }
+
+/* Global toggle */
+.global-toggle {
+  display: flex; align-items: flex-start; gap: .75rem;
+  padding: .75rem .9rem;
+  border: 1px solid var(--mist); border-radius: var(--radius);
+  cursor: pointer; background: var(--ivory);
+}
+.global-toggle input { accent-color: var(--sky); width: 1rem; height: 1rem; flex-shrink: 0; margin-top: .12rem; }
+.global-toggle-text strong { font-size: var(--text-sm); }
+.global-toggle-text p { font-size: var(--text-xs); color: var(--ash); margin-top: .15rem; line-height: 1.45; }
+
+/* Credentials notice */
+.creds-notice {
+  display: flex; gap: .75rem;
+  background: var(--amber-pale); border: 1px solid var(--amber-tint);
+  border-radius: var(--radius); padding: .9rem 1rem;
+  font-size: var(--text-sm); color: var(--amber-dark); line-height: 1.5;
+}
+.creds-notice i { font-size: 1.05rem; flex-shrink: 0; margin-top: .15rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="new-emp-wrap">
+
+  <div>
     <a href="{% url 'app_admin:empleados' %}" class="btn btn-ghost btn-sm">
       <i class="bi bi-arrow-left"></i> Volver a empleados
     </a>
   </div>
 
-  <div class="card">
-    <div class="card-head">Datos del empleado</div>
-    <form method="post" style="padding:1.25rem;display:flex;flex-direction:column;gap:1rem;">
-      {% csrf_token %}
-
-      <div class="form-grid">
-        <div class="field">
-          <label class="field-label">Nombre <span style="color:var(--red);">*</span></label>
-          <input type="text" name="first_name" class="form-input" required placeholder="Nombre">
-        </div>
-        <div class="field">
-          <label class="field-label">Apellido <span style="color:var(--red);">*</span></label>
-          <input type="text" name="last_name" class="form-input" required placeholder="Apellido">
-        </div>
-      </div>
-
-      <div class="form-grid">
-        <div class="field">
-          <label class="field-label">Correo electrónico</label>
-          <input type="email" name="email" class="form-input" placeholder="correo@ejemplo.com">
-        </div>
-        <div class="field">
-          <label class="field-label">Teléfono</label>
-          <input type="tel" name="telefono" class="form-input" placeholder="3001234567">
-        </div>
-      </div>
-
-      <div class="form-grid">
-        <div class="field">
-          <label class="field-label">N° Documento</label>
-          <input type="text" name="documento" class="form-input" placeholder="Cédula o ID">
-        </div>
-        <div class="field">
-          <label class="field-label">Cargo</label>
-          <select name="cargo" class="form-input">
-            {% for val, label in cargos %}
-            <option value="{{ val }}">{{ label }}</option>
-            {% endfor %}
-          </select>
-        </div>
-      </div>
-
-      <!-- Sedes -->
-      <div class="field">
-        <label class="field-label">Sedes asignadas</label>
-        {% if sedes %}
-        <div style="display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.25rem;">
-          {% for s in sedes %}
-          <label style="display:flex;align-items:center;gap:.4rem;font-size:var(--text-sm);cursor:pointer;padding:.35rem .75rem;border:1px solid var(--fog);border-radius:var(--radius);background:var(--cream);">
-            <input type="checkbox" name="sedes" value="{{ s.pk }}" style="accent-color:var(--leaf);">
-            {{ s.nombre }}
-          </label>
-          {% endfor %}
-        </div>
-        {% else %}
-        <div style="color:var(--ash);font-size:var(--text-sm);margin-top:.25rem;">
-          No hay sedes activas. <a href="{% url 'app_admin:sedes' %}">Crear una sede</a>
-        </div>
-        {% endif %}
-      </div>
-
-      <!-- Acceso global -->
-      <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;font-size:var(--text-sm);">
-        <input type="checkbox" name="es_global" style="accent-color:var(--sky);width:1rem;height:1rem;">
-        <span><strong>Acceso global</strong> — puede ver información consolidada de todas las sedes</span>
-      </label>
-
-      <!-- Nota credenciales -->
-      <div style="background:var(--amber-pale);border:1px solid var(--amber-tint);border-radius:var(--radius);padding:.75rem 1rem;font-size:var(--text-sm);color:var(--amber-dark);">
-        <i class="bi bi-key"></i>
-        El nombre de usuario y la contraseña se generan automáticamente al crear el empleado.
-        Se mostrarán una sola vez: guárdalos y compártelos de forma segura.
-      </div>
-
-      <div style="display:flex;gap:.75rem;margin-top:.25rem;">
-        <button type="submit" class="btn btn-primary">Crear empleado</button>
-        <a href="{% url 'app_admin:empleados' %}" class="btn btn-ghost">Cancelar</a>
-      </div>
-    </form>
+  <!-- Hero -->
+  <div class="new-emp-hero">
+    <div class="new-emp-hero-ico"><i class="bi bi-person-plus-fill"></i></div>
+    <div>
+      <h2>Nuevo empleado</h2>
+      <p>Completa los datos para registrar al nuevo miembro del equipo.</p>
+    </div>
   </div>
 
+  <form method="post" style="display:flex;flex-direction:column;gap:1rem;">
+    {% csrf_token %}
+
+    <!-- Datos personales -->
+    <div class="form-section">
+      <div class="form-section-head">
+        <i class="bi bi-person" style="color:var(--ash);"></i>
+        Datos personales
+      </div>
+      <div class="form-section-body">
+        <div class="form-grid">
+          <div class="field">
+            <label class="field-label">Nombre <span style="color:var(--red);">*</span></label>
+            <input type="text" name="first_name" class="form-input" required placeholder="Nombre">
+          </div>
+          <div class="field">
+            <label class="field-label">Apellido <span style="color:var(--red);">*</span></label>
+            <input type="text" name="last_name" class="form-input" required placeholder="Apellido">
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label class="field-label">Correo electrónico</label>
+            <input type="email" name="email" class="form-input" placeholder="correo@ejemplo.com">
+          </div>
+          <div class="field">
+            <label class="field-label">Teléfono</label>
+            <input type="tel" name="telefono" class="form-input" placeholder="3001234567">
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label class="field-label">N° Documento</label>
+            <input type="text" name="documento" class="form-input" placeholder="Cédula o ID">
+          </div>
+          <div class="field">
+            <label class="field-label">Cargo</label>
+            <select name="cargo" class="form-input">
+              {% for val, label in cargos %}
+              <option value="{{ val }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Acceso y sedes -->
+    <div class="form-section">
+      <div class="form-section-head">
+        <i class="bi bi-geo-alt" style="color:var(--ash);"></i>
+        Acceso y sedes
+      </div>
+      <div class="form-section-body">
+        {% if sedes %}
+        <div class="field">
+          <label class="field-label" style="margin-bottom:.5rem;">Sedes asignadas</label>
+          <div style="display:flex;flex-direction:column;gap:.4rem;">
+            {% for s in sedes %}
+            <label class="sede-toggle">
+              <input type="checkbox" name="sedes" value="{{ s.pk }}">
+              <i class="bi bi-geo-alt" style="color:var(--sky);font-size:.9rem;"></i>
+              {{ s.nombre }}
+              <span style="margin-left:auto;font-size:var(--text-xs);color:var(--ash);">{{ s.ciudad }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        {% else %}
+        <div style="color:var(--ash);font-size:var(--text-sm);">
+          No hay sedes activas.
+          <a href="{% url 'app_admin:sedes' %}" style="color:var(--leaf);">Crear una sede</a>
+        </div>
+        {% endif %}
+
+        <label class="global-toggle">
+          <input type="checkbox" name="es_global">
+          <div class="global-toggle-text">
+            <strong>Acceso global</strong>
+            <p>Puede ver información consolidada de todas las sedes sin restricción.</p>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <!-- Aviso credenciales -->
+    <div class="creds-notice">
+      <i class="bi bi-key-fill"></i>
+      <div>
+        <strong>Credenciales automáticas</strong><br>
+        El nombre de usuario y la contraseña se generan automáticamente al crear el empleado.
+        Se mostrarán una sola vez — guárdalos y compártelos de forma segura.
+      </div>
+    </div>
+
+    <!-- Acciones -->
+    <div style="display:flex;gap:.75rem;">
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-person-plus"></i> Crear empleado
+      </button>
+      <a href="{% url 'app_admin:empleados' %}" class="btn btn-ghost">Cancelar</a>
+    </div>
+
+  </form>
 </div>
 {% endblock %}

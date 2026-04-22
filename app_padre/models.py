@@ -11,12 +11,77 @@ from simple_history.models import HistoricalRecords
 # RECARGA DE SALDO (con flujo de validación)
 # ══════════════════════════════════════════════════════════════════════════════
 
+ESTADO_RECARGA_CHOICES = [
+    ('pendiente', 'Pendiente'),
+    ('aprobada',  'Aprobada'),
+    ('rechazada', 'Rechazada'),
+]
+
+
+class RecargaPadre(models.Model):
+    """Solicitud de recarga del saldo personal del padre (no del estudiante)."""
+
+    padre            = models.ForeignKey(Padre, on_delete=models.CASCADE, related_name='recargas_propias')
+    monto            = models.DecimalField(max_digits=10, decimal_places=2)
+    comprobante      = models.ImageField(upload_to='recargas/padres/', blank=True, null=True, validators=[validate_image])
+    nota             = models.CharField(max_length=300, blank=True)
+    estado           = models.CharField(max_length=15, choices=ESTADO_RECARGA_CHOICES, default='pendiente')
+    nota_admin       = models.CharField(max_length=300, blank=True, verbose_name='Nota del administrador')
+    fecha            = models.DateTimeField(auto_now_add=True)
+    fecha_resolucion = models.DateTimeField(null=True, blank=True)
+
+    @transaction.atomic
+    def aprobar(self):
+        from decimal import Decimal
+        recarga = RecargaPadre.objects.select_for_update().get(pk=self.pk)
+        if recarga.estado != 'pendiente':
+            return
+        padre = Padre.objects.select_for_update().get(pk=recarga.padre.pk)
+        recarga.estado = 'aprobada'
+        recarga.fecha_resolucion = timezone.now()
+        recarga.save(update_fields=['estado', 'fecha_resolucion'])
+        padre.saldo += Decimal(str(recarga.monto))
+        padre.save(update_fields=['saldo'])
+        self.estado = recarga.estado
+        self.fecha_resolucion = recarga.fecha_resolucion
+        Notificacion.objects.create(
+            padre=recarga.padre,
+            tipo='recarga_aprobada',
+            titulo='Recarga de saldo propio aprobada',
+            mensaje=f'Tu recarga de ${recarga.monto:,.0f} para tu saldo personal fue aprobada.',
+            url_accion='/padre/saldo/',
+        )
+
+    @transaction.atomic
+    def rechazar(self, nota=''):
+        recarga = RecargaPadre.objects.select_for_update().get(pk=self.pk)
+        if recarga.estado != 'pendiente':
+            return
+        recarga.estado = 'rechazada'
+        recarga.nota_admin = nota
+        recarga.fecha_resolucion = timezone.now()
+        recarga.save(update_fields=['estado', 'nota_admin', 'fecha_resolucion'])
+        self.estado = recarga.estado
+        self.fecha_resolucion = recarga.fecha_resolucion
+        Notificacion.objects.create(
+            padre=recarga.padre,
+            tipo='recarga_rechazada',
+            titulo='Recarga de saldo propio rechazada',
+            mensaje=f'Tu recarga de ${recarga.monto:,.0f} fue rechazada. {nota}'.strip(),
+            url_accion='/padre/saldo/',
+        )
+
+    def __str__(self):
+        return f'Recarga padre ${self.monto} → {self.padre} [{self.get_estado_display()}]'
+
+    class Meta:
+        verbose_name = 'Recarga de Padre'
+        verbose_name_plural = 'Recargas de Padre'
+        ordering = ['-fecha']
+
+
 class RecargaSaldo(models.Model):
-    ESTADO_CHOICES = [
-        ('pendiente', 'Pendiente'),
-        ('aprobada',  'Aprobada'),
-        ('rechazada', 'Rechazada'),
-    ]
+    ESTADO_CHOICES = ESTADO_RECARGA_CHOICES
 
     estudiante       = models.ForeignKey(Estudiante, on_delete=models.CASCADE, related_name='recargas')
     padre            = models.ForeignKey(Padre, on_delete=models.SET_NULL, null=True, related_name='recargas_realizadas')

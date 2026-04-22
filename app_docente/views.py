@@ -639,16 +639,63 @@ def toggle_favorito(request, pk):
 @docente_required
 @require_POST
 def guardar_reseña(request, pk):
+    from edupos.ai_client import get_client
+    import anthropic as _anthropic
+
     docente  = _get_docente(request)
     producto = get_object_or_404(Producto, pk=pk)
     calificacion = int(request.POST.get('calificacion', 5))
     comentario   = request.POST.get('comentario', '').strip()[:500]
 
+    # Moderación con IA (solo si hay comentario de texto)
+    sentimiento   = 'neutro'
+    visible       = True
+    razon_rechazo = ''
+
+    if comentario:
+        prompt = (
+            'Eres moderador de reseñas de una cafetería escolar en Colombia.\n'
+            'Evalúa este comentario de un docente sobre un producto de cafetería.\n\n'
+            f'Comentario: "{comentario}"\n'
+            f'Calificación (1-5): {calificacion}\n\n'
+            'Responde SOLO con JSON válido:\n'
+            '{\n'
+            '  "aprobado": true,\n'
+            '  "sentimiento": "positivo|neutro|negativo",\n'
+            '  "razon_rechazo": null\n'
+            '}\n\n'
+            'Rechaza SOLO si contiene: lenguaje ofensivo, datos personales de terceros, '
+            'contenido irrelevante a alimentos o spam. Sé permisivo con críticas legítimas.'
+        )
+        try:
+            msg = get_client().messages.create(
+                model='claude-haiku-4-5-20251001',
+                max_tokens=100,
+                messages=[{'role': 'user', 'content': prompt}],
+            )
+            mod = json.loads(msg.content[0].text.strip())
+            sentimiento   = mod.get('sentimiento', 'neutro')
+            visible       = bool(mod.get('aprobado', True))
+            razon_rechazo = mod.get('razon_rechazo') or ''
+        except (RuntimeError, _anthropic.APIError, ValueError, KeyError):
+            pass  # Fail-open: si la IA no responde, la reseña se aprueba
+
     ReseñaProducto.objects.update_or_create(
         docente=docente, producto=producto,
-        defaults={'calificacion': calificacion, 'comentario': comentario},
+        defaults={
+            'calificacion':  calificacion,
+            'comentario':    comentario,
+            'sentimiento':   sentimiento,
+            'visible':       visible,
+            'razon_rechazo': razon_rechazo,
+        },
     )
-    messages.success(request, f'Reseña de "{producto.nombre}" guardada.')
+
+    if not visible:
+        messages.warning(request, f'Tu reseña de "{producto.nombre}" está pendiente de revisión.')
+    else:
+        messages.success(request, f'Reseña de "{producto.nombre}" guardada.')
+
     next_url = request.POST.get('next', 'app_docente:menu')
     return redirect(next_url)
 
