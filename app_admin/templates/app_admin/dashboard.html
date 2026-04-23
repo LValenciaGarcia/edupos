@@ -128,7 +128,7 @@
     {% for p in ultimos_pedidos %}
     <tr>
       <td><span style="font-family:monospace;font-size:.8rem;color:var(--green-mid);font-weight:700;">{{ p.ticket }}</span></td>
-      <td style="font-weight:600;">{{ p.estudiante.perfil.user.get_full_name|default:p.estudiante.perfil.user.username }}</td>
+      <td style="font-weight:600;">{{ p.estudiante.perfil.user.get_full_name|default:p.estudiante.perfil.user.email }}</td>
       <td style="font-weight:700;">${{ p.total|miles }}</td>
       <td style="color:var(--green-mid);font-weight:600;">${{ p.ganancia|miles }}</td>
       <td><span class="badge badge-{{ p.estado }}">{{ p.get_estado_display }}</span></td>

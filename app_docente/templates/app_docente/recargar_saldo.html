@@ -99,7 +99,7 @@
         {{ request.user.first_name|slice:":1"|upper }}
       </div>
       <div style="position:relative; z-index:1; flex:1;">
-        <div style="font-family:var(--serif); font-size:1.1rem; font-style:italic; color:#fff;">{{ request.user.get_full_name|default:request.user.username }}</div>
+        <div style="font-family:var(--serif); font-size:1.1rem; font-style:italic; color:#fff;">{{ request.user.get_full_name|default:request.user.email }}</div>
         <div style="font-size:.7rem; color:rgba(255,255,255,.72);">Docente{% if docente.materia %} &middot; {{ docente.materia }}{% endif %}</div>
       </div>
       <div style="text-align:right; position:relative; z-index:1;">

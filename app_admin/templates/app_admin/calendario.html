@@ -325,6 +325,7 @@
     <div class="cal-leg-item"><span class="cal-leg-dot" style="background:var(--sky);"></span>Entrada ingrediente</div>
     <div class="cal-leg-item"><span class="cal-leg-dot" style="background:var(--amber);"></span>Salida ingrediente</div>
     <div class="cal-leg-item"><span class="cal-leg-dot" style="background:var(--violet);"></span>Pedido entregado</div>
+    <div class="cal-leg-item"><span class="cal-leg-dot" style="background:#ea580c;"></span>Pedido docente</div>
   </div>
 
   <!-- ── Calendar grid ── -->
@@ -377,8 +378,9 @@
     blue:   { hex: '#0284c7', cssVar: 'var(--sky)',    label: 'Entrada ingrediente', icon: 'bi-basket-fill',            bg: 'rgba(2,132,199,0.1)',   short: 'Ent. I.' },
     amber:  { hex: '#d97706', cssVar: 'var(--amber)',  label: 'Salida ingrediente',  icon: 'bi-basket',                 bg: 'rgba(217,119,6,0.1)',   short: 'Sal. I.' },
     violet: { hex: '#7c3aed', cssVar: 'var(--violet)', label: 'Pedido entregado',    icon: 'bi-bag-check-fill',         bg: 'rgba(124,58,237,0.1)',  short: 'Pedidos' },
+    orange: { hex: '#ea580c', cssVar: '#ea580c',       label: 'Pedido docente',      icon: 'bi-person-badge-fill',      bg: 'rgba(234,88,12,0.1)',   short: 'Docente' },
   };
-  const TYPE_ORDER = ['green','red','blue','amber','violet'];
+  const TYPE_ORDER = ['green','red','blue','amber','violet','orange'];
 
   function classifyColor(c) {
     if (!c) return 'green';
@@ -388,6 +390,7 @@
     if (c.includes('1a56') || c.includes('0284')) return 'blue';
     if (c.includes('e07b') || c.includes('d977')) return 'amber';
     if (c.includes('6b21') || c.includes('7c3a')) return 'violet';
+    if (c.includes('ea58')) return 'orange';
     return 'green';
   }
 
@@ -491,7 +494,7 @@
       ].filter(Boolean).join(' ');
 
       // Dots
-      const counts = { green:0, red:0, blue:0, amber:0, violet:0 };
+      const counts = { green:0, red:0, blue:0, amber:0, violet:0, orange:0 };
       events.forEach(ev => counts[ev.type]++);
       const MAX = 9;
       let dotHtml = '', dotSeen = 0;
@@ -543,7 +546,7 @@
     elWday.textContent   = DAYS_L[d.getDay()];
 
     // Summary strip
-    const counts = { green:0, red:0, blue:0, amber:0, violet:0 };
+    const counts = { green:0, red:0, blue:0, amber:0, violet:0, orange:0 };
     events.forEach(ev => counts[ev.type]++);
     elStrip.innerHTML = TYPE_ORDER.map(t => `
       <div class="cal-strip-item">

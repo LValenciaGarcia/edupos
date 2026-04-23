@@ -544,7 +544,7 @@
             <div>
               <div style="font-weight:600;font-size:0.85rem;">{{ ing.nombre }}</div>
               <div style="font-size:0.71rem;color:var(--ash);margin-top:0.1rem;">
-                {{ ing.stock_unidades|floatformat:"-2" }} {{ ing.unidad_compra }} · {{ ing.get_unidad_base_display }}
+                {{ ing.unidad_compra }} · {{ ing.get_unidad_base_display }}
               </div>
             </div>
           </div>
@@ -560,21 +560,17 @@
         </td>
         <td style="color:var(--ash);font-size:0.8rem;">{{ ing.stock_minimo }}</td>
         <td>
-          {% if ing.fecha_vencimiento %}
-            {% if ing.vencido %}
-              <span class="venc-pill venc-vencido">
-                <i class="bi bi-x-circle-fill"></i> {{ ing.fecha_vencimiento|date:"d/m/Y" }}
-              </span>
-            {% elif ing.vence_pronto %}
-              <span class="venc-pill venc-pronto">
-                <i class="bi bi-exclamation-triangle-fill"></i> {{ ing.fecha_vencimiento|date:"d/m/Y" }}
-              </span>
-            {% else %}
-              <span class="venc-pill venc-ok">{{ ing.fecha_vencimiento|date:"d/m/Y" }}</span>
-            {% endif %}
+          {% with lote=ing.lote_proximo_vencer %}
+          {% if ing.vencido %}
+            <span class="venc-pill venc-vencido"><i class="bi bi-x-circle-fill"></i> Vencido</span>
+          {% elif ing.vence_pronto and lote %}
+            <span class="venc-pill venc-pronto"><i class="bi bi-exclamation-triangle-fill"></i> {{ lote.fecha_vencimiento|date:"d/m/Y" }}</span>
+          {% elif lote %}
+            <span class="venc-pill venc-ok">{{ lote.fecha_vencimiento|date:"d/m/Y" }}</span>
           {% else %}
             <span style="color:var(--fog);font-size:0.8rem;">—</span>
           {% endif %}
+          {% endwith %}
         </td>
         <td>
           {% if ing.sin_stock %}<span class="badge badge-out">Sin stock</span>

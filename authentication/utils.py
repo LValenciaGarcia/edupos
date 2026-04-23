@@ -10,12 +10,6 @@ def _normalizar(s: str) -> str:
     return re.sub(r'[^a-z0-9]', '', s.lower())
 
 
-def generar_username(first_name: str, last_name: str) -> str:
-    """Genera un username único con formato nombre.apellido."""
-    base     = f"{_normalizar(first_name)}.{_normalizar(last_name)}"
-    username = base
-    counter  = 1
-    while User.objects.filter(username=username).exists():
-        username = f"{base}{counter}"
-        counter += 1
-    return username
+def generar_username(email: str) -> str:
+    """Username = email. Ya validado como único en el formulario."""
+    return email.lower().strip()

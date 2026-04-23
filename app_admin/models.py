@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from authentication.models import Estudiante
 from authentication.validators import validate_image
+from decimal import Decimal
 import datetime
 
 
@@ -98,11 +99,12 @@ class Ingrediente(models.Model):
 
     nombre               = models.CharField(max_length=100)
     imagen               = models.ImageField(upload_to='ingredientes/', blank=True, null=True, validators=[validate_image])
-    # ── Unidad de compra (cómo se adquiere) ──────────────────────────────────
-    stock_unidades       = models.DecimalField(
-        max_digits=10, decimal_places=2, default=0,
-        help_text='Cantidad de unidades de compra disponibles (ej: 10 bandejas)'
+    proveedor            = models.ForeignKey(
+        'Proveedor', on_delete=models.PROTECT,
+        related_name='ingredientes', null=True, blank=False,
+        verbose_name='Proveedor principal'
     )
+    # ── Unidad de compra (cómo se adquiere) ──────────────────────────────────
     unidad_compra        = models.CharField(
         max_length=50, default='und',
         help_text='Nombre de la unidad de compra (ej: bandeja, paquete, bolsa)'
@@ -116,16 +118,11 @@ class Ingrediente(models.Model):
         max_length=10, choices=UNIDAD_BASE_CHOICES, default='und',
         help_text='Unidad en la que se mide para recetas (ej: und, g, ml)'
     )
-    precio_compra        = models.DecimalField(
-        max_digits=10, decimal_places=2,
-        help_text='Precio pagado por cada unidad de compra (ej: $8.000 por bandeja)'
-    )
     # ── Alertas ───────────────────────────────────────────────────────────────
     stock_minimo         = models.DecimalField(
         max_digits=10, decimal_places=2, default=0,
         help_text='Alerta cuando stock_real baje de este valor (en unidades base)'
     )
-    fecha_vencimiento    = models.DateField(null=True, blank=True)
     alergenos            = models.ManyToManyField(
         'Alergeno', blank=True, related_name='ingredientes',
         verbose_name='Alérgenos que contiene'
@@ -138,36 +135,56 @@ class Ingrediente(models.Model):
 
     @property
     def stock_real(self):
-        """Stock disponible expresado en unidades base."""
-        return round(float(self.stock_unidades) * float(self.contenido_por_unidad), 4)
+        """Stock total en unidades base — suma de lotes activos no vencidos."""
+        total = self.lotes.filter(
+            cantidad_base__gt=0,
+            fecha_vencimiento__gte=datetime.date.today()
+        ).aggregate(total=models.Sum('cantidad_base'))['total']
+        return round(float(total or 0), 3)
 
     @property
     def costo_unitario_real(self):
-        """Costo por unidad base — base para cálculo de recetas."""
+        """Costo por unidad base — promedio ponderado de lotes activos."""
+        lotes = list(self.lotes.filter(
+            cantidad_base__gt=0,
+            fecha_vencimiento__gte=datetime.date.today()
+        ))
+        total_base = sum(float(l.cantidad_base) for l in lotes)
         cpd = float(self.contenido_por_unidad)
         if cpd == 0:
             return 0
-        return round(float(self.precio_compra) / cpd, 6)
+        if total_base == 0:
+            ultimo = self.lotes.order_by('-fecha_ingreso').first()
+            return round(float(ultimo.precio_compra) / cpd, 6) if ultimo else 0
+        costo_total = sum(float(l.cantidad_base) * float(l.precio_compra) / cpd for l in lotes)
+        return round(costo_total / total_base, 6)
 
     @property
     def stock_bajo(self):
-        return self.stock_real <= float(self.stock_minimo)
+        return 0 < self.stock_real <= float(self.stock_minimo)
 
     @property
     def sin_stock(self):
         return self.stock_real <= 0
 
     @property
+    def lote_proximo_vencer(self):
+        return self.lotes.filter(
+            cantidad_base__gt=0,
+            fecha_vencimiento__gte=datetime.date.today()
+        ).order_by('fecha_vencimiento').first()
+
+    @property
     def vence_pronto(self):
-        if not self.fecha_vencimiento:
-            return False
-        return self.fecha_vencimiento <= (datetime.date.today() + datetime.timedelta(days=7))
+        lote = self.lote_proximo_vencer
+        return lote is not None and (lote.fecha_vencimiento - datetime.date.today()).days <= 7
 
     @property
     def vencido(self):
-        if not self.fecha_vencimiento:
-            return False
-        return self.fecha_vencimiento < datetime.date.today()
+        return self.lotes.filter(
+            cantidad_base__gt=0,
+            fecha_vencimiento__lt=datetime.date.today()
+        ).exists()
 
     @property
     def dias_restantes(self):
@@ -187,6 +204,107 @@ class Ingrediente(models.Model):
         verbose_name = 'Ingrediente'
         verbose_name_plural = 'Ingredientes'
         ordering = ['nombre']
+
+
+# ─── LOTE DE INGREDIENTE ──────────────────────────────────────────────────────
+
+class LoteIngrediente(models.Model):
+    """Batch of an ingredient with its own expiry date and purchase price (FIFO)."""
+    ingrediente           = models.ForeignKey(Ingrediente, on_delete=models.CASCADE, related_name='lotes')
+    proveedor             = models.ForeignKey('Proveedor', on_delete=models.PROTECT, related_name='lotes_ingrediente')
+    unidades_compra       = models.DecimalField(max_digits=10, decimal_places=2, help_text='Cantidad de unidades de compra recibidas')
+    precio_compra         = models.DecimalField(max_digits=10, decimal_places=2, help_text='Precio por unidad de compra')
+    cantidad_base         = models.DecimalField(max_digits=10, decimal_places=3, help_text='Stock actual en unidades base')
+    cantidad_base_inicial = models.DecimalField(max_digits=10, decimal_places=3, help_text='Stock inicial en unidades base')
+    fecha_vencimiento     = models.DateField()
+    fecha_ingreso         = models.DateField(auto_now_add=True)
+    compra                = models.ForeignKey(
+        'CompraProveedor', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='lotes_ingrediente'
+    )
+    nota                  = models.CharField(max_length=200, blank=True)
+
+    @property
+    def vencido(self):
+        return self.fecha_vencimiento < datetime.date.today()
+
+    @property
+    def vence_pronto(self):
+        dias = (self.fecha_vencimiento - datetime.date.today()).days
+        return 0 < dias <= 7
+
+    @property
+    def dias_restantes(self):
+        return (self.fecha_vencimiento - datetime.date.today()).days
+
+    @property
+    def costo_unitario_base(self):
+        cpd = float(self.ingrediente.contenido_por_unidad)
+        return round(float(self.precio_compra) / cpd, 6) if cpd else 0
+
+    @property
+    def subtotal_lote(self):
+        return round(float(self.precio_compra) * float(self.unidades_compra), 2)
+
+    @property
+    def porcentaje_consumido(self):
+        ini = float(self.cantidad_base_inicial)
+        return round((1 - float(self.cantidad_base) / ini) * 100, 1) if ini else 100
+
+    def __str__(self):
+        return f'Lote {self.ingrediente.nombre} — vence {self.fecha_vencimiento}'
+
+    class Meta:
+        verbose_name = 'Lote de Ingrediente'
+        verbose_name_plural = 'Lotes de Ingredientes'
+        ordering = ['fecha_vencimiento']
+
+
+# ─── UTILIDADES FIFO Y VENCIMIENTOS ──────────────────────────────────────────
+
+def descontar_fifo(ingrediente, cantidad_base, nota=''):
+    """Deduct cantidad_base from ingredient lots ordered by earliest expiry (FIFO).
+    Must be called inside a transaction.atomic() block.
+    Returns the unmet remainder (0.0 if fully covered)."""
+    lotes = LoteIngrediente.objects.select_for_update().filter(
+        ingrediente=ingrediente,
+        cantidad_base__gt=0,
+        fecha_vencimiento__gte=datetime.date.today()
+    ).order_by('fecha_vencimiento')
+
+    pendiente = Decimal(str(round(float(cantidad_base), 3)))
+    for lote in lotes:
+        if pendiente <= Decimal('0'):
+            break
+        descontar = min(lote.cantidad_base, pendiente)
+        lote.cantidad_base = lote.cantidad_base - descontar
+        lote.save(update_fields=['cantidad_base'])
+        pendiente -= descontar
+
+    return float(pendiente)
+
+
+def verificar_lotes_vencidos():
+    """Detect expired lots that still have stock and write them off as merma.
+    Safe to call on every page load — idempotent."""
+    lotes = LoteIngrediente.objects.filter(
+        fecha_vencimiento__lt=datetime.date.today(),
+        cantidad_base__gt=0
+    )
+    count = 0
+    for lote in lotes:
+        qty = lote.cantidad_base
+        if float(qty) > 0:
+            MovimientoIngrediente.objects.create(
+                ingrediente=lote.ingrediente,
+                tipo='merma',
+                cantidad=qty,
+                nota=f'Baja automática por vencimiento — lote {lote.fecha_vencimiento}'
+            )
+            lote.cantidad_base = Decimal('0')
+            lote.save(update_fields=['cantidad_base'])
+            count += 1
+    return count
 
 
 # ─── MOVIMIENTO DE INGREDIENTE ────────────────────────────────────────────────
@@ -261,16 +379,11 @@ class Producto(models.Model):
 
     @property
     def stock_bajo(self):
-        return self.tipo == 'simple' and self.stock <= self.stock_minimo
+        return 0 < self.stock <= self.stock_minimo
 
     @property
     def sin_stock(self):
-        if self.tipo == 'simple':
-            return self.stock <= 0
-        for r in self.receta.all():
-            if r.ingrediente.stock_real < float(r.cantidad):
-                return True
-        return False
+        return self.stock <= 0
 
     @property
     def dias_restantes(self):
@@ -348,6 +461,30 @@ class MovimientoInventario(models.Model):
     class Meta:
         verbose_name = 'Movimiento de Inventario'
         verbose_name_plural = 'Movimientos de Inventario'
+        ordering = ['-fecha']
+
+
+# ─── PRODUCCIÓN DE PRODUCTO ELABORADO ────────────────────────────────────────
+
+class ProduccionElaborado(models.Model):
+    """Records production of elaborated products, consuming ingredients via FIFO."""
+    from django.contrib.auth import get_user_model
+
+    producto           = models.ForeignKey('Producto', on_delete=models.PROTECT, related_name='producciones')
+    cantidad_producida = models.PositiveIntegerField()
+    responsable        = models.ForeignKey(
+        'auth.User', on_delete=models.PROTECT, related_name='producciones'
+    )
+    costo_total        = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    nota               = models.TextField(blank=True)
+    fecha              = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'Prod. {self.cantidad_producida}× {self.producto.nombre} ({self.fecha.strftime("%d/%m/%Y")})'
+
+    class Meta:
+        verbose_name = 'Producción'
+        verbose_name_plural = 'Producciones'
         ordering = ['-fecha']
 
 

@@ -95,23 +95,25 @@
   <div>
     <div class="hist-name">{{ ingrediente.nombre }}</div>
     <div class="hist-meta">
-      {{ ingrediente.stock_unidades|floatformat:"-2" }} {{ ingrediente.unidad_compra }}(s) · {{ ingrediente.get_unidad_base_display }}
-      {% if ingrediente.fecha_vencimiento %}
+      {{ ingrediente.stock_real|floatformat:"-2" }} {{ ingrediente.get_unidad_base_display }} · {{ ingrediente.unidad_compra }}
+      {% with lote=ingrediente.lote_proximo_vencer %}
+      {% if lote %}
         ·
         {% if ingrediente.vencido %}
           <span class="venc-chip" style="background:var(--red-pale);color:var(--red);">
-            <i class="bi bi-x-circle-fill"></i> Vencido {{ ingrediente.fecha_vencimiento|date:"d/m/Y" }}
+            <i class="bi bi-x-circle-fill"></i> Lote vencido
           </span>
         {% elif ingrediente.vence_pronto %}
           <span class="venc-chip" style="background:var(--amber-pale);color:var(--amber);">
-            <i class="bi bi-exclamation-triangle-fill"></i> Vence {{ ingrediente.fecha_vencimiento|date:"d/m/Y" }}
+            <i class="bi bi-exclamation-triangle-fill"></i> Vence {{ lote.fecha_vencimiento|date:"d/m/Y" }}
           </span>
         {% else %}
           <span class="venc-chip" style="background:var(--leaf-pale);color:var(--leaf-dark);">
-            Vence {{ ingrediente.fecha_vencimiento|date:"d/m/Y" }}
+            Vence {{ lote.fecha_vencimiento|date:"d/m/Y" }}
           </span>
         {% endif %}
       {% endif %}
+      {% endwith %}
     </div>
   </div>
 

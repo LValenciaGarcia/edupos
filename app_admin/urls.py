@@ -36,6 +36,14 @@ urlpatterns = [
     # ── Eliminar ingrediente (soft-delete) ────────────────────────────────
     path('inventario/ingredientes/<int:pk>/eliminar/', views.ingrediente_eliminar, name='ingrediente_eliminar'),
 
+    # ── Lotes de ingrediente ───────────────────────────────────────────────
+    path('inventario/ingredientes/<int:pk>/lotes/',          views.lotes_ingrediente, name='lotes_ingrediente'),
+    path('inventario/lotes/<int:pk>/eliminar/',              views.lote_eliminar,     name='lote_eliminar'),
+
+    # ── Producción de productos elaborados ────────────────────────────────
+    path('produccion/',                                      views.producciones,      name='producciones'),
+    path('produccion/nueva/',                                views.produccion_nueva,  name='produccion_nueva'),
+
     # ── Historial unificado ────────────────────────────────────────────────
     path('historial/',                          views.historial,                name='historial'),
     path('historial/api/',                      views.historial_api,            name='historial_api'),

@@ -1,6 +1,12 @@
 # ─── Framework principal ──────────────────────────────────────────────────────
 Django==6.0.3
 
+# ─── Autenticación con Google ──────────────────────────────────────────────────────
+django-allauth==65.3.0
+requests==2.32.3
+PyJWT==2.10.1
+cryptography==44.0.3
+
 # ─── Procesamiento de imágenes ────────────────────────────────────────────────
 Pillow==12.1.1
 

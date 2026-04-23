@@ -16,7 +16,7 @@
       </div>
       <div>
         <div style="font-family:var(--serif);font-size:1.2rem;color:var(--ink);">
-          {{ request.user.get_full_name|default:request.user.username }}
+          {{ request.user.get_full_name|default:request.user.email }}
         </div>
         <div style="color:var(--emp);font-size:var(--text-xs);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:.15rem;">
           {{ empleado.get_cargo_display }}
@@ -27,7 +27,7 @@
     <div style="display:flex;flex-direction:column;gap:0;">
       <div class="perfil-info-row">
         <span class="perfil-info-label"><i class="bi bi-person" style="margin-right:.35rem;"></i>Usuario</span>
-        <span class="perfil-info-val">{{ request.user.username }}</span>
+        <span class="perfil-info-val">{{ request.user.email }}</span>
       </div>
       <div class="perfil-info-row">
         <span class="perfil-info-label"><i class="bi bi-card-text" style="margin-right:.35rem;"></i>Documento</span>

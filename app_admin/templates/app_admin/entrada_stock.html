@@ -18,7 +18,7 @@
   .compra-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; padding: 1.2rem 1.4rem; }
   .compra-grid .field-full { grid-column: 1 / -1; }
   .items-wrap { padding: 0 1.4rem 1.4rem; }
-  .item-fila { display: grid; grid-template-columns: 120px 1fr 100px 120px 110px 36px; gap: 0.6rem; align-items: center; padding: 0.7rem 0.9rem; border: 1.5px solid var(--mist); border-radius: 10px; background: var(--ivory); margin-bottom: 0.55rem; transition: border-color 0.15s, box-shadow 0.15s; }
+  .item-fila { display: grid; grid-template-columns: 110px 1fr 90px 110px 100px 130px 36px; gap: 0.6rem; align-items: center; padding: 0.7rem 0.9rem; border: 1.5px solid var(--mist); border-radius: 10px; background: var(--ivory); margin-bottom: 0.55rem; transition: border-color 0.15s, box-shadow 0.15s; }
   .item-fila:hover { border-color: var(--fog); box-shadow: 0 2px 10px rgba(0,0,0,0.04); }
   .item-fila:focus-within { border-color: var(--amber); box-shadow: 0 0 0 3px rgba(217,119,6,0.08); }
   .fila-label { font-size: 0.65rem; font-weight: 700; color: var(--stone); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.2rem; }
@@ -128,12 +128,13 @@
     <div class="items-wrap" style="padding-top:1rem;">
 
       <!-- Encabezado columnas -->
-      <div style="display:grid;grid-template-columns:120px 1fr 100px 120px 110px 36px;gap:0.6rem;padding:0 0.9rem 0.3rem;">
+      <div style="display:grid;grid-template-columns:110px 1fr 90px 110px 100px 130px 36px;gap:0.6rem;padding:0 0.9rem 0.3rem;">
         <span class="fila-label">Tipo</span>
         <span class="fila-label">Ítem</span>
         <span class="fila-label">Cantidad</span>
         <span class="fila-label">Precio / u</span>
         <span class="fila-label">Subtotal</span>
+        <span class="fila-label" style="color:var(--amber);">Venc. (ingred.)</span>
         <span></span>
       </div>
 
@@ -162,6 +163,10 @@
           <div class="fila-cell fila-cell-sub">
             <span class="subtotal-val">$0</span>
           </div>
+          <div class="fila-cell fila-cell-venc" style="display:none;">
+            <input type="date" name="item_vencimiento" class="venc-inp"
+                   style="font-size:0.78rem;padding:0.15rem 0.25rem;border:1px solid var(--amber);border-radius:5px;width:100%;">
+          </div>
           <button type="button" class="btn-del" title="Eliminar">
             <i class="bi bi-trash" style="font-size:0.8rem;"></i>
           </button>
@@ -177,7 +182,7 @@
           <div class="fila-cell fila-cell-item">
             <select name="item_id" class="item-sel">
               {% for ing in ingredientes %}
-              <option value="{{ ing.pk }}" data-precio="{{ ing.precio_compra|default:0|floatformat:'2' }}" {% if ing.pk == ingrediente_sel.pk %}selected{% endif %}>{{ ing.nombre }}</option>
+              <option value="{{ ing.pk }}" data-precio="0" {% if ing.pk == ingrediente_sel.pk %}selected{% endif %}>{{ ing.nombre }}</option>
               {% endfor %}
             </select>
           </div>
@@ -185,10 +190,14 @@
             <input type="number" name="item_cantidad" min="0.01" step="0.01" class="cant-inp" placeholder="0">
           </div>
           <div class="fila-cell fila-cell-precio">
-            <input type="text" name="item_precio" inputmode="numeric" class="precio-inp" placeholder="0" value="{{ ingrediente_sel.precio_compra|default:0|floatformat:'2' }}">
+            <input type="text" name="item_precio" inputmode="numeric" class="precio-inp" placeholder="0">
           </div>
           <div class="fila-cell fila-cell-sub">
             <span class="subtotal-val">$0</span>
+          </div>
+          <div class="fila-cell fila-cell-venc">
+            <input type="date" name="item_vencimiento" class="venc-inp" required
+                   style="font-size:0.78rem;padding:0.15rem 0.25rem;border:1px solid var(--amber);border-radius:5px;width:100%;">
           </div>
           <button type="button" class="btn-del" title="Eliminar">
             <i class="bi bi-trash" style="font-size:0.8rem;"></i>
@@ -217,6 +226,10 @@
           </div>
           <div class="fila-cell fila-cell-sub">
             <span class="subtotal-val">$0</span>
+          </div>
+          <div class="fila-cell fila-cell-venc" style="display:none;">
+            <input type="date" name="item_vencimiento" class="venc-inp"
+                   style="font-size:0.78rem;padding:0.15rem 0.25rem;border:1px solid var(--amber);border-radius:5px;width:100%;">
           </div>
           <button type="button" class="btn-del" title="Eliminar">
             <i class="bi bi-trash" style="font-size:0.8rem;"></i>
@@ -274,7 +287,7 @@ const PRODUCTOS = [
   {% for p in productos %}{"id": {{ p.pk }}, "nombre": "{{ p.nombre|escapejs }}", "precio": {{ p.precio_costo|default:0|stringformat:".2f" }} },{% endfor %}
 ];
 const INGREDIENTES = [
-  {% for ing in ingredientes %}{"id": {{ ing.pk }}, "nombre": "{{ ing.nombre|escapejs }}", "precio": {{ ing.precio_compra|default:0|stringformat:".2f" }} },{% endfor %}
+  {% for ing in ingredientes %}{"id": {{ ing.pk }}, "nombre": "{{ ing.nombre|escapejs }}", "precio": 0},{% endfor %}
 ];
 
 // ========== 3. FUNCIONES DE LA DINÁMICA ==========
@@ -330,7 +343,7 @@ function autocompletarPrecio(itemSel) {
     const precio = opt ? parseFloat(opt.dataset.precio) || 0 : 0;
     const precioInp = fila.querySelector('.precio-inp');
     if (precioInp) {
-        precioInp.value = precio >= 0 ? fmtMiles(precio) : '';
+        precioInp.value = precio > 0 ? fmtMiles(precio) : '';
         initPrecioFmt(precioInp);
         calcularSubtotal(precioInp);
     }
@@ -396,9 +409,27 @@ function crearFila() {
         <div class="fila-cell fila-cell-sub">
             <span class="subtotal-val">$0</span>
         </div>
+        <div class="fila-cell fila-cell-venc" style="display:none;">
+            <input type="date" name="item_vencimiento" class="venc-inp"
+                   style="font-size:0.78rem;padding:0.15rem 0.25rem;border:1px solid var(--amber);border-radius:5px;width:100%;">
+        </div>
         <button type="button" class="btn-del"><i class="bi bi-trash"></i></button>
     `;
     return div;
+}
+
+function toggleVencimiento(tipoSel) {
+    const fila  = tipoSel.closest('.item-fila');
+    const vencCell = fila.querySelector('.fila-cell-venc');
+    if (!vencCell) return;
+    const vencInp  = fila.querySelector('.venc-inp');
+    if (tipoSel.value === 'ingrediente') {
+        vencCell.style.display = '';
+        if (vencInp) vencInp.required = true;
+    } else {
+        vencCell.style.display = 'none';
+        if (vencInp) vencInp.required = false;
+    }
 }
 
 function agregarFila() {
@@ -436,7 +467,7 @@ function asignarEventosFila(fila) {
     const precioInp = fila.querySelector('.precio-inp');
     const delBtn = fila.querySelector('.btn-del');
 
-    if (tipoSel) tipoSel.addEventListener('change', () => actualizarSelectItem(tipoSel));
+    if (tipoSel) tipoSel.addEventListener('change', () => { actualizarSelectItem(tipoSel); toggleVencimiento(tipoSel); });
     if (itemSel) itemSel.addEventListener('change', () => autocompletarPrecio(itemSel));
     if (cantInp) cantInp.addEventListener('input', () => calcularSubtotal(cantInp));
     if (precioInp) precioInp.addEventListener('input', () => calcularSubtotal(precioInp));
@@ -538,6 +569,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Asignar eventos a filas existentes
     document.querySelectorAll('.item-fila').forEach(fila => {
         asignarEventosFila(fila);
+        const tipoSel = fila.querySelector('.tipo-sel');
+        if (tipoSel) toggleVencimiento(tipoSel);
         const precioInp = fila.querySelector('.precio-inp');
         if (precioInp) initPrecioFmt(precioInp);
         const itemSel = fila.querySelector('.item-sel');

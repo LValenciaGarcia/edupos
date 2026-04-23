@@ -24,6 +24,21 @@
                required placeholder="Ej: Arroz, Huevos, Aceite de girasol…">
       </div>
 
+      <!-- Proveedor principal -->
+      <div class="field full">
+        <label>Proveedor principal *</label>
+        <select name="proveedor" required>
+          <option value="">— Selecciona el proveedor principal —</option>
+          {% for prov in proveedores %}
+          <option value="{{ prov.pk }}"
+            {% if ingrediente.proveedor_id == prov.pk %}selected{% endif %}>
+            {{ prov.nombre }}
+          </option>
+          {% endfor %}
+        </select>
+        <span class="hint">El proveedor habitual de este ingrediente. Cada lote puede tener su propio proveedor.</span>
+      </div>
+
       <!-- Imagen -->
       <div class="field full">
         <label>Imagen del ingrediente</label>
@@ -37,7 +52,7 @@
                       border:1px solid var(--gray-200);margin-bottom:.5rem;">
         {% endif %}
         <input type="file" name="imagen" accept="image/*" onchange="previewImg(this)">
-        <span class="hint">JPG, PNG o WEBP. {% if ingrediente.imagen %}Dejar vacío para conservar la actual.{% endif %}</span>
+        <span class="hint">JPG, PNG o WEBP.{% if ingrediente.imagen %} Dejar vacío para conservar la actual.{% endif %}</span>
       </div>
 
       <!-- ── Sección: Unidad de compra ───────────────────────────────────── -->
@@ -49,15 +64,6 @@
         </div>
       </div>
 
-      <!-- Stock en unidades de compra -->
-      <div class="field">
-        <label>Stock actual (unidades de compra)</label>
-        <input type="number" name="stock_unidades"
-               value="{{ ingrediente.stock_unidades|default:'0' }}"
-               min="0" step="0.01" placeholder="0">
-        <span class="hint">Ej: 10 bandejas, 5 paquetes, 3 bolsas.</span>
-      </div>
-
       <!-- Nombre de la unidad de compra -->
       <div class="field">
         <label>Nombre de la unidad de compra *</label>
@@ -67,14 +73,13 @@
         <span class="hint">Cómo se denomina lo que compras.</span>
       </div>
 
-      <!-- Precio por unidad de compra -->
+      <!-- Contenido por unidad de compra -->
       <div class="field">
-        <label>Precio de compra (COP) *</label>
-        <input type="number" name="precio_compra"
-               value="{{ ingrediente.precio_compra|default:'' }}"
-               required min="0" step="0.01" placeholder="Ej: 8000"
-               class="fmt-miles" inputmode="decimal">
-        <span class="hint">Precio total que pagas por cada unidad de compra.</span>
+        <label>Contenido por unidad de compra *</label>
+        <input type="number" name="contenido_por_unidad"
+               value="{{ ingrediente.contenido_por_unidad|default:'1' }}"
+               required min="0.0001" step="0.0001" placeholder="Ej: 12, 500, 1000">
+        <span class="hint">Cuántas unidades base hay en cada unidad de compra.<br>Ej: 12 huevos por bandeja · 500 g por bolsa · 1 000 ml por botella.</span>
       </div>
 
       <!-- ── Sección: Unidad base ────────────────────────────────────────── -->
@@ -84,15 +89,6 @@
             <i class="bi bi-rulers"></i> Unidad base — cómo se consume en recetas
           </span>
         </div>
-      </div>
-
-      <!-- Contenido por unidad de compra -->
-      <div class="field">
-        <label>Contenido por unidad de compra *</label>
-        <input type="number" name="contenido_por_unidad"
-               value="{{ ingrediente.contenido_por_unidad|default:'1' }}"
-               required min="0.0001" step="0.0001" placeholder="Ej: 12, 500, 1000">
-        <span class="hint">Cuántas unidades base hay en cada unidad de compra.<br>Ej: 12 huevos por bandeja · 500 g por bolsa · 1000 ml por botella.</span>
       </div>
 
       <!-- Unidad base -->
@@ -109,25 +105,7 @@
         <span class="hint">Unidad en la que se mide para recetas.</span>
       </div>
 
-      <!-- ── Resumen calculado (solo lectura) ───────────────────────────── -->
-      {% if ingrediente %}
-      <div class="field full">
-        <div style="display:flex;gap:1rem;flex-wrap:wrap;padding:0.85rem 1rem;background:var(--cream);border:1px solid var(--mist);border-radius:10px;">
-          <div style="flex:1;min-width:140px;">
-            <div style="font-size:0.6rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--ash);margin-bottom:0.25rem;">Stock real</div>
-            <div style="font-size:1.1rem;font-weight:700;color:var(--ink);">{{ ingrediente.stock_real|floatformat:"-2" }} {{ ingrediente.get_unidad_base_display }}</div>
-            <div style="font-size:0.68rem;color:var(--ash);">{{ ingrediente.stock_unidades }} {{ ingrediente.unidad_compra }}(s) × {{ ingrediente.contenido_por_unidad|floatformat:"-4" }} {{ ingrediente.get_unidad_base_display }}</div>
-          </div>
-          <div style="flex:1;min-width:140px;">
-            <div style="font-size:0.6rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--ash);margin-bottom:0.25rem;">Costo unitario real</div>
-            <div style="font-size:1.1rem;font-weight:700;color:var(--ink);">${{ ingrediente.costo_unitario_real|floatformat:4 }} / {{ ingrediente.get_unidad_base_display }}</div>
-            <div style="font-size:0.68rem;color:var(--ash);">${{ ingrediente.precio_compra }} ÷ {{ ingrediente.contenido_por_unidad|floatformat:"-4" }}</div>
-          </div>
-        </div>
-      </div>
-      {% endif %}
-
-      <!-- ── Alertas ─────────────────────────────────────────────────────── -->
+      <!-- Stock mínimo -->
       <div class="field">
         <label>Stock mínimo alerta (en unidades base)</label>
         <input type="number" name="stock_minimo"
@@ -136,12 +114,20 @@
         <span class="hint">Alerta cuando el stock real baje de este valor.</span>
       </div>
 
-      <!-- Fecha de vencimiento -->
-      <div class="field">
-        <label>Fecha de vencimiento del lote</label>
-        <input type="date" name="fecha_vencimiento"
-               value="{{ ingrediente.fecha_vencimiento|date:'Y-m-d'|default:'' }}">
-        <span class="hint">Opcional. Se alertará 7 días antes.</span>
+      <!-- ── Nota sobre lotes ───────────────────────────────────────────── -->
+      <div class="field full">
+        <div style="display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;
+                    background:rgba(2,132,199,.06);border:1px solid rgba(2,132,199,.18);
+                    border-radius:9px;">
+          <i class="bi bi-info-circle" style="color:var(--sky);font-size:1.1rem;flex-shrink:0;"></i>
+          <span style="font-size:.78rem;color:var(--stone);">
+            El <strong>stock, precio y fecha de vencimiento</strong> se gestionan por lote en la sección
+            <em>Gestión de lotes</em> de cada ingrediente.
+            {% if ingrediente %}
+            Después de guardar podrás <a href="{% url 'app_admin:lotes_ingrediente' ingrediente.pk %}" style="color:var(--sky);">ver y registrar lotes</a>.
+            {% endif %}
+          </span>
+        </div>
       </div>
 
       <!-- Alérgenos -->
@@ -189,7 +175,6 @@ function previewImg(input) {
     preview.style.display = 'block';
   }
 }
-
 function toggleAlergLabel(input, pk) {
   const label = document.getElementById('alerg-label-' + pk);
   if (input.checked) {
@@ -202,7 +187,6 @@ function toggleAlergLabel(input, pk) {
     label.style.color       = '';
   }
 }
-
 document.querySelectorAll('input[name="alergenos"]:checked').forEach(inp => {
   toggleAlergLabel(inp, inp.value);
 });

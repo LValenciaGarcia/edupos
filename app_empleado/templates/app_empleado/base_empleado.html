@@ -83,9 +83,9 @@
   <div class="sb-bottom">
     <div class="sb-bottom-wrap">
       <button class="sb-user-btn" onclick="toggleUserDrop()" id="userBtn">
-        <div class="sb-avatar">{{ request.user.username|slice:":1"|upper }}</div>
+        <div class="sb-avatar">{{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}</div>
         <div class="sb-user-info">
-          <div class="sb-uname">{{ request.user.get_full_name|default:request.user.username }}</div>
+          <div class="sb-uname">{{ request.user.get_full_name|default:request.user.email }}</div>
           <div class="sb-urole sb-urole-emp">
             {% if request.user.perfil.empleado.es_global %}
               Global
@@ -99,7 +99,7 @@
       </button>
       <div class="sb-user-dropdown" id="userDrop">
         <div class="sb-drop-info">
-          <div class="sb-drop-name">{{ request.user.get_full_name|default:request.user.username }}</div>
+          <div class="sb-drop-name">{{ request.user.get_full_name|default:request.user.email }}</div>
           <div class="sb-drop-role">{{ request.user.perfil.empleado.get_cargo_display }}</div>
         </div>
         <a href="{% url 'app_empleado:perfil' %}" class="sb-drop-link"><i class="bi bi-person"></i> Mi perfil</a>

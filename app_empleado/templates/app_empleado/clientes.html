@@ -52,7 +52,7 @@
         </div>
         <div style="flex:1;">
           <div style="font-family:var(--serif);font-size:1.2rem;color:var(--ink);">
-            {{ cliente_obj.perfil.user.get_full_name|default:cliente_obj.perfil.user.username }}
+            {{ cliente_obj.perfil.user.get_full_name|default:get_full_name|default:cliente_obj.perfil.user.email }}
           </div>
           <div style="color:var(--stone);font-size:var(--text-sm);margin-top:.2rem;">
             {% if tipo == 'estudiante' %}

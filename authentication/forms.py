@@ -3,9 +3,9 @@ from django.contrib.auth.models import User
 
 
 class LoginForm(forms.Form):
-    username = forms.CharField(
-        max_length=150,
-        widget=forms.TextInput(attrs={'placeholder': 'Usuario', 'autofocus': True}),
+    email = forms.EmailField(
+        max_length=254,
+        widget=forms.TextInput(attrs={'placeholder': 'correo@gmail.com', 'autofocus': True, 'type': 'email'}),
     )
     password = forms.CharField(
         widget=forms.PasswordInput(attrs={'placeholder': 'Contraseña'}),

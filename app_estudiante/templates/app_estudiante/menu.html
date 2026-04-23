@@ -260,6 +260,15 @@
         <div class="prod-body">
           <div class="prod-name">{{ prod.nombre }}</div>
           <div class="prod-cat">{{ prod.get_tipo_display }}</div>
+          {% if prod.stock_bajo %}
+          <span style="display:inline-flex;align-items:center;gap:.25rem;padding:.13rem .42rem;border-radius:99px;font-size:.58rem;font-weight:700;background:#fef3c7;color:#92400e;margin-bottom:.2rem;">
+            <i class="bi bi-exclamation-triangle-fill" style="font-size:.53rem;"></i> {{ prod.stock }} uds
+          </span>
+          {% else %}
+          <span style="display:inline-flex;align-items:center;gap:.25rem;padding:.13rem .42rem;border-radius:99px;font-size:.58rem;font-weight:700;background:#dcfce7;color:#166534;margin-bottom:.2rem;">
+            <i class="bi bi-check-circle-fill" style="font-size:.53rem;"></i> {{ prod.stock }} uds
+          </span>
+          {% endif %}
           <div class="prod-price">${{ prod.precio_venta|miles }}</div>
           {% if not prod.sin_stock and not restringido %}
           <div class="qty-control">

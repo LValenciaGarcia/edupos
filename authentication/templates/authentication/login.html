@@ -1,4 +1,5 @@
 {% load static %}
+{% load socialaccount %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -80,6 +81,61 @@
     .eye-btn { position: absolute; right: 10px; width: 28px; height: 28px; background: none; border: none; cursor: pointer; border-radius: 7px; display: flex; align-items: center; justify-content: center; color: var(--gray-400); transition: color 0.18s, background 0.18s; padding: 0; }
     .eye-btn:hover { color: var(--green-mid); background: var(--green-pale); }
     .eye-btn svg   { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; display: block; pointer-events: none; }
+
+    /* Separador "o" */
+    .separator {
+      display: flex;
+      align-items: center;
+      text-align: center;
+      margin: 1.8rem 0 1.2rem;
+    }
+    .separator::before,
+    .separator::after {
+      content: '';
+      flex: 1;
+      border-bottom: 1px solid var(--gray-200);
+    }
+    .separator span {
+      padding: 0 1rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--gray-500);
+    }
+
+    /* Botón Google profesional */
+    .btn-google {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+      height: 52px;
+      background: white;
+      border: 1px solid var(--gray-200);
+      border-radius: 12px;
+      font-family: var(--sans);
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #3c4043;
+      text-decoration: none;
+      transition: all 0.2s var(--ease);
+      cursor: pointer;
+      margin-top: 0.5rem;
+    }
+    .btn-google:hover {
+      background: #f8f9fa;
+      border-color: var(--gray-400);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    .btn-google img {
+      width: 20px;
+      height: 20px;
+      object-fit: contain;
+    }
+
     .card-footer { padding: 1.6rem 2.6rem 2.2rem; }
     .btn-login { width: 100%; height: 52px; background: var(--black); color: var(--white); border: none; border-radius: 12px; font-family: var(--sans); font-size: 0.97rem; font-weight: 700; cursor: pointer; letter-spacing: 0.02em; position: relative; overflow: hidden; transition: transform 0.18s var(--ease), box-shadow 0.22s var(--ease); }
     .btn-login::before { content: ''; position: absolute; inset: 0; background: var(--green-vivid); transform: translateY(100%); transition: transform 0.3s var(--ease); border-radius: 12px; }
@@ -143,13 +199,15 @@
             {% endfor %}
           </ul>
         {% endif %}
+
+        <!-- Formulario de inicio de sesión normal -->
         <form method="post" action="{% url 'authentication:login' %}">
           {% csrf_token %}
           <div class="form-group">
-            <label class="field-label" for="username">Usuario</label>
+            <label class="field-label" for="email">Correo Gmail</label>
             <div class="input-wrap">
-              <span class="i-left"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
-              <input type="text" id="username" name="username" placeholder="Tu nombre de usuario" autocomplete="username" required />
+              <span class="i-left"><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 4-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 4"/></svg></span>
+              <input type="email" id="email" name="email" placeholder="correo@gmail.com" autocomplete="email" required />
             </div>
           </div>
           <div class="form-group">
@@ -166,10 +224,22 @@
               </button>
             </div>
           </div>
-      </div>
-      <div class="card-footer">
           <button type="submit" class="btn-login"><span>Entrar al sistema</span></button>
         </form>
+
+        <!-- Separador -->
+        <div class="separator">
+          <span>o</span>
+        </div>
+
+        <!-- Botón de Google profesional usando el tag correcto de allauth -->
+        <a href="{% provider_login_url 'google' %}" class="btn-google">
+          <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google" width="20" height="20">
+          <span>Continuar con Google</span>
+        </a>
+      </div>
+
+      <div class="card-footer">
         <div class="register-row">
           <span>¿Eres padre de familia?</span>
           <a href="{% url 'authentication:registro_padre' %}">Regístrate aquí</a>

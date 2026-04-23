@@ -1,7 +1,7 @@
 {% load filtros %}
 <div class="ticket-card" onclick="window.location='{% url 'app_admin:pedido_detalle' pedido.pk %}'">
   <div class="ticket-id">{{ pedido.ticket }}</div>
-  <div class="ticket-name">{{ pedido.estudiante.perfil.user.get_full_name|default:pedido.estudiante.perfil.user.username }}</div>
+  <div class="ticket-name">{{ pedido.estudiante.perfil.user.get_full_name|default:get_full_name|default:pedido.estudiante.perfil.user.email }}</div>
   <div class="ticket-grade">Grado {{ pedido.estudiante.grado }}</div>
   <div class="ticket-items">
     {% for d in pedido.detalles.all %}

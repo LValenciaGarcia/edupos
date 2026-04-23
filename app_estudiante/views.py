@@ -229,7 +229,7 @@ def menu(request):
     q = request.GET.get('q', '').strip()
 
     productos_qs = (
-        Producto.objects.filter(disponible=True)
+        Producto.objects.filter(disponible=True, stock__gt=0)
         .select_related('categoria')
         .order_by('categoria__nombre', 'nombre')
     )

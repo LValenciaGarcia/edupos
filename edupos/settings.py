@@ -27,6 +27,12 @@ INSTALLED_APPS = [
     'simple_history',
     'csp',
     'widget_tweaks',
+    # Allauth
+    'django.contrib.sites',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
     # Apps propias
     'core',
     'authentication',
@@ -36,22 +42,35 @@ INSTALLED_APPS = [
     'app_docente',
     'app_empleado',
 ]
+SITE_ID = 1
 
 if DEBUG:
     INSTALLED_APPS += ['debug_toolbar']
 
+# ─── Autenticación ────────────────────────────────────────────────────────────
+AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesStandaloneBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+LOGIN_URL           = '/login/'
+LOGIN_REDIRECT_URL  = '/'
+LOGOUT_REDIRECT_URL = '/'
+
 # ─── Middleware ───────────────────────────────────────────────────────────────
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',   # Archivos estáticos en producción
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'axes.middleware.AxesMiddleware',               # Protección contra fuerza bruta
+    'allauth.account.middleware.AccountMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'simple_history.middleware.HistoryRequestMiddleware',  # Registra usuario en historial
+    'simple_history.middleware.HistoryRequestMiddleware',
+    'axes.middleware.AxesMiddleware',   # ← al final para no interferir con allauth
 ]
 
 if DEBUG:
@@ -90,16 +109,6 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# ─── Autenticación ────────────────────────────────────────────────────────────
-LOGIN_URL           = '/login/'
-LOGIN_REDIRECT_URL  = '/admin-panel/'
-LOGOUT_REDIRECT_URL = '/'
-
-AUTHENTICATION_BACKENDS = [
-    'axes.backends.AxesStandaloneBackend',
-    'django.contrib.auth.backends.ModelBackend',
-]
-
 # ─── Internacionalización ─────────────────────────────────────────────────────
 LANGUAGE_CODE = 'es-co'
 TIME_ZONE     = 'America/Bogota'
@@ -113,7 +122,6 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 MEDIA_URL     = '/media/'
 MEDIA_ROOT    = BASE_DIR / 'media'
 
-# WhiteNoise: compresión gzip y caché headers para estáticos
 STORAGES = {
     'default': {
         'BACKEND': 'django.core.files.storage.FileSystemStorage',
@@ -125,7 +133,7 @@ STORAGES = {
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# ─── Caché (LocMemCache en desarrollo; cambiar a Redis en producción) ─────────
+# ─── Caché ────────────────────────────────────────────────────────────────────
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
@@ -133,19 +141,23 @@ CACHES = {
     }
 }
 
-# ─── django-axes (protección fuerza bruta en login) ──────────────────────────
-AXES_FAILURE_LIMIT        = 5       # Bloquear tras 5 intentos fallidos
-AXES_COOLOFF_TIME         = 1       # Bloqueo de 1 hora
-AXES_LOCKOUT_CALLABLE     = None    # Usa la vista de lockout por defecto
-AXES_RESET_ON_SUCCESS     = True    # Resetea contador al iniciar sesión bien
 
-# ─── django-csp (Content Security Policy) ────────────────────────────────────
+# ─── django-axes ──────────────────────────────────────────────────────────────
+AXES_ENABLED          = False   # ← temporal para diagnóstico
+AXES_FAILURE_LIMIT    = 5
+AXES_COOLOFF_TIME     = 1
+AXES_LOCKOUT_CALLABLE = None
+AXES_RESET_ON_SUCCESS = True
+AXES_NEVER_LOCKOUT_WHITELIST = True
+AXES_IP_WHITELIST     = ['127.0.0.1']
+
+# ─── django-csp ───────────────────────────────────────────────────────────────
 CONTENT_SECURITY_POLICY = {
     'DIRECTIVES': {
         'default-src': ("'self'",),
         'script-src': (
             "'self'",
-            "'unsafe-inline'",           # Necesario para scripts inline en templates
+            "'unsafe-inline'",
             'cdn.jsdelivr.net',
             'cdnjs.cloudflare.com',
             'cdn.skypack.dev',
@@ -221,3 +233,23 @@ structlog.configure(
     logger_factory=structlog.stdlib.LoggerFactory(),
     cache_logger_on_first_use=True,
 )
+
+# ─── django-allauth ───────────────────────────────────────────────────────────
+ACCOUNT_EMAIL_VERIFICATION = 'none'
+SOCIALACCOUNT_AUTO_SIGNUP  = True
+SOCIALACCOUNT_LOGIN_ON_GET = True
+SOCIALACCOUNT_ADAPTER      = 'authentication.adapters.RolSocialAccountAdapter'
+ACCOUNT_ADAPTER             = 'allauth.account.adapter.DefaultAccountAdapter'
+
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'APP': {
+            'client_id': env('GOOGLE_CLIENT_ID'),
+            'secret': env('GOOGLE_SECRET'),
+            'key': ''
+        },
+        'SCOPE': ['profile', 'email'],
+        'AUTH_PARAMS': {'access_type': 'online'},
+        'OAUTH_PKCE_ENABLED': True,
+    }
+}

@@ -289,10 +289,14 @@
           </div>
         {% endif %}
         <span class="prod-cat-badge cat-{{ prod.categoria.nombre }}">{{ prod.categoria.get_nombre_display }}</span>
-        {% if prod.sin_stock %}
-          <span class="prod-stock-badge stock-agotado">Agotado</span>
+        {% if prod.stock_bajo %}
+          <span class="prod-stock-badge" style="background:#fef3c7;color:#92400e;">
+            <i class="bi bi-exclamation-triangle-fill" style="font-size:.55rem;"></i> {{ prod.stock }} uds
+          </span>
         {% else %}
-          <span class="prod-stock-badge stock-disponible">Disponible</span>
+          <span class="prod-stock-badge" style="background:#dcfce7;color:#166534;">
+            <i class="bi bi-check-circle-fill" style="font-size:.55rem;"></i> {{ prod.stock }} uds
+          </span>
         {% endif %}
       </div>
       <div class="prod-body">
@@ -303,7 +307,7 @@
           <div class="prod-tipo">{{ prod.get_tipo_display }}</div>
         </div>
       </div>
-      {% if not restringido and not prod.sin_stock and hijos %}
+      {% if not restringido and hijos %}
       <button class="prod-pedir-btn" onclick="abrirSelectorHijo({{ prod.pk }})">
         <i class="bi bi-cart-plus"></i> Pedir para hijo
       </button>
@@ -335,10 +339,14 @@
             </div>
           {% endif %}
           <span class="prod-cat-badge cat-{{ prod.categoria.nombre }}">{{ prod.categoria.get_nombre_display }}</span>
-          {% if prod.sin_stock %}
-            <span class="prod-stock-badge stock-agotado">Agotado</span>
+          {% if prod.stock_bajo %}
+            <span class="prod-stock-badge" style="background:#fef3c7;color:#92400e;">
+              <i class="bi bi-exclamation-triangle-fill" style="font-size:.55rem;"></i> {{ prod.stock }} uds
+            </span>
           {% else %}
-            <span class="prod-stock-badge stock-disponible">Disponible</span>
+            <span class="prod-stock-badge" style="background:#dcfce7;color:#166534;">
+              <i class="bi bi-check-circle-fill" style="font-size:.55rem;"></i> {{ prod.stock }} uds
+            </span>
           {% endif %}
         </div>
         <div class="prod-body">
@@ -349,7 +357,7 @@
             <div class="prod-tipo">{{ prod.get_tipo_display }}</div>
           </div>
         </div>
-        {% if prod.id not in restricciones_prod and prod.categoria_id not in restricciones_cat and not prod.sin_stock and hijos %}
+        {% if prod.id not in restricciones_prod and prod.categoria_id not in restricciones_cat and hijos %}
         <button class="prod-pedir-btn" onclick="abrirSelectorHijo({{ prod.pk }})">
           <i class="bi bi-cart-plus"></i> Pedir para hijo
         </button>

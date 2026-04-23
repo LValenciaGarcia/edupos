@@ -1,0 +1,86 @@
+{% extends 'app_admin/base_admin.html' %}
+{% load filtros %}
+{% block title %}Producciones{% endblock %}
+{% block page_title %}Producciones{% endblock %}
+{% block nav_inventario %}active{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'app_admin:produccion_nueva' %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg"></i> Nueva producción
+  </a>
+{% endblock %}
+
+{% block content %}
+<style>
+  .prod-row { display:grid;grid-template-columns:140px 1fr 90px 130px 110px;gap:.7rem;align-items:center;
+              padding:.7rem .9rem;border:1px solid var(--mist);border-radius:10px;
+              background:var(--ivory);margin-bottom:.5rem; }
+  .cell-label { font-size:.63rem;font-weight:700;color:var(--stone);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.15rem; }
+  .cell-val   { font-size:.87rem;font-weight:600;color:var(--ink); }
+  .cell-sub   { font-size:.74rem;color:var(--ash); }
+</style>
+
+<div style="max-width:860px;margin:0 auto;">
+
+  {% if messages %}
+    {% for msg in messages %}
+    <div style="display:flex;align-items:center;gap:.6rem;padding:.75rem 1rem;margin-bottom:.75rem;border-radius:9px;
+                background:{% if msg.tags == 'error' %}#fee2e2{% else %}#dcfce7{% endif %};
+                color:{% if msg.tags == 'error' %}#991b1b{% else %}#166534{% endif %};
+                border:1px solid {% if msg.tags == 'error' %}#fca5a5{% else %}#86efac{% endif %};">
+      <i class="bi {% if msg.tags == 'error' %}bi-x-circle-fill{% else %}bi-check-circle-fill{% endif %}"></i>
+      {{ msg }}
+    </div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="card">
+    <div class="card-head" style="display:flex;align-items:center;justify-content:space-between;">
+      <span class="card-title">Historial de producciones</span>
+      <a href="{% url 'app_admin:produccion_nueva' %}" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-lg"></i> Nueva
+      </a>
+    </div>
+    <div style="padding:1rem 1.2rem;">
+
+      <!-- Header -->
+      <div style="display:grid;grid-template-columns:140px 1fr 90px 130px 110px;gap:.7rem;padding:0 .9rem .4rem;
+                  font-size:.63rem;font-weight:700;color:var(--stone);text-transform:uppercase;letter-spacing:.04em;">
+        <span>Fecha</span><span>Producto</span><span>Cantidad</span><span>Costo total</span><span>Responsable</span>
+      </div>
+
+      {% for p in producciones %}
+      <div class="prod-row">
+        <div>
+          <div class="cell-val">{{ p.fecha|date:"d/m/Y" }}</div>
+          <div class="cell-sub">{{ p.fecha|time:"H:i" }}</div>
+        </div>
+        <div>
+          <div class="cell-val">{{ p.producto.nombre }}</div>
+          {% if p.nota %}<div class="cell-sub">{{ p.nota }}</div>{% endif %}
+        </div>
+        <div>
+          <div class="cell-val">{{ p.cantidad_producida }} und</div>
+        </div>
+        <div>
+          <div class="cell-val">${{ p.costo_total|miles }}</div>
+          {% if p.cantidad_producida %}
+          <div class="cell-sub">≈ ${{ p.costo_total|floatformat:0 }}  / und</div>
+          {% endif %}
+        </div>
+        <div>
+          <div class="cell-val">{{ p.responsable.get_full_name|default:get_full_name|default:p.responsable.username }}</div>
+        </div>
+      </div>
+      {% empty %}
+      <div style="text-align:center;padding:3rem;color:var(--ash);">
+        <i class="bi bi-hammer" style="font-size:2.5rem;display:block;margin-bottom:.6rem;opacity:.4;"></i>
+        Sin producciones registradas.
+        <a href="{% url 'app_admin:produccion_nueva' %}" style="color:var(--leaf);font-weight:600;">Registrar primera producción</a>
+      </div>
+      {% endfor %}
+
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,191 @@
+{% extends 'app_admin/base_admin.html' %}
+{% load filtros %}
+{% block title %}Lotes — {{ ingrediente.nombre }}{% endblock %}
+{% block page_title %}Lotes de {{ ingrediente.nombre }}{% endblock %}
+{% block nav_ingredientes %}active{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'app_admin:ingredientes' %}" class="btn btn-ghost btn-sm">
+    <i class="bi bi-arrow-left"></i> Volver
+  </a>
+{% endblock %}
+
+{% block content %}
+<style>
+  .lotes-wrap { max-width: 820px; margin: 0 auto; }
+  .badge-venc { display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .55rem;border-radius:99px;font-size:.72rem;font-weight:700; }
+  .badge-ok   { background:#dcfce7;color:#166534; }
+  .badge-warn { background:#fef3c7;color:#92400e; }
+  .badge-exp  { background:#fee2e2;color:#991b1b; }
+  .lote-row   { display:grid;grid-template-columns:110px 1fr 100px 110px 100px auto;gap:.6rem;align-items:center;padding:.65rem .9rem;border:1px solid var(--mist);border-radius:10px;background:var(--ivory);margin-bottom:.5rem; }
+  .lote-row.expired { opacity:.65;background:#fafafa; }
+  .cell-label { font-size:.63rem;font-weight:700;color:var(--stone);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.15rem; }
+  .cell-val   { font-size:.87rem;font-weight:600;color:var(--ink); }
+  .cell-sub   { font-size:.75rem;color:var(--ash); }
+  .kpi-strip  { display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-bottom:1.2rem; }
+  .kpi-card   { background:var(--ivory);border:1px solid var(--mist);border-radius:10px;padding:.85rem 1rem; }
+  .kpi-label  { font-size:.68rem;font-weight:700;color:var(--stone);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem; }
+  .kpi-val    { font-size:1.3rem;font-weight:800;color:var(--ink); }
+  .kpi-sub    { font-size:.72rem;color:var(--ash);margin-top:.1rem; }
+  .form-lote  { background:var(--ivory);border:1px solid var(--mist);border-radius:12px;padding:1.2rem 1.4rem;margin-bottom:1rem; }
+  .lote-form-grid { display:grid;grid-template-columns:1fr 1fr;gap:.9rem; }
+</style>
+
+<div class="lotes-wrap">
+
+  <!-- KPI strip -->
+  <div class="kpi-strip">
+    <div class="kpi-card">
+      <div class="kpi-label">Stock total</div>
+      <div class="kpi-val">{{ ingrediente.stock_real|floatformat:2 }}</div>
+      <div class="kpi-sub">{{ ingrediente.unidad_base }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Costo unitario promedio</div>
+      <div class="kpi-val">${{ ingrediente.costo_unitario_real|floatformat:2|stringformat:"s" }}</div>
+      <div class="kpi-sub">por {{ ingrediente.unidad_base }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Lotes activos</div>
+      <div class="kpi-val">{{ lotes_activos }}</div>
+      <div class="kpi-sub">{% if lotes_venc_pronto %}
+        <span style="color:var(--amber);"><i class="bi bi-exclamation-triangle-fill"></i> {{ lotes_venc_pronto }} vence{% if lotes_venc_pronto != 1 %}n{% endif %} pronto</span>
+      {% else %}Sin alertas{% endif %}</div>
+    </div>
+  </div>
+
+  <!-- Lotes existentes -->
+  <div class="card" style="margin-bottom:1rem;overflow:hidden;">
+    <div class="card-head">
+      <span class="card-title" style="font-size:.95rem;">
+        <i class="bi bi-layers" style="margin-right:.4rem;"></i>Lotes registrados
+      </span>
+      <span style="font-size:.78rem;color:var(--ash);">FIFO por fecha de vencimiento</span>
+    </div>
+    <div style="padding:1rem 1.2rem;">
+
+      <!-- Header -->
+      <div style="display:grid;grid-template-columns:110px 1fr 100px 110px 100px auto;gap:.6rem;padding:0 .9rem .4rem;font-size:.63rem;font-weight:700;color:var(--stone);text-transform:uppercase;letter-spacing:.04em;">
+        <span>Vencimiento</span><span>Proveedor</span><span>Cantidad base</span><span>Precio compra</span><span>Estado</span><span></span>
+      </div>
+
+      {% for lote in lotes %}
+      <div class="lote-row{% if lote.vencido %} expired{% endif %}">
+
+        <div>
+          <div class="cell-label">Vence</div>
+          <div class="cell-val" style="{% if lote.vencido %}color:var(--red);{% elif lote.vence_pronto %}color:var(--amber);{% endif %}">
+            {{ lote.fecha_vencimiento|date:"d/m/Y" }}
+          </div>
+          <div class="cell-sub">Ingresó {{ lote.fecha_ingreso|date:"d/m/Y" }}</div>
+        </div>
+
+        <div>
+          <div class="cell-label">Proveedor</div>
+          <div class="cell-val">{{ lote.proveedor.nombre }}</div>
+          {% if lote.nota %}<div class="cell-sub">{{ lote.nota }}</div>{% endif %}
+        </div>
+
+        <div>
+          <div class="cell-label">Stock ({{ ingrediente.unidad_base }})</div>
+          <div class="cell-val">{{ lote.cantidad_base|floatformat:3 }}</div>
+          <div class="cell-sub">de {{ lote.cantidad_base_inicial|floatformat:3 }}</div>
+        </div>
+
+        <div>
+          <div class="cell-label">Precio lote</div>
+          <div class="cell-val">${{ lote.precio_compra|miles }}</div>
+          <div class="cell-sub">{{ lote.unidades_compra }} {{ ingrediente.unidad_compra }}</div>
+        </div>
+
+        <div>
+          {% if lote.vencido %}
+            <span class="badge-venc badge-exp"><i class="bi bi-x-circle-fill"></i> Vencido</span>
+          {% elif lote.vence_pronto %}
+            <span class="badge-venc badge-warn"><i class="bi bi-clock-fill"></i> Vence pronto</span>
+          {% else %}
+            <span class="badge-venc badge-ok"><i class="bi bi-check-circle-fill"></i> OK</span>
+          {% endif %}
+        </div>
+
+        <div>
+          {% if lote.vencido or lote.cantidad_base == 0 %}
+            <form method="post" action="{% url 'app_admin:lote_eliminar' lote.pk %}"
+                  onsubmit="return confirm('¿Eliminar este lote? Esta acción no se puede deshacer.');" style="display:inline;">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red);">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          {% endif %}
+        </div>
+
+      </div>
+      {% empty %}
+      <div style="text-align:center;padding:2rem;color:var(--ash);">
+        <i class="bi bi-inbox" style="font-size:2rem;display:block;margin-bottom:.5rem;"></i>
+        Sin lotes registrados. Añade el primero abajo.
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Añadir lote manual -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title" style="font-size:.95rem;">
+        <i class="bi bi-plus-circle" style="margin-right:.4rem;"></i>Registrar nuevo lote
+      </span>
+    </div>
+    <div style="padding:1.2rem 1.4rem;">
+      <form method="post">
+        {% csrf_token %}
+        {% if form.errors %}
+        <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:.75rem 1rem;margin-bottom:1rem;font-size:.83rem;color:#991b1b;">
+          {% for field, errors in form.errors.items %}
+            {% for err in errors %}<div><i class="bi bi-x-circle"></i> {{ err }}</div>{% endfor %}
+          {% endfor %}
+        </div>
+        {% endif %}
+        <div class="lote-form-grid">
+
+          <div class="field">
+            <label>Proveedor *</label>
+            {{ form.proveedor }}
+          </div>
+
+          <div class="field">
+            <label>Fecha de vencimiento *</label>
+            {{ form.fecha_vencimiento }}
+          </div>
+
+          <div class="field">
+            <label>Unidades compradas *</label>
+            {{ form.unidades_compra }}
+            <span class="hint">En {{ ingrediente.unidad_compra }}. 1 {{ ingrediente.unidad_compra }} = {{ ingrediente.contenido_por_unidad }} {{ ingrediente.unidad_base }}.</span>
+          </div>
+
+          <div class="field">
+            <label>Precio total del lote *</label>
+            {{ form.precio_compra }}
+            <span class="hint">Precio pagado por todas las unidades de este lote.</span>
+          </div>
+
+          <div class="field" style="grid-column:1/-1;">
+            <label>Nota (opcional)</label>
+            {{ form.nota }}
+          </div>
+
+        </div>
+        <div style="display:flex;gap:.75rem;margin-top:1rem;">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> Añadir lote
+          </button>
+          <a href="{% url 'app_admin:ingredientes' %}" class="btn btn-ghost">Cancelar</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

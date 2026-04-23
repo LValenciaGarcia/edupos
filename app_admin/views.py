@@ -12,12 +12,15 @@ import json
 from authentication.models import Perfil, Estudiante, Padre, Docente
 from .models import (
     Producto, Categoria, Ingrediente, RecetaIngrediente,
+    LoteIngrediente, ProduccionElaborado,
     Proveedor, CompraProveedor, DetalleCompra,
     Pedido, DetallePedido,
     MovimientoInventario, MovimientoIngrediente,
     Insumo, MovimientoInsumo,
     PerfilAdmin, Alergeno,
+    descontar_fifo, verificar_lotes_vencidos,
 )
+from .forms import LoteIngredienteForm, ProduccionForm
 from app_docente.models import PedidoDocente, DetallePedidoDocente
 
 
@@ -45,26 +48,40 @@ def admin_required(view_func):
 
 def _get_alertas():
     """Devuelve conteo de alertas activas para el topbar."""
-    stock_prod = Producto.objects.filter(tipo='simple', stock__lte=F('stock_minimo')).count()
-    stock_ing  = Ingrediente.objects.filter(activo=True, stock_unidades__lte=F('stock_minimo')).count()
-    vencidos   = Ingrediente.objects.filter(
-        activo=True, fecha_vencimiento__lt=date.today()
-    ).count()
-    vence_pronto = Ingrediente.objects.filter(
-        activo=True,
-        fecha_vencimiento__gte=date.today(),
-        fecha_vencimiento__lte=date.today() + timedelta(days=7)
-    ).count()
+    hoy = date.today()
+    stock_prod = Producto.objects.filter(stock__gt=0, stock__lte=F('stock_minimo')).count()
+
+    # Stock de ingredientes: calcula con base en lotes (property stock_real)
+    todos_ings = list(Ingrediente.objects.filter(activo=True).prefetch_related('lotes'))
+    stock_ing  = sum(1 for i in todos_ings if i.stock_bajo)
+
+    # Lotes con stock positivo que ya vencieron
+    vencidos = LoteIngrediente.objects.filter(
+        fecha_vencimiento__lt=hoy, cantidad_base__gt=0
+    ).values('ingrediente').distinct().count()
+
+    # Lotes que vencen en ≤ 7 días
+    vence_pronto = LoteIngrediente.objects.filter(
+        cantidad_base__gt=0,
+        fecha_vencimiento__gte=hoy,
+        fecha_vencimiento__lte=hoy + timedelta(days=7)
+    ).values('ingrediente').distinct().count()
+
     pedidos_pend = Pedido.objects.filter(
         estado__in=['pendiente', 'preparando'],
-        fecha_pedido__date=date.today()
+        fecha_pedido__date=hoy
     ).count()
+    pedidos_pend += PedidoDocente.objects.filter(
+        estado__in=['pendiente', 'preparando'],
+        fecha_pedido__date=hoy
+    ).count()
+
     total = stock_prod + stock_ing + vencidos + vence_pronto + pedidos_pend
     return {
-        'total': total,
-        'stock_prod': stock_prod,
-        'stock_ing': stock_ing,
-        'vencidos': vencidos,
+        'total':        total,
+        'stock_prod':   stock_prod,
+        'stock_ing':    stock_ing,
+        'vencidos':     vencidos,
         'vence_pronto': vence_pronto,
         'pedidos_pend': pedidos_pend,
     }
@@ -101,9 +118,11 @@ def dashboard(request):
         tipo='simple', stock__lte=F('stock_minimo')
     ).select_related('proveedor').order_by('stock')[:8]
 
-    ings_criticos = Ingrediente.objects.filter(
-        activo=True, stock_unidades__lte=F('stock_minimo')
-    ).order_by('stock_unidades')[:8]
+    todos_ings_act = list(Ingrediente.objects.filter(activo=True).prefetch_related('lotes'))
+    ings_criticos = sorted(
+        [i for i in todos_ings_act if i.stock_bajo or i.sin_stock],
+        key=lambda i: i.stock_real
+    )[:8]
 
     ultimos_pedidos = Pedido.objects.select_related(
         'estudiante__perfil__user'
@@ -505,12 +524,34 @@ def entrada_stock(request, pk=None):
                 else:
                     ing = get_object_or_404(Ingrediente, pk=id_)
                     det.ingrediente_id = ing.pk
-                    ing.stock_unidades = float(ing.stock_unidades) + cant_f
-                    ing.save(update_fields=['stock_unidades'])
+                    # Fecha de vencimiento del lote (may come per-line from the form)
+                    f_venc_key = f'item_vencimiento_{item_ids.index(id_)}'
+                    f_venc = request.POST.get(f_venc_key, '').strip() or None
+                    if not f_venc:
+                        # Fall back to a field named item_vencimiento[] positional
+                        item_vencs = request.POST.getlist('item_vencimiento')
+                        idx = item_ids.index(id_)
+                        f_venc = item_vencs[idx] if idx < len(item_vencs) else None
+                    if not f_venc:
+                        from datetime import date as _date
+                        f_venc = str(_date.today().replace(year=_date.today().year + 1))
+                    cpd = float(ing.contenido_por_unidad) or 1
+                    cantidad_base = round(cant_f * cpd, 3)
+                    LoteIngrediente.objects.create(
+                        ingrediente=ing,
+                        proveedor_id=prov_id,
+                        unidades_compra=cant_f,
+                        precio_compra=precio_f,
+                        cantidad_base=cantidad_base,
+                        cantidad_base_inicial=cantidad_base,
+                        fecha_vencimiento=f_venc,
+                        compra=compra,
+                        nota=nota or f'Compra #{compra.pk}',
+                    )
                     MovimientoIngrediente.objects.create(
                         ingrediente=ing, tipo='entrada',
-                        cantidad=cant_f,
-                        nota=nota or f'Compra #{compra.pk}',
+                        cantidad=cantidad_base,
+                        nota=nota or f'Compra #{compra.pk} — lote vence {f_venc}',
                         compra=compra
                     )
                 det.save()
@@ -576,13 +617,14 @@ def salida_stock(request):
                     messages.success(request, f'Salida de "{prod.nombre}" registrada. Stock actual: {prod.stock}')
                 else:
                     ing = get_object_or_404(Ingrediente, pk=item_id)
-                    ing.stock_unidades = max(0, float(ing.stock_unidades) - cantidad)
-                    ing.save(update_fields=['stock_unidades'])
-                    MovimientoIngrediente.objects.create(
-                        ingrediente=ing, tipo=motivo,
-                        cantidad=cantidad, nota=nota
-                    )
-                    messages.success(request, f'Salida de "{ing.nombre}" registrada. Stock real: {ing.stock_real:.2f} {ing.unidad_base}')
+                    with transaction.atomic():
+                        resto = descontar_fifo(ing, cantidad, nota=nota)
+                        descontado = cantidad - resto
+                        MovimientoIngrediente.objects.create(
+                            ingrediente=ing, tipo=motivo,
+                            cantidad=descontado, nota=nota
+                        )
+                    messages.success(request, f'Salida de "{ing.nombre}" registrada. Stock real: {ing.stock_real:.2f} {ing.get_unidad_base_display()}')
                 return redirect('app_admin:inventario')
             except Exception as e:
                 messages.error(request, f'Error al registrar la salida: {str(e)}')
@@ -625,7 +667,10 @@ def ingrediente_eliminar(request, pk):
 
 @admin_required
 def ingredientes(request):
-    qs = Ingrediente.objects.prefetch_related('alergenos').filter(activo=True)
+    # Auto-expire any lots that passed their date
+    n_vencidos = verificar_lotes_vencidos()
+
+    qs = Ingrediente.objects.select_related('proveedor').prefetch_related('alergenos', 'lotes').filter(activo=True)
     q  = request.GET.get('q', '').strip()
     if q:
         qs = qs.filter(nombre__icontains=q)
@@ -634,11 +679,13 @@ def ingredientes(request):
         'ingrediente', 'compra__proveedor'
     ).order_by('-fecha')[:50]
 
-    todos = list(Ingrediente.objects.filter(activo=True))
+    todos = list(Ingrediente.objects.filter(activo=True).prefetch_related('lotes'))
     kpi = {
-        'sin_stock':  sum(1 for i in todos if i.sin_stock),
-        'stock_bajo': sum(1 for i in todos if i.stock_bajo and not i.sin_stock),
-        'total':      len(todos),
+        'sin_stock':      sum(1 for i in todos if i.sin_stock),
+        'stock_bajo':     sum(1 for i in todos if i.stock_bajo),
+        'vence_pronto':   sum(1 for i in todos if i.vence_pronto),
+        'total':          len(todos),
+        'n_vencidos_hoy': n_vencidos,
     }
 
     return render(request, 'app_admin/ingredientes.html', _ctx({
@@ -652,66 +699,73 @@ def ingredientes(request):
 @admin_required
 def ingrediente_nuevo(request):
     alergenos_todos = Alergeno.objects.all()
+    proveedores     = Proveedor.objects.filter(activo=True)
+
     if request.method == 'POST':
         nombre               = request.POST.get('nombre', '').strip()
+        proveedor_id         = request.POST.get('proveedor') or None
         unidad_compra        = request.POST.get('unidad_compra', 'und').strip()
         contenido_por_unidad = request.POST.get('contenido_por_unidad', 1)
         unidad_base          = request.POST.get('unidad_base', 'und')
-        precio_compra        = request.POST.get('precio_compra')
-        stock_unidades       = request.POST.get('stock_unidades', 0)
         stock_min            = request.POST.get('stock_minimo', 0)
-        f_venc               = request.POST.get('fecha_vencimiento') or None
         imagen               = request.FILES.get('imagen')
         alerg_ids            = request.POST.getlist('alergenos')
 
-        if not nombre or not precio_compra:
-            messages.error(request, 'Nombre y precio de compra son obligatorios.')
+        errores = []
+        if not nombre:
+            errores.append('El nombre es obligatorio.')
+        if not proveedor_id:
+            errores.append('Debes seleccionar el proveedor principal.')
+
+        if errores:
+            for e in errores:
+                messages.error(request, e)
         else:
             ing = Ingrediente.objects.create(
                 nombre=nombre,
+                proveedor_id=proveedor_id,
                 unidad_compra=unidad_compra,
                 contenido_por_unidad=contenido_por_unidad,
                 unidad_base=unidad_base,
-                precio_compra=precio_compra,
-                stock_unidades=stock_unidades,
                 stock_minimo=stock_min,
-                fecha_vencimiento=f_venc,
                 imagen=imagen,
             )
             if alerg_ids:
                 ing.alergenos.set(alerg_ids)
-            messages.success(request, f'Ingrediente "{nombre}" creado.')
-            return redirect('app_admin:ingredientes')
+            messages.success(request, f'Ingrediente "{nombre}" creado. Ahora registra el primer lote.')
+            return redirect('app_admin:lotes_ingrediente', pk=ing.pk)
 
     return render(request, 'app_admin/ingrediente_form.html', _ctx({
         'alergenos_todos': alergenos_todos,
-        'accion': 'Nuevo ingrediente',
+        'proveedores':     proveedores,
+        'accion':          'Nuevo ingrediente',
     }))
 
 
 @admin_required
-@admin_required
 def ingrediente_editar(request, pk):
     ing             = get_object_or_404(Ingrediente, pk=pk)
     alergenos_todos = Alergeno.objects.all()
-    if request.method == 'POST':
-        ing.nombre               = request.POST.get('nombre', ing.nombre).strip()
-        ing.unidad_compra        = request.POST.get('unidad_compra', ing.unidad_compra).strip()
-        ing.unidad_base          = request.POST.get('unidad_base', ing.unidad_base)
-        ing.fecha_vencimiento    = request.POST.get('fecha_vencimiento') or None
+    proveedores     = Proveedor.objects.filter(activo=True)
 
-        # Campos decimales: solo asignar si vienen con valor
-        stock_unidades = request.POST.get('stock_unidades', '').strip()
-        if stock_unidades:
-            ing.stock_unidades = stock_unidades
+    if request.method == 'POST':
+        ing.nombre    = request.POST.get('nombre', ing.nombre).strip()
+        prov_id       = request.POST.get('proveedor') or None
+        if not prov_id:
+            messages.error(request, 'El proveedor principal es obligatorio.')
+            return render(request, 'app_admin/ingrediente_form.html', _ctx({
+                'ingrediente': ing, 'alergenos_todos': alergenos_todos,
+                'proveedores': proveedores,
+                'alergenos_seleccionados': set(ing.alergenos.values_list('pk', flat=True)),
+                'accion': 'Editar ingrediente',
+            }))
+        ing.proveedor_id     = prov_id
+        ing.unidad_compra    = request.POST.get('unidad_compra', ing.unidad_compra).strip()
+        ing.unidad_base      = request.POST.get('unidad_base', ing.unidad_base)
 
         contenido = request.POST.get('contenido_por_unidad', '').strip()
         if contenido:
             ing.contenido_por_unidad = contenido
-
-        precio = request.POST.get('precio_compra', '').strip()
-        if precio:
-            ing.precio_compra = precio
 
         stock_minimo = request.POST.get('stock_minimo', '').strip()
         if stock_minimo:
@@ -727,8 +781,9 @@ def ingrediente_editar(request, pk):
     return render(request, 'app_admin/ingrediente_form.html', _ctx({
         'ingrediente':             ing,
         'alergenos_todos':         alergenos_todos,
+        'proveedores':             proveedores,
         'alergenos_seleccionados': set(ing.alergenos.values_list('pk', flat=True)),
-        'accion': 'Editar ingrediente',
+        'accion':                  'Editar ingrediente',
     }))
 
 @admin_required
@@ -739,16 +794,24 @@ def ingrediente_ajuste(request, pk):
         cantidad = float(request.POST.get('cantidad', 0))
         nota     = request.POST.get('nota', '').strip()
 
-        if tipo == 'entrada':
-            ing.stock_unidades = float(ing.stock_unidades) + cantidad
-        elif tipo in ['salida', 'merma']:
-            ing.stock_unidades = max(0, float(ing.stock_unidades) - cantidad)
-        elif tipo == 'ajuste':
-            ing.stock_unidades = cantidad
+        with transaction.atomic():
+            if tipo in ['salida', 'merma']:
+                descontar_fifo(ing, cantidad, nota=nota)
+            elif tipo == 'ajuste':
+                # Manual override: set remaining stock to exact value on the oldest lot
+                lote = ing.lotes.filter(
+                    cantidad_base__gt=0,
+                    fecha_vencimiento__gte=date.today()
+                ).order_by('fecha_vencimiento').first()
+                if lote:
+                    lote.cantidad_base = cantidad
+                    lote.save(update_fields=['cantidad_base'])
 
-        ing.save(update_fields=['stock_unidades'])
-        MovimientoIngrediente.objects.create(ingrediente=ing, tipo=tipo, cantidad=cantidad, nota=nota)
-        messages.success(request, f'Stock de "{ing.nombre}" actualizado.')
+            MovimientoIngrediente.objects.create(
+                ingrediente=ing, tipo=tipo, cantidad=cantidad, nota=nota
+            )
+
+        messages.success(request, f'Stock de "{ing.nombre}" actualizado. Stock real: {ing.stock_real:.2f} {ing.get_unidad_base_display()}')
     return redirect('app_admin:ingredientes')
 
 
@@ -759,6 +822,169 @@ def ingrediente_historial(request, pk):
     return render(request, 'app_admin/ingrediente_historial.html', _ctx({
         'ingrediente': ing,
         'movimientos': movimientos,
+    }))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LOTES DE INGREDIENTE
+# ══════════════════════════════════════════════════════════════════════════════
+
+@admin_required
+def lotes_ingrediente(request, pk):
+    ing   = get_object_or_404(Ingrediente, pk=pk)
+    lotes = ing.lotes.select_related('proveedor', 'compra').order_by('fecha_vencimiento')
+    form  = LoteIngredienteForm(ingrediente=ing)
+
+    if request.method == 'POST':
+        form = LoteIngredienteForm(request.POST, ingrediente=ing)
+        if form.is_valid():
+            with transaction.atomic():
+                lote = form.save()
+                MovimientoIngrediente.objects.create(
+                    ingrediente=ing,
+                    tipo='entrada',
+                    cantidad=lote.cantidad_base,
+                    nota=f'Lote manual — vence {lote.fecha_vencimiento}',
+                )
+            messages.success(request, f'Lote creado: {lote.cantidad_base:.2f} {ing.get_unidad_base_display()} — vence {lote.fecha_vencimiento}')
+            return redirect('app_admin:lotes_ingrediente', pk=pk)
+        else:
+            messages.error(request, 'Corrige los errores del formulario.')
+
+    lotes_list = list(lotes)
+    lotes_activos    = sum(1 for l in lotes_list if not l.vencido and float(l.cantidad_base) > 0)
+    lotes_venc_pronto = sum(1 for l in lotes_list if l.vence_pronto and float(l.cantidad_base) > 0)
+    return render(request, 'app_admin/lotes_ingrediente.html', _ctx({
+        'ingrediente':       ing,
+        'lotes':             lotes_list,
+        'form':              form,
+        'proveedores':       Proveedor.objects.filter(activo=True),
+        'lotes_activos':     lotes_activos,
+        'lotes_venc_pronto': lotes_venc_pronto,
+    }))
+
+
+@admin_required
+def lote_eliminar(request, pk):
+    lote = get_object_or_404(LoteIngrediente, pk=pk)
+    ing_pk = lote.ingrediente_id
+    if request.method == 'POST':
+        if float(lote.cantidad_base) > 0:
+            MovimientoIngrediente.objects.create(
+                ingrediente=lote.ingrediente,
+                tipo='merma',
+                cantidad=lote.cantidad_base,
+                nota='Lote eliminado manualmente',
+            )
+        lote.delete()
+        messages.success(request, 'Lote eliminado.')
+    return redirect('app_admin:lotes_ingrediente', pk=ing_pk)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PRODUCCIÓN DE PRODUCTOS ELABORADOS
+# ══════════════════════════════════════════════════════════════════════════════
+
+@admin_required
+def producciones(request):
+    qs = ProduccionElaborado.objects.select_related('producto', 'responsable').order_by('-fecha')
+    return render(request, 'app_admin/producciones.html', _ctx({'producciones': qs}))
+
+
+@admin_required
+def produccion_nueva(request):
+    elaborados = Producto.objects.filter(tipo='elaborado', disponible=True).prefetch_related('receta__ingrediente')
+    if request.method == 'POST':
+        prod_id  = request.POST.get('producto')
+        cantidad = request.POST.get('cantidad_producida', '0').strip()
+        nota     = request.POST.get('nota', '').strip()
+
+        errores = []
+        if not prod_id:
+            errores.append('Selecciona un producto.')
+        try:
+            cantidad = int(cantidad)
+            if cantidad <= 0:
+                errores.append('La cantidad debe ser mayor a 0.')
+        except (ValueError, TypeError):
+            errores.append('Cantidad inválida.')
+
+        if not errores:
+            prod = get_object_or_404(Producto, pk=prod_id, tipo='elaborado')
+            # Validate ingredient availability for requested quantity
+            for receta_ing in prod.receta.select_related('ingrediente').all():
+                needed = float(receta_ing.cantidad) * cantidad
+                disponible = receta_ing.ingrediente.stock_real
+                if disponible < needed:
+                    errores.append(
+                        f'Stock insuficiente de {receta_ing.ingrediente.nombre}: '
+                        f'necesitas {needed:.2f} {receta_ing.ingrediente.get_unidad_base_display()}, '
+                        f'hay {disponible:.2f}.'
+                    )
+
+        if errores:
+            for e in errores:
+                messages.error(request, e)
+        else:
+            with transaction.atomic():
+                costo_total = 0
+                for receta_ing in prod.receta.select_related('ingrediente').all():
+                    needed = float(receta_ing.cantidad) * cantidad
+                    costo_total += needed * receta_ing.ingrediente.costo_unitario_real
+                    descontar_fifo(receta_ing.ingrediente, needed,
+                                   nota=f'Producción {cantidad}× {prod.nombre}')
+                    MovimientoIngrediente.objects.create(
+                        ingrediente=receta_ing.ingrediente,
+                        tipo='salida',
+                        cantidad=needed,
+                        nota=f'Producción {cantidad}× {prod.nombre}',
+                    )
+
+                prod.stock += cantidad
+                prod.save(update_fields=['stock'])
+                MovimientoInventario.objects.create(
+                    producto=prod, tipo='entrada',
+                    cantidad=cantidad,
+                    nota=f'Producción registrada por {request.user.get_full_name() or request.user.username}',
+                )
+                ProduccionElaborado.objects.create(
+                    producto=prod,
+                    cantidad_producida=cantidad,
+                    responsable=request.user,
+                    costo_total=round(costo_total, 2),
+                    nota=nota,
+                )
+
+            messages.success(request, f'Producción registrada: {cantidad}× {prod.nombre}. Stock ahora: {prod.stock}.')
+            return redirect('app_admin:producciones')
+
+    # Build ingredient summary for each elaborated product (for JS preview)
+    prods_data = []
+    for p in elaborados:
+        receta = [
+            {
+                'nombre': r.ingrediente.nombre,
+                'cantidad': float(r.cantidad),
+                'unidad': r.ingrediente.get_unidad_base_display(),
+                'stock_real': r.ingrediente.stock_real,
+            }
+            for r in p.receta.select_related('ingrediente').all()
+        ]
+        max_producible = min(
+            (r['stock_real'] // r['cantidad'] if r['cantidad'] else 0)
+            for r in receta
+        ) if receta else 0
+        prods_data.append({
+            'id': p.pk,
+            'nombre': p.nombre,
+            'stock': p.stock,
+            'receta': receta,
+            'max_producible': int(max_producible),
+        })
+
+    return render(request, 'app_admin/produccion_form.html', _ctx({
+        'elaborados':  elaborados,
+        'prods_json':  json.dumps(prods_data),
     }))
 
 
@@ -778,7 +1004,7 @@ def exportar_ingredientes_excel(request):
     header_fill = PatternFill(start_color='1a3d2b', end_color='1a3d2b', fill_type='solid')
     header_font = Font(color='FFFFFF', bold=True)
 
-    headers = ['Nombre', 'Unidad compra', 'Stock (uds)', 'Contenido/ud', 'Unidad base', 'Stock real', 'Mínimo (base)', 'Precio compra', 'Costo unitario', 'Vencimiento']
+    headers = ['Nombre', 'Proveedor', 'Unidad compra', 'Contenido/ud', 'Unidad base', 'Stock real', 'Mínimo (base)', 'Costo unitario', 'Próx. vencimiento', 'Lotes activos']
     ws.append(headers)
     for col_num, _ in enumerate(headers, 1):
         cell = ws.cell(row=1, column=col_num)
@@ -786,18 +1012,19 @@ def exportar_ingredientes_excel(request):
         cell.font = header_font
         cell.alignment = Alignment(horizontal='center')
 
-    for ing in Ingrediente.objects.filter(activo=True).order_by('nombre'):
+    for ing in Ingrediente.objects.filter(activo=True).select_related('proveedor').prefetch_related('lotes').order_by('nombre'):
+        lote_prox = ing.lote_proximo_vencer
         ws.append([
             ing.nombre,
+            ing.proveedor.nombre if ing.proveedor else '—',
             ing.unidad_compra,
-            float(ing.stock_unidades),
             float(ing.contenido_por_unidad),
             ing.get_unidad_base_display(),
             ing.stock_real,
             float(ing.stock_minimo),
-            float(ing.precio_compra),
             ing.costo_unitario_real,
-            ing.fecha_vencimiento.strftime('%d/%m/%Y') if ing.fecha_vencimiento else '—',
+            lote_prox.fecha_vencimiento.strftime('%d/%m/%Y') if lote_prox else '—',
+            ing.lotes.filter(cantidad_base__gt=0).count(),
         ])
 
     for col in ws.columns:
@@ -834,20 +1061,21 @@ def exportar_ingredientes_pdf(request):
     elements.append(Paragraph(f'Generado: {date.today().strftime("%d/%m/%Y")}', styles['Normal']))
     elements.append(Spacer(1, 0.5*cm))
 
-    headers = ['Nombre', 'Ud. compra', 'Stock uds', 'Cont./ud', 'Ud. base', 'Stock real', 'Mínimo', 'Precio compra', 'Costo/ud base', 'Vencimiento']
+    headers = ['Nombre', 'Proveedor', 'Ud. compra', 'Cont./ud', 'Ud. base', 'Stock real', 'Mínimo', 'Costo/ud base', 'Próx. vencimiento', 'Lotes']
     data = [headers]
-    for ing in Ingrediente.objects.filter(activo=True).order_by('nombre'):
+    for ing in Ingrediente.objects.filter(activo=True).select_related('proveedor').prefetch_related('lotes').order_by('nombre'):
+        lote_prox = ing.lote_proximo_vencer
         data.append([
             ing.nombre[:28],
+            (ing.proveedor.nombre if ing.proveedor else '—')[:18],
             ing.unidad_compra,
-            f'{float(ing.stock_unidades):g}',
             f'{float(ing.contenido_por_unidad):g}',
             ing.get_unidad_base_display(),
             f'{ing.stock_real:g}',
             f'{float(ing.stock_minimo):g}',
-            f'${float(ing.precio_compra):,.0f}',
             f'${ing.costo_unitario_real:,.4f}',
-            ing.fecha_vencimiento.strftime('%d/%m/%Y') if ing.fecha_vencimiento else '—',
+            lote_prox.fecha_vencimiento.strftime('%d/%m/%Y') if lote_prox else '—',
+            str(ing.lotes.filter(cantidad_base__gt=0).count()),
         ])
 
     verde_oscuro = colors.HexColor('#1a3d2b')
@@ -936,10 +1164,9 @@ def historial_api(request):
         if hasta:   qs = qs.filter(fecha__date__lte=hasta)
         if q:       qs = qs.filter(ingrediente__nombre__icontains=q)
         for m in qs[:200]:
-            # Proveedor: 1) el de la compra vinculada, 2) el registrado en el ingrediente
             if m.compra and m.compra.proveedor:
                 prov = m.compra.proveedor.nombre
-            elif m.ingrediente.proveedor:
+            elif hasattr(m.ingrediente, 'proveedor') and m.ingrediente.proveedor:
                 prov = m.ingrediente.proveedor.nombre
             else:
                 prov = '—'
@@ -1024,18 +1251,34 @@ def calendario_api(request):
             'extendedProps':   {'tipo': m.tipo, 'cat': 'Ingrediente'},
         })
 
-    # Pedidos entregados
+    # Pedidos estudiante entregados
     for p in Pedido.objects.filter(
         fecha_pedido__date__gte=desde, fecha_pedido__date__lte=hasta, estado='entregado'
-    ):
+    ).select_related('estudiante__perfil__user'):
         fecha_local = timezone.localtime(p.fecha_pedido).date()
+        nombre = p.estudiante.perfil.user.get_full_name() or p.estudiante.perfil.user.username
         eventos.append({
-            'title':           f'Pedido {p.ticket}',
+            'title':           f'{p.ticket} — {nombre}',
             'start':           fecha_local.isoformat(),
             'backgroundColor': '#7c3aed',
             'borderColor':     '#7c3aed',
             'textColor':       '#fff',
-            'extendedProps':   {'tipo': 'pedido', 'cat': 'Venta'},
+            'extendedProps':   {'tipo': 'entregado', 'cat': 'Estudiante'},
+        })
+
+    # Pedidos docente entregados
+    for p in PedidoDocente.objects.filter(
+        fecha_pedido__date__gte=desde, fecha_pedido__date__lte=hasta, estado='entregado'
+    ).select_related('docente__perfil__user'):
+        fecha_local = timezone.localtime(p.fecha_pedido).date()
+        nombre = p.docente.perfil.user.get_full_name() or p.docente.perfil.user.username
+        eventos.append({
+            'title':           f'{p.ticket} — {nombre}',
+            'start':           fecha_local.isoformat(),
+            'backgroundColor': '#ea580c',
+            'borderColor':     '#ea580c',
+            'textColor':       '#fff',
+            'extendedProps':   {'tipo': 'entregado', 'cat': 'Docente'},
         })
 
     return JsonResponse(eventos, safe=False)
@@ -1062,7 +1305,8 @@ def proveedores(request):
         items = []
         for p in Producto.objects.filter(proveedor=prov, tipo='simple'):
             items.append({'tipo': 'Producto', 'nombre': p.nombre, 'stock': str(p.stock), 'unidad': 'und'})
-        # Ingredientes ya no tienen proveedor directo — omitidos aquí
+        for ing in Ingrediente.objects.filter(proveedor=prov, activo=True):
+            items.append({'tipo': 'Ingrediente', 'nombre': ing.nombre, 'stock': f'{ing.stock_real:.2f}', 'unidad': ing.get_unidad_base_display()})
         for ins in Insumo.objects.filter(proveedor=prov, activo=True):
             items.append({'tipo': 'Insumo', 'nombre': ins.nombre, 'stock': str(ins.stock), 'unidad': ins.get_unidad_display()})
         proveedores_data.append({'prov': prov, 'items_json': json.dumps(items)})
@@ -1253,28 +1497,15 @@ def pedido_estado(request, pk):
             pedido_locked.estado = nuevo
             if nuevo == 'entregado':
                 pedido_locked.fecha_entrega = timezone.now()
-                # Descontar stock con select_for_update para evitar race conditions
                 for detalle in pedido_locked.detalles.select_related('producto').all():
-                    if detalle.producto.tipo == 'elaborado':
-                        for r in detalle.producto.receta.select_related('ingrediente').all():
-                            ing = Ingrediente.objects.select_for_update().get(pk=r.ingrediente.pk)
-                            consumo_base = float(r.cantidad) * detalle.cantidad
-                            consumo_unidades = consumo_base / float(ing.contenido_por_unidad) if float(ing.contenido_por_unidad) else 0
-                            ing.stock_unidades = max(0, float(ing.stock_unidades) - consumo_unidades)
-                            ing.save(update_fields=['stock_unidades'])
-                            MovimientoIngrediente.objects.create(
-                                ingrediente=ing, tipo='salida',
-                                cantidad=consumo,
-                                nota=f'Pedido {pedido_locked.ticket}'
-                            )
-                    else:
-                        prod = Producto.objects.select_for_update().get(pk=detalle.producto.pk)
-                        prod.stock = max(0, prod.stock - detalle.cantidad)
-                        prod.save(update_fields=['stock'])
-                        MovimientoInventario.objects.create(
-                            producto=prod, tipo='salida',
-                            cantidad=detalle.cantidad, nota=f'Pedido {pedido_locked.ticket}'
-                        )
+                    prod = Producto.objects.select_for_update().get(pk=detalle.producto.pk)
+                    prod.stock = max(0, prod.stock - detalle.cantidad)
+                    prod.save(update_fields=['stock'])
+                    MovimientoInventario.objects.create(
+                        producto=prod, tipo='salida',
+                        cantidad=detalle.cantidad,
+                        nota=f'Pedido {pedido_locked.ticket}'
+                    )
 
             pedido_locked.save(update_fields=['estado', 'fecha_entrega'])
 
@@ -1366,9 +1597,17 @@ def pedido_docente_estado(request, pk):
 
             pedido_locked.estado = nuevo
             if nuevo == 'entregado':
-                pedido_locked.fecha_pedido = timezone.now()
+                for detalle in pedido_locked.detalles.select_related('producto').all():
+                    prod = Producto.objects.select_for_update().get(pk=detalle.producto.pk)
+                    prod.stock = max(0, prod.stock - detalle.cantidad)
+                    prod.save(update_fields=['stock'])
+                    MovimientoInventario.objects.create(
+                        producto=prod, tipo='salida',
+                        cantidad=detalle.cantidad,
+                        nota=f'Pedido docente {pedido_locked.ticket}'
+                    )
 
-            pedido_locked.save(update_fields=['estado', 'fecha_pedido'])
+            pedido_locked.save(update_fields=['estado'])
 
         messages.success(request, f'Pedido {pedido.ticket} → {dict(PedidoDocente.ESTADO_CHOICES).get(nuevo)}')
     return redirect(next_url)
@@ -1848,7 +2087,6 @@ def usuarios(request):
         perfiles = perfiles.filter(
             Q(user__first_name__icontains=q) |
             Q(user__last_name__icontains=q)  |
-            Q(user__username__icontains=q)   |
             Q(user__email__icontains=q)
         )
 
@@ -2258,23 +2496,28 @@ def api_alertas(request):
             'color': 'amber',
         })
 
-    for i in Ingrediente.objects.filter(activo=True, fecha_vencimiento__lt=date.today())[:3]:
+    for lote in LoteIngrediente.objects.filter(
+        ingrediente__activo=True,
+        cantidad_base__gt=0,
+        fecha_vencimiento__lt=date.today()
+    ).select_related('ingrediente').order_by('fecha_vencimiento')[:3]:
         detalle.append({
             'tipo': 'vencido',
-            'texto': f'{i.nombre} venció el {i.fecha_vencimiento.strftime("%d/%m/%Y")}',
-            'url': f'/admin-panel/inventario/ingredientes/',
+            'texto': f'{lote.ingrediente.nombre} venció el {lote.fecha_vencimiento.strftime("%d/%m/%Y")}',
+            'url': '/admin-panel/inventario/ingredientes/',
             'color': 'red',
         })
 
-    for i in Ingrediente.objects.filter(
-        activo=True,
+    for lote in LoteIngrediente.objects.filter(
+        ingrediente__activo=True,
+        cantidad_base__gt=0,
         fecha_vencimiento__gte=date.today(),
         fecha_vencimiento__lte=date.today() + timedelta(days=7)
-    )[:3]:
+    ).select_related('ingrediente').order_by('fecha_vencimiento')[:3]:
         detalle.append({
             'tipo': 'vence_pronto',
-            'texto': f'{i.nombre} vence el {i.fecha_vencimiento.strftime("%d/%m/%Y")}',
-            'url': f'/admin-panel/inventario/ingredientes/',
+            'texto': f'{lote.ingrediente.nombre} vence el {lote.fecha_vencimiento.strftime("%d/%m/%Y")}',
+            'url': '/admin-panel/inventario/ingredientes/',
             'color': 'amber',
         })
 
@@ -2802,7 +3045,7 @@ def empleados(request):
         qs = qs.filter(
             Q(perfil__user__first_name__icontains=q) |
             Q(perfil__user__last_name__icontains=q) |
-            Q(perfil__user__username__icontains=q) |
+            Q(perfil__user__email__icontains=q) |
             Q(documento__icontains=q)
         )
     if sede_id:
@@ -2851,7 +3094,12 @@ def empleado_nuevo(request):
                 messages.error(request, e)
         else:
             password = _generar_password()
-            username = generar_username(first_name, last_name)
+            from authentication.utils import _normalizar
+            if email:
+                username = generar_username(email)
+            else:
+                username = f"{_normalizar(first_name)}.{_normalizar(last_name)}@interno.local"
+                email = username
 
             user = User.objects.create_user(
                 username=username, password=password,
@@ -2867,7 +3115,7 @@ def empleado_nuevo(request):
 
             messages.success(
                 request,
-                f'Empleado creado. Usuario: <strong>{username}</strong> — '
+                f'Empleado creado. Correo: <strong>{email}</strong> — '
                 f'Contrasena temporal: <strong>{password}</strong>. '
                 f'Comparte estas credenciales de forma segura.'
             )

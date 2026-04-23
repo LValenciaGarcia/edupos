@@ -251,7 +251,7 @@ def recargar_saldo(request, pk):
                 mensaje=f'Tu solicitud de recarga de ${monto:,.0f} para {estudiante.perfil.user.get_full_name()} está siendo revisada.',
                 url_accion='/padre/hijos/',
             )
-            nombre = estudiante.perfil.user.first_name or estudiante.perfil.user.username
+            nombre = estudiante.perfil.user.first_name or estudiante.perfil.user.email
             messages.success(request, f'Solicitud de recarga de ${monto:,.0f} enviada. El saldo se actualizará cuando sea aprobada.')
             return redirect('app_padre:hijos')
 
@@ -274,7 +274,7 @@ def menu(request):
     q        = request.GET.get('q', '').strip()
     hijo_pk  = request.GET.get('hijo', '')
 
-    productos = Producto.objects.filter(disponible=True).select_related('categoria').order_by('categoria', 'nombre')
+    productos = Producto.objects.filter(disponible=True, stock__gt=0).select_related('categoria').order_by('categoria', 'nombre')
 
     if cat_slug:
         productos = productos.filter(categoria__nombre=cat_slug)
@@ -851,7 +851,7 @@ def pedido_padre(request, pk):
         messages.success(request, f'Pedido {pedido.ticket} creado exitosamente por ${total:,.0f}.')
         return redirect('app_padre:historial')
 
-    productos    = Producto.objects.filter(disponible=True).select_related('categoria').prefetch_related('receta__ingrediente__alergenos').order_by('categoria', 'nombre')
+    productos    = Producto.objects.filter(disponible=True, stock__gt=0).select_related('categoria').prefetch_related('receta__ingrediente__alergenos').order_by('categoria', 'nombre')
     categorias   = Categoria.objects.filter(activa=True)
 
     alergias_estudiante = set(

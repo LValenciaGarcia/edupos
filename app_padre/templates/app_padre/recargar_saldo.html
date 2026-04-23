@@ -101,7 +101,7 @@
     <div class="est-info-box">
       <div class="est-avatar">{{ estudiante.perfil.user.first_name|slice:":1"|upper }}</div>
       <div>
-        <div class="est-name">{{ estudiante.perfil.user.get_full_name|default:estudiante.perfil.user.username }}</div>
+        <div class="est-name">{{ estudiante.perfil.user.get_full_name|default:get_full_name|default:estudiante.perfil.user.email }}</div>
         <div class="est-meta">Grado {{ estudiante.grado }} · {{ estudiante.codigo }}</div>
       </div>
       <div class="est-saldo-box">

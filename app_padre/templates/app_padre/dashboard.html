@@ -127,7 +127,7 @@
 <div class="welcome-bar">
   <div>
     <div class="welcome-greeting">Bienvenido de nuevo</div>
-    <div class="welcome-name">{{ request.user.get_full_name|default:request.user.username }}</div>
+    <div class="welcome-name">{{ request.user.get_full_name|default:request.user.email }}</div>
     <div class="welcome-sub">Panel de padre — Punto Asis · {{ hijos.count }} hijo{{ hijos.count|pluralize:"s" }} vinculado{{ hijos.count|pluralize:"s" }}</div>
   </div>
   <div class="welcome-actions">
@@ -206,7 +206,7 @@
       <div class="hijo-row">
         <div class="hijo-avatar">{{ hijo.perfil.user.first_name|slice:":1"|upper }}</div>
         <div class="hijo-info">
-          <div class="hijo-nombre">{{ hijo.perfil.user.get_full_name|default:hijo.perfil.user.username }}</div>
+          <div class="hijo-nombre">{{ hijo.perfil.user.get_full_name|default:get_full_name|default:hijo.perfil.user.email }}</div>
           <div class="hijo-meta">Grado {{ hijo.grado }} · {{ hijo.codigo }}</div>
         </div>
         <div class="hijo-saldo">
@@ -245,7 +245,7 @@
           {% if pedido.pedido_padre %}<span class="badge badge-padre" style="margin-left:2px;">Padre</span>{% endif %}
         </div>
         <div class="pedido-info">
-          <div class="pedido-estudiante">{{ pedido.estudiante.perfil.user.get_full_name|default:pedido.estudiante.perfil.user.username }}</div>
+          <div class="pedido-estudiante">{{ pedido.estudiante.perfil.user.get_full_name|default:get_full_name|default:pedido.estudiante.perfil.user.email }}</div>
           <div class="pedido-fecha">{{ pedido.fecha_pedido|date:"d M, H:i" }}</div>
         </div>
         <div class="pedido-total">${{ pedido.total|miles }}</div>

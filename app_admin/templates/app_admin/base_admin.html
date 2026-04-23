@@ -138,19 +138,19 @@
       <button class="sb-user-btn" onclick="toggleUserDrop()" id="userBtn">
         <div class="sb-avatar">
           {% if request.user.perfil.perfil_admin.foto %}
-          <img src="{{ request.user.perfil.perfil_admin.foto.url }}" alt="{{ request.user.username }}">
+          <img src="{{ request.user.perfil.perfil_admin.foto.url }}" alt="{{ request.user.email }}">
           {% else %}
-            {{ request.user.username|slice:":1"|upper }}
+            {{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}
           {% endif %}
         </div>
         <div class="sb-user-info">
-          <div class="sb-uname">{{ request.user.get_full_name|default:request.user.username }}</div>
+          <div class="sb-uname">{{ request.user.get_full_name|default:request.user.email }}</div>
           <div class="sb-urole">Administrador</div>
         </div>
       </button>
       <div class="sb-user-dropdown" id="userDrop">
         <div class="sb-drop-info">
-          <div class="sb-drop-name">{{ request.user.get_full_name|default:request.user.username }}</div>
+          <div class="sb-drop-name">{{ request.user.get_full_name|default:request.user.email }}</div>
           <div class="sb-drop-role">Administrador</div>
         </div>
         <a href="{% url 'app_admin:perfil' %}" class="sb-drop-link"><i class="bi bi-person"></i> Mi perfil</a>

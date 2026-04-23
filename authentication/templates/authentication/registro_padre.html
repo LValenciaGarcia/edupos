@@ -1,4 +1,5 @@
 {% load static %}
+{% load socialaccount %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -76,8 +77,6 @@
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
     .form-row.full { grid-column: span 2; }
     .input-wrap input[type="email"] { grid-column: span 2; }
-    .username-preview { margin-top: 0.5rem; font-size: 0.78rem; color: var(--gray-500); display: flex; align-items: center; gap: 5px; min-height: 1.2em; }
-    .username-preview strong { color: var(--green-mid); }
     .card-footer { padding: 1.6rem 2.6rem 2.2rem; border-top: 1px solid var(--gray-200); }
     .btn-login { width: 100%; height: 48px; background: var(--black); color: var(--white); border: none; border-radius: 12px; font-family: var(--sans); font-size: 0.97rem; font-weight: 700; cursor: pointer; letter-spacing: 0.02em; position: relative; overflow: hidden; transition: transform 0.18s var(--ease), box-shadow 0.22s var(--ease); }
     .btn-login::before { content: ''; position: absolute; inset: 0; background: var(--green-vivid); transform: translateY(100%); transition: transform 0.3s var(--ease); border-radius: 12px; }
@@ -94,6 +93,16 @@
     .messages { list-style: none; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.4rem; }
     .messages li { background: #fff5f5; border: 1px solid #ffd0d0; color: #c0392b; border-radius: 10px; padding: 10px 14px; font-size: 0.82rem; display: flex; align-items: center; gap: 8px; }
     .messages li.success { background: var(--green-pale); border-color: var(--green-light); color: var(--green-dark); }
+
+    /* Separador "o" */
+    .separator { display: flex; align-items: center; text-align: center; margin: 1.2rem 0 1rem; }
+    .separator::before, .separator::after { content: ''; flex: 1; border-bottom: 1px solid var(--gray-200); }
+    .separator span { padding: 0 1rem; font-size: 0.75rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500); }
+
+    /* Botón Google */
+    .btn-google { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; height: 48px; background: white; border: 1.5px solid var(--gray-200); border-radius: 12px; font-family: var(--sans); font-size: 0.9rem; font-weight: 600; color: #3c4043; text-decoration: none; transition: all 0.2s var(--ease); cursor: pointer; }
+    .btn-google:hover { background: #f8f9fa; border-color: var(--gray-400); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.07); }
+
     @media (max-width: 860px) { body { grid-template-columns: 1fr; } .left-panel { display: none; } .right-panel { padding: 2rem 1.2rem; } .login-card { max-width: 100%; } }
   </style>
 </head>
@@ -148,31 +157,22 @@
               <label class="field-label">Nombre *</label>
               <div class="input-wrap">
                 <input type="text" name="first_name" id="first_name" placeholder="Ej: María"
-                       required value="{{ request.POST.first_name|default:'' }}"
-                       oninput="previewUsername()">
+                       required value="{{ request.POST.first_name|default:'' }}">
               </div>
             </div>
             <div class="form-group">
               <label class="field-label">Apellido *</label>
               <div class="input-wrap">
                 <input type="text" name="last_name" id="last_name" placeholder="Ej: García"
-                       required value="{{ request.POST.last_name|default:'' }}"
-                       oninput="previewUsername()">
+                       required value="{{ request.POST.last_name|default:'' }}">
               </div>
             </div>
           </div>
           <div class="form-group">
-            <label class="field-label">Usuario generado</label>
-            <div class="username-preview" id="username-preview">
-              <svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              Se generará automáticamente a partir de tu nombre y apellido
-            </div>
-          </div>
-          <div class="form-group">
-            <label class="field-label">Correo electrónico</label>
+            <label class="field-label">Correo electrónico *</label>
             <div class="input-wrap">
-              <input type="email" name="email" placeholder="correo@email.com"
-                     value="{{ request.POST.email|default:'' }}">
+              <input type="email" name="email" placeholder="correo@gmail.com"
+                     required value="{{ request.POST.email|default:'' }}">
             </div>
           </div>
           <div class="form-row">
@@ -206,6 +206,12 @@
             </div>
           </div>
           <div class="card-footer" style="padding-top: 1.6rem; border-top: 1px solid var(--gray-200);">
+            <!-- Registro con Google -->
+            <a href="{% provider_login_url 'google' %}" class="btn-google">
+              <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google" width="20" height="20">
+              <span>Registrarse con Google</span>
+            </a>
+            <div class="separator"><span>o regístrate con correo</span></div>
             <button type="submit" class="btn-login"><span>Crear cuenta</span></button>
             <div class="register-row">
               <span>¿Ya tienes cuenta?</span>
@@ -222,26 +228,5 @@
   </div>
 </div>
 
-<script>
-  function normalizar(s) {
-    return s.normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, '');
-  }
-
-  function previewUsername() {
-    const fn = normalizar(document.getElementById('first_name').value.trim());
-    const ln = normalizar(document.getElementById('last_name').value.trim());
-    const preview = document.getElementById('username-preview');
-    const icon = `<svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
-    if (fn || ln) {
-      const base = [fn, ln].filter(Boolean).join('.');
-      preview.innerHTML = `${icon} Tu usuario será: <strong>${base}</strong> (puede añadirse un número si ya existe)`;
-    } else {
-      preview.innerHTML = `${icon} Se generará automáticamente a partir de tu nombre y apellido`;
-    }
-  }
-</script>
 </body>
 </html>

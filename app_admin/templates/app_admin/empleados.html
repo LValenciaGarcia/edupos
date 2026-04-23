@@ -205,16 +205,16 @@
           {% elif cargo == 'atencion' %}av-atencion
           {% elif cargo == 'supervisor' %}av-supervisor
           {% else %}av-default{% endif %}">
-          {{ emp.perfil.user.get_full_name|default:emp.perfil.user.username|slice:":1"|upper }}
+          {{ emp.perfil.user.get_full_name|default:get_full_name|default:emp.perfil.user.email|slice:":1"|upper }}
         </div>
 
         <!-- Nombre + usuario -->
         <div style="flex:1;min-width:0;">
           <div class="emp-name">
-            {{ emp.perfil.user.get_full_name|default:emp.perfil.user.username }}
+            {{ emp.perfil.user.get_full_name|default:get_full_name|default:emp.perfil.user.email }}
           </div>
           <div class="emp-sub">
-            @{{ emp.perfil.user.username }}{% if emp.documento %} · {{ emp.documento }}{% endif %}
+            {{ emp.perfil.user.email }}{% if emp.documento %} · {{ emp.documento }}{% endif %}
           </div>
         </div>
 

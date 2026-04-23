@@ -1,7 +1,7 @@
 {% extends 'app_admin/base_admin.html' %}
 {% load static %}
 
-{% block title %}{{ empleado.perfil.user.get_full_name|default:empleado.perfil.user.username }}{% endblock %}
+{% block title %}{{ empleado.perfil.user.get_full_name|default:get_full_name|default:empleado.perfil.user.email }}{% endblock %}
 {% block page_title %}Detalle Empleado{% endblock %}
 {% block nav_empleados %}active{% endblock %}
 
@@ -113,16 +113,16 @@
         {% elif cargo == 'atencion' %}av-atencion
         {% elif cargo == 'supervisor' %}av-supervisor
         {% else %}av-default{% endif %}">
-        {{ empleado.perfil.user.get_full_name|default:empleado.perfil.user.username|slice:":1"|upper }}
+        {{ empleado.perfil.user.get_full_name|default:get_full_name|default:empleado.perfil.user.email|slice:":1"|upper }}
       </div>
       {% endwith %}
 
       <div style="flex:1;min-width:0;">
         <div class="emp-hero-name">
-          {{ empleado.perfil.user.get_full_name|default:empleado.perfil.user.username }}
+          {{ empleado.perfil.user.get_full_name|default:get_full_name|default:empleado.perfil.user.email }}
         </div>
         <div class="emp-hero-sub">
-          @{{ empleado.perfil.user.username }}
+          {{ empleado.perfil.user.email }}
           {% if empleado.documento %} · {{ empleado.documento }}{% endif %}
         </div>
         <div class="emp-hero-tags">

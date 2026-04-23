@@ -358,7 +358,7 @@
         <!-- Unidad de compra -->
         <td>
           <div style="font-size:0.8rem;font-weight:600;color:var(--ink);">
-            {{ ing.stock_unidades|floatformat:"-2" }} {{ ing.unidad_compra }}
+            {{ ing.unidad_compra }}
           </div>
           <div style="font-size:0.68rem;color:var(--ash);margin-top:0.05rem;">
             {{ ing.contenido_por_unidad|floatformat:"-4" }} {{ ing.get_unidad_base_display }} c/u
@@ -399,19 +399,23 @@
           {% endif %}
           {% endwith %}
         </td>
-        <!-- Vencimiento -->
+        <!-- Vencimiento (basado en lote próximo a vencer) -->
         <td>
-          {% if ing.fecha_vencimiento %}
-            {% if ing.vencido %}
-              <span class="venc-pill venc-vencido"><i class="bi bi-x-circle-fill"></i> {{ ing.fecha_vencimiento|date:"d/m/Y" }}</span>
-            {% elif ing.vence_pronto %}
-              <span class="venc-pill venc-pronto"><i class="bi bi-exclamation-triangle-fill"></i> {{ ing.fecha_vencimiento|date:"d/m/Y" }}</span>
-            {% else %}
-              <span class="venc-pill venc-ok">{{ ing.fecha_vencimiento|date:"d/m/Y" }}</span>
-            {% endif %}
+          {% with lote=ing.lote_proximo_vencer %}
+          {% if ing.vencido %}
+            <a href="{% url 'app_admin:lotes_ingrediente' ing.pk %}" class="venc-pill venc-vencido" style="text-decoration:none;">
+              <i class="bi bi-x-circle-fill"></i> Lote vencido
+            </a>
+          {% elif ing.vence_pronto and lote %}
+            <a href="{% url 'app_admin:lotes_ingrediente' ing.pk %}" class="venc-pill venc-pronto" style="text-decoration:none;">
+              <i class="bi bi-exclamation-triangle-fill"></i> {{ lote.fecha_vencimiento|date:"d/m/Y" }}
+            </a>
+          {% elif lote %}
+            <span class="venc-pill venc-ok">{{ lote.fecha_vencimiento|date:"d/m/Y" }}</span>
           {% else %}
-            <span style="color:var(--fog);font-size:0.8rem;">—</span>
+            <a href="{% url 'app_admin:lotes_ingrediente' ing.pk %}" style="color:var(--fog);font-size:0.78rem;">Sin lotes</a>
           {% endif %}
+          {% endwith %}
         </td>
         <!-- Proyección -->
         <td>
@@ -424,6 +428,9 @@
         <!-- Acciones -->
         <td>
           <div class="action-group">
+            <a href="{% url 'app_admin:lotes_ingrediente' ing.pk %}" class="action-btn" title="Ver/añadir lotes" style="color:var(--sky);border-color:var(--sky);">
+              <i class="bi bi-layers"></i> Lotes
+            </a>
             <a href="{% url 'app_admin:entrada_stock' %}?ing={{ ing.pk }}" class="action-btn entrada" title="Registrar entrada">
               <i class="bi bi-box-arrow-in-down"></i> Entrada
             </a>
@@ -450,14 +457,12 @@
             {
               "nombre":            "{{ ing.nombre|escapejs }}",
               "unidad_compra":     "{{ ing.unidad_compra|escapejs }}",
-              "stock_unidades":    "{{ ing.stock_unidades|floatformat:'-2' }}",
               "contenido":         "{{ ing.contenido_por_unidad|floatformat:'-4' }}",
               "unidad_base":       "{{ ing.get_unidad_base_display }}",
               "stock_real":        "{{ ing.stock_real|floatformat:'-2' }}",
               "stock_minimo":      "{{ ing.stock_minimo|floatformat:'-2' }}",
-              "precio_compra":     "${{ ing.precio_compra|miles }}",
               "costo_unitario":    "${{ ing.costo_unitario_real|floatformat:4 }}",
-              "fecha_vencimiento": "{% if ing.fecha_vencimiento %}{{ ing.fecha_vencimiento|date:'d/m/Y' }}{% endif %}",
+              "fecha_vencimiento": "{% with lote=ing.lote_proximo_vencer %}{% if lote %}{{ lote.fecha_vencimiento|date:'d/m/Y' }}{% endif %}{% endwith %}",
               "vencido":           {{ ing.vencido|yesno:"true,false" }},
               "vence_pronto":      {{ ing.vence_pronto|yesno:"true,false" }},
               "sin_stock":         {{ ing.sin_stock|yesno:"true,false" }},
@@ -587,7 +592,7 @@ function abrirInfoIngrediente(pk) {
 
   document.getElementById('info-ing-nombre').textContent = d.nombre;
   document.getElementById('info-ing-unidad').textContent =
-    d.stock_unidades + ' ' + d.unidad_compra + '(s) · ' + d.unidad_base;
+    d.stock_real + ' ' + d.unidad_base + ' · ' + d.unidad_compra + ' (' + d.contenido + ' ' + d.unidad_base + '/u)';
 
   // Icono y color según estado
   const iconEl = document.getElementById('info-ing-icon');
@@ -613,11 +618,9 @@ function abrirInfoIngrediente(pk) {
   // Grid de datos
   const grid = document.getElementById('info-ing-grid');
   const fields = [
-    { label: 'Stock (uds compra)',  value: d.stock_unidades + ' ' + d.unidad_compra },
-    { label: 'Contenido por ud.',   value: d.contenido + ' ' + d.unidad_base },
+    { label: 'Unidad de compra',    value: d.unidad_compra + ' (' + d.contenido + ' ' + d.unidad_base + '/u)' },
     { label: 'Stock real',          value: d.stock_real + ' ' + d.unidad_base },
     { label: 'Stock mínimo',        value: d.stock_minimo + ' ' + d.unidad_base },
-    { label: 'Precio de compra',    value: d.precio_compra + ' / ' + d.unidad_compra },
     { label: 'Costo unitario real', value: d.costo_unitario + ' / ' + d.unidad_base },
     ...(d.dias_restantes ? [{ label: 'Proyección', value: d.dias_restantes }] : []),
   ];

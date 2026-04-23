@@ -314,11 +314,11 @@
             {% elif perfil.rol == 'padre' %}av-padre
             {% elif perfil.rol == 'estudiante' %}av-student
             {% else %}av-default{% endif %}">
-            {{ perfil.user.get_full_name|default:perfil.user.username|slice:":2"|upper }}
+            {{ perfil.user.get_full_name|default:get_full_name|default:perfil.user.username|slice:":2"|upper }}
           </div>
           <div>
             <div class="u-name">{{ perfil.user.get_full_name|default:"Sin nombre" }}</div>
-            <div class="u-username">@{{ perfil.user.username }}</div>
+            <div class="u-username">{{ perfil.user.email }}</div>
             {% if perfil.user.email %}
             <div class="u-email">{{ perfil.user.email }}</div>
             {% endif %}
@@ -368,7 +368,7 @@
             {% csrf_token %}
             <button type="submit" class="btn-xs {% if perfil.activo %}btn-danger{% else %}btn-enable{% endif %}"
               title="{% if perfil.activo %}Desactivar{% else %}Activar{% endif %}"
-              onclick="return confirm('¿{% if perfil.activo %}Desactivar{% else %}Activar{% endif %} a @{{ perfil.user.username }}?')">
+              onclick="return confirm('¿{% if perfil.activo %}Desactivar{% else %}Activar{% endif %} a {{ perfil.user.email }}?')">
               <i class="bi bi-{% if perfil.activo %}pause-circle{% else %}play-circle{% endif %}" style="font-size:0.78rem;"></i>
               {% if perfil.activo %}Desactivar{% else %}Activar{% endif %}
             </button>

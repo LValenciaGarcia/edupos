@@ -134,7 +134,7 @@ def menu(request):
     cat_filter = request.GET.get('cat')
     busqueda   = request.GET.get('q', '').strip()
 
-    productos = Producto.objects.filter(disponible=True).select_related('categoria')
+    productos = Producto.objects.filter(disponible=True, stock__gt=0).select_related('categoria')
     if cat_filter:
         productos = productos.filter(categoria__nombre=cat_filter)
     if busqueda:

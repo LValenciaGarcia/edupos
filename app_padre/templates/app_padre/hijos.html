@@ -89,8 +89,8 @@
   <div class="hijo-header">
     <div class="hijo-ava">{{ hijo.perfil.user.first_name|slice:":1"|upper }}</div>
     <div class="hijo-h-info">
-      <div class="hijo-h-name">{{ hijo.perfil.user.get_full_name|default:hijo.perfil.user.username }}</div>
-      <div class="hijo-h-meta">Grado {{ hijo.grado }} &nbsp;·&nbsp; Código: {{ hijo.codigo }} &nbsp;·&nbsp; @{{ hijo.perfil.user.username }}</div>
+      <div class="hijo-h-name">{{ hijo.perfil.user.get_full_name|default:get_full_name|default:hijo.perfil.user.email }}</div>
+      <div class="hijo-h-meta">Grado {{ hijo.grado }} &nbsp;·&nbsp; Código: {{ hijo.codigo }} &nbsp;·&nbsp; @{{ hijo.perfil.user.email }}</div>
       {% if item.gasto_hoy > 0 %}
       <div class="gasto-hoy-chip"><i class="bi bi-sun"></i> Gasto hoy: ${{ item.gasto_hoy|floatformat:0|miles }}</div>
       {% endif %}

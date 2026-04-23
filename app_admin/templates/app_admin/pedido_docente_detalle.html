@@ -22,7 +22,7 @@
         <div class="grid-2" style="gap:1rem;margin-bottom:1rem;">
           <div>
             <div style="font-size:0.7rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.2rem;">Docente</div>
-            <div style="font-weight:600;">{{ pedido.docente.perfil.user.get_full_name|default:pedido.docente.perfil.user.username }}</div>
+            <div style="font-weight:600;">{{ pedido.docente.perfil.user.get_full_name|default:get_full_name|default:pedido.docente.perfil.user.email }}</div>
             <div style="font-size:0.82rem;color:var(--gray-500);">{{ pedido.docente.materia }}</div>
           </div>
           <div>

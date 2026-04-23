@@ -1,0 +1,157 @@
+{% extends 'app_admin/base_admin.html' %}
+{% block title %}Registrar producción{% endblock %}
+{% block page_title %}Registrar producción{% endblock %}
+{% block nav_inventario %}active{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'app_admin:producciones' %}" class="btn btn-ghost btn-sm">
+    <i class="bi bi-arrow-left"></i> Volver
+  </a>
+{% endblock %}
+
+{% block content %}
+<style>
+  .prod-wrap { max-width: 680px; margin: 0 auto; }
+  .ing-preview { background: var(--ivory); border: 1px solid var(--mist); border-radius: 10px; padding: .85rem 1rem; margin-top: .75rem; }
+  .ing-row { display:flex; align-items:center; gap:.6rem; padding: .35rem 0; border-bottom: 1px solid var(--mist); font-size: .83rem; }
+  .ing-row:last-child { border-bottom: none; }
+  .ing-name { flex: 1; font-weight: 600; color: var(--ink); }
+  .ing-need { color: var(--stone); min-width: 90px; text-align:right; }
+  .ing-stock { min-width: 80px; text-align:right; font-weight: 700; }
+  .ing-ok   { color: #166534; }
+  .ing-warn { color: #92400e; }
+  .ing-err  { color: #991b1b; }
+  .max-badge { display:inline-flex;align-items:center;gap:.3rem;padding:.25rem .65rem;border-radius:99px;font-size:.75rem;font-weight:700;background:var(--cream);color:var(--stone);margin-top:.5rem; }
+  .max-badge.ok   { background:#dcfce7;color:#166534; }
+  .max-badge.warn { background:#fef3c7;color:#92400e; }
+  .max-badge.err  { background:#fee2e2;color:#991b1b; }
+</style>
+
+<div class="prod-wrap">
+{% if messages %}
+  {% for msg in messages %}
+  <div style="display:flex;align-items:center;gap:.6rem;padding:.75rem 1rem;margin-bottom:.75rem;border-radius:9px;
+              background:{% if msg.tags == 'error' %}#fee2e2{% else %}#dcfce7{% endif %};
+              color:{% if msg.tags == 'error' %}#991b1b{% else %}#166534{% endif %};
+              border:1px solid {% if msg.tags == 'error' %}#fca5a5{% else %}#86efac{% endif %};">
+    <i class="bi {% if msg.tags == 'error' %}bi-x-circle-fill{% else %}bi-check-circle-fill{% endif %}"></i>
+    {{ msg }}
+  </div>
+  {% endfor %}
+{% endif %}
+
+<form method="post" id="form-produccion">
+{% csrf_token %}
+<div class="card" style="margin-bottom:1rem;">
+  <div class="card-head">
+    <span class="card-title" style="font-size:.95rem;">
+      <i class="bi bi-hammer" style="margin-right:.4rem;"></i>Nueva producción
+    </span>
+  </div>
+  <div style="padding:1.2rem 1.4rem;">
+    <div style="display:grid;grid-template-columns:1fr 160px;gap:1rem;margin-bottom:1rem;">
+
+      <div class="field">
+        <label>Producto elaborado *</label>
+        <select name="producto" id="sel-producto" required onchange="actualizarPreview()">
+          <option value="">— Selecciona un producto —</option>
+          {% for p in elaborados %}
+          <option value="{{ p.pk }}">{{ p.nombre }} (stock: {{ p.stock }})</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Cantidad a producir *</label>
+        <input type="number" name="cantidad_producida" id="inp-cantidad"
+               min="1" step="1" required placeholder="0" oninput="actualizarPreview()">
+      </div>
+
+    </div>
+
+    <!-- Preview de ingredientes -->
+    <div id="ing-preview-wrap" style="display:none;">
+      <div style="font-size:.72rem;font-weight:700;color:var(--stone);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem;">
+        <i class="bi bi-list-check"></i> Ingredientes necesarios
+      </div>
+      <div class="ing-preview">
+        <div id="ing-preview-body"></div>
+      </div>
+      <div id="max-badge-wrap" style="margin-top:.5rem;"></div>
+    </div>
+
+    <div class="field" style="margin-top:1rem;">
+      <label>Nota (opcional)</label>
+      <input type="text" name="nota" placeholder="Ej: turno mañana, lote especial…">
+    </div>
+  </div>
+</div>
+
+<div style="display:flex;gap:.75rem;justify-content:flex-end;">
+  <a href="{% url 'app_admin:producciones' %}" class="btn btn-ghost">Cancelar</a>
+  <button type="submit" class="btn btn-primary" id="btn-producir" disabled>
+    <i class="bi bi-hammer"></i> Registrar producción
+  </button>
+</div>
+</form>
+</div>
+
+<script>
+const PRODS = {{ prods_json|safe }};
+
+function actualizarPreview() {
+    const prodId   = parseInt(document.getElementById('sel-producto').value);
+    const cantidad = parseInt(document.getElementById('inp-cantidad').value) || 0;
+    const wrap     = document.getElementById('ing-preview-wrap');
+    const body     = document.getElementById('ing-preview-body');
+    const maxWrap  = document.getElementById('max-badge-wrap');
+    const btnProd  = document.getElementById('btn-producir');
+
+    if (!prodId) { wrap.style.display = 'none'; btnProd.disabled = true; return; }
+
+    const prod = PRODS.find(p => p.id === prodId);
+    if (!prod) { wrap.style.display = 'none'; btnProd.disabled = true; return; }
+
+    if (!prod.receta || prod.receta.length === 0) {
+        body.innerHTML = '<div style="color:var(--ash);font-size:.82rem;padding:.3rem 0;">Este producto no tiene receta definida.</div>';
+        wrap.style.display = '';
+        maxWrap.innerHTML = '';
+        btnProd.disabled = true;
+        return;
+    }
+
+    let puedeProd = true;
+    let rows = '';
+    for (const ing of prod.receta) {
+        const needed = ing.cantidad * cantidad;
+        const ok = ing.stock_real >= needed;
+        if (cantidad > 0 && !ok) puedeProd = false;
+        const cls = cantidad === 0 ? '' : (ok ? 'ing-ok' : 'ing-err');
+        rows += `
+        <div class="ing-row">
+            <span class="ing-name">${escHtml(ing.nombre)}</span>
+            <span class="ing-need">${cantidad > 0 ? 'Necesita: ' + fmtNum(needed) + ' ' + escHtml(ing.unidad) : '—'}</span>
+            <span class="ing-stock ${cls}">Stock: ${fmtNum(ing.stock_real)} ${escHtml(ing.unidad)}</span>
+        </div>`;
+    }
+    body.innerHTML = rows;
+    wrap.style.display = '';
+
+    const max = prod.max_producible;
+    const badgeCls = max === 0 ? 'err' : (max < 5 ? 'warn' : 'ok');
+    const icon = max === 0 ? 'bi-x-circle-fill' : (max < 5 ? 'bi-exclamation-triangle-fill' : 'bi-check-circle-fill');
+    maxWrap.innerHTML = `<span class="max-badge ${badgeCls}"><i class="bi ${icon}"></i> Máx. producibles: ${max}</span>`;
+
+    btnProd.disabled = !(cantidad > 0 && puedeProd && prod.receta.length > 0);
+}
+
+function fmtNum(n) {
+    return Number(n).toLocaleString('es-CO', {maximumFractionDigits: 3});
+}
+
+function escHtml(s) {
+    if (!s) return '';
+    return s.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
+}
+</script>
+{% endblock %}

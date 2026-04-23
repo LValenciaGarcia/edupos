@@ -15,7 +15,7 @@ class AlergenoAdmin(admin.ModelAdmin):
 
 @admin.register(Ingrediente)
 class IngredienteAdmin(admin.ModelAdmin):
-    list_display      = ('nombre', 'stock_unidades', 'unidad_compra', 'contenido_por_unidad', 'unidad_base', 'precio_compra', 'stock_minimo')
+    list_display      = ('nombre', 'unidad_compra', 'contenido_por_unidad', 'unidad_base', 'stock_minimo')
     list_filter       = ('unidad_base', 'alergenos')
     search_fields     = ('nombre',)
     filter_horizontal = ('alergenos',)
