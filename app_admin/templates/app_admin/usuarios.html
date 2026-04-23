@@ -374,7 +374,7 @@
             </button>
           </form>
           <button class="btn-xs btn-danger" title="Eliminar usuario"
-                  onclick="confirmarEliminarUsuario('{{ perfil.user.username|escapejs }}', '{% url 'app_admin:usuario_eliminar' perfil.pk %}')">
+                  onclick="confirmarEliminarUsuario('{{ perfil.user.email|escapejs }}', '{% url 'app_admin:usuario_eliminar' perfil.pk %}')">
             <i class="bi bi-trash3" style="font-size:0.78rem;"></i>
           </button>
           {% endif %}

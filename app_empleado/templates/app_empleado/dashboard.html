@@ -18,7 +18,7 @@
   <div class="emp-welcome anim-1">
     <div>
       <div class="emp-welcome-name">
-        Hola, {{ request.user.first_name|default:request.user.username }}
+        Hola, {{ request.user.first_name|default:request.user.email }}
         <span style="font-style:italic;opacity:.7;">—</span>
       </div>
       <div class="emp-welcome-sub">

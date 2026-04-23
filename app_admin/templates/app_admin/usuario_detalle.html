@@ -1,7 +1,7 @@
 {% extends 'app_admin/base_admin.html' %}
 {% load filtros %}
-{% block title %}{{ perfil.user.username }}{% endblock %}
-{% block page_title %}Usuario: {{ perfil.user.username }}{% endblock %}
+{% block title %}{{ perfil.user.email }}{% endblock %}
+{% block page_title %}Correo: {{ perfil.user.email }}{% endblock %}
 {% block nav_usuarios %}active{% endblock %}
 {% block topbar_actions %}<a href="{% url 'app_admin:usuarios' %}" class="btn btn-ghost"><i class="bi bi-arrow-left"></i> Usuarios</a>{% endblock %}
 
@@ -19,8 +19,7 @@
     <div class="card-body" style="display:flex;flex-direction:column;gap:0.7rem;">
       {% with u=perfil.user %}
       <div><span style="font-size:0.72rem;color:var(--gray-400);text-transform:uppercase;font-weight:700;">Nombre</span><div style="font-weight:600;">{{ u.get_full_name|default:"—" }}</div></div>
-      <div><span style="font-size:0.72rem;color:var(--gray-400);text-transform:uppercase;font-weight:700;">Usuario</span><div style="font-family:monospace;">{{ u.username }}</div></div>
-      <div><span style="font-size:0.72rem;color:var(--gray-400);text-transform:uppercase;font-weight:700;">Correo</span><div>{{ u.email|default:"—" }}</div></div>
+      <div><span style="font-size:0.72rem;color:var(--gray-400);text-transform:uppercase;font-weight:700;">Correo</span><div style="font-family:monospace;">{{ u.email|default:"—" }}</div></div>
       <div><span style="font-size:0.72rem;color:var(--gray-400);text-transform:uppercase;font-weight:700;">Teléfono</span><div>{{ perfil.telefono|default:"—" }}</div></div>
       <div><span style="font-size:0.72rem;color:var(--gray-400);text-transform:uppercase;font-weight:700;">Rol</span><div>{{ perfil.get_rol_display }}</div></div>
       <div><span style="font-size:0.72rem;color:var(--gray-400);text-transform:uppercase;font-weight:700;">Registro</span><div>{{ perfil.created_at|date:"d/m/Y H:i" }}</div></div>

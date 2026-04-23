@@ -16,7 +16,7 @@
       </div>
       <div style="position:relative; z-index:1;">
         <div style="font-family:var(--serif); font-size:1.35rem; font-style:italic; color:#fff; line-height:1.1;">{{ user.get_full_name }}</div>
-        <div style="font-size:.72rem; color:rgba(255,255,255,.72); margin-top:.2rem;">@{{ user.username }} &middot; Docente</div>
+        <div style="font-size:.72rem; color:rgba(255,255,255,.72); margin-top:.2rem;">@{{ user.email }} &middot; Docente</div>
         {% if docente.materia %}
         <div style="font-size:.75rem; color:rgba(255,255,255,.9); font-weight:600; margin-top:.2rem;"><i class="bi bi-mortarboard"></i> {{ docente.materia }}</div>
         {% endif %}

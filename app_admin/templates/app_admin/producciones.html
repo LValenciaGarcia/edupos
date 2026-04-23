@@ -69,7 +69,7 @@
           {% endif %}
         </div>
         <div>
-          <div class="cell-val">{{ p.responsable.get_full_name|default:get_full_name|default:p.responsable.username }}</div>
+          <div class="cell-val">{{ p.responsable.get_full_name|default:get_full_name|default:p.responsable.email }}</div>
         </div>
       </div>
       {% empty %}
