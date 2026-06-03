@@ -1,3 +1,4 @@
+{% load filtros %}
 {% extends 'app_admin/base_admin.html' %}
 {% block title %}Historial — {{ insumo.nombre }}{% endblock %}
 {% block page_title %}Historial de insumo{% endblock %}
@@ -72,7 +73,7 @@
 <div class="hist-header">
   <div class="hist-avatar">
     {% if insumo.imagen %}
-    <img src="{{ insumo.imagen.url }}" alt="{{ insumo.nombre }}">
+    <img src="{{ insumo.imagen.url|cloudinary_jpg }}" alt="{{ insumo.nombre }}">
     {% else %}
     <i class="bi bi-box2"></i>
     {% endif %}

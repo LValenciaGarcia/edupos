@@ -433,7 +433,7 @@
         <td style="min-width:200px;">
           <div style="display:flex;align-items:center;gap:0.55rem;">
             {% if p.imagen %}
-            <img src="{{ p.imagen.url }}" alt="{{ p.nombre }}"
+            <img src="{{ p.imagen.url|cloudinary_jpg }}" alt="{{ p.nombre }}"
                  style="width:2.2rem;height:2.2rem;object-fit:cover;border-radius:5px;flex-shrink:0;border:1px solid var(--mist);">
             {% else %}
             <div style="width:2.2rem;height:2.2rem;border-radius:5px;background:var(--cream);border:1px solid var(--mist);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
@@ -538,7 +538,7 @@
               "stock":     "{{ p.stock }}",
               "stock_minimo": "{{ p.stock_minimo }}",
               "proveedor": "{{ p.proveedor|default:'—' }}",
-              "imagen_url":"{% if p.imagen %}{{ p.imagen.url }}{% endif %}",
+              "imagen_url":"{% if p.imagen %}{{ p.imagen.url|cloudinary_jpg }}{% endif %}",
               "receta": [
                 {% for r in p.receta.all %}
                 {"nombre":"{{ r.ingrediente.nombre|escapejs }}","cantidad":"{{ r.cantidad }} {{ r.ingrediente.unidad }}"}{% if not forloop.last %},{% endif %}

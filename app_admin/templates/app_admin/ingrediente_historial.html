@@ -87,7 +87,7 @@
 <div class="hist-header">
   <div class="hist-avatar">
     {% if ingrediente.imagen %}
-      <img src="{{ ingrediente.imagen.url }}" alt="{{ ingrediente.nombre }}">
+      <img src="{{ ingrediente.imagen.url|cloudinary_jpg }}" alt="{{ ingrediente.nombre }}">
     {% else %}
       <i class="bi bi-basket"></i>
     {% endif %}

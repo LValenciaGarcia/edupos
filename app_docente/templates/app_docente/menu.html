@@ -153,7 +153,7 @@
     <!-- Image -->
     <div class="prod-img-wrap">
       {% if p.imagen %}
-      <img src="{{ p.imagen.url }}" alt="{{ p.nombre }}">
+      <img src="{{ p.imagen.url|cloudinary_jpg }}" alt="{{ p.nombre }}">
       {% else %}
       <div class="prod-img-placeholder"><i class="bi bi-egg-fried"></i></div>
       {% endif %}

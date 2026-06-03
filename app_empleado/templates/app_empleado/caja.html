@@ -146,7 +146,7 @@
            title="{{ p.nombre }}{% if p.sin_stock %} — Agotado{% endif %}">
         <div class="pos-item-img">
           {% if p.imagen %}
-            <img src="{{ p.imagen.url }}" alt="{{ p.nombre }}">
+            <img src="{{ p.imagen.url|cloudinary_jpg }}" alt="{{ p.nombre }}">
           {% else %}
             <i class="bi bi-bag" style="font-size:2rem;color:var(--fog);display:flex;align-items:center;justify-content:center;height:90px;width:100%;"></i>
           {% endif %}

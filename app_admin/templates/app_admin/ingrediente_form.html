@@ -1,3 +1,4 @@
+{% load filtros %}
 {% extends 'app_admin/base_admin.html' %}
 {% block title %}{{ accion }}{% endblock %}
 {% block page_title %}{{ accion }}{% endblock %}
@@ -43,7 +44,7 @@
       <div class="field full">
         <label>Imagen del ingrediente</label>
         {% if ingrediente.imagen %}
-          <img src="{{ ingrediente.imagen.url }}" id="img-preview"
+          <img src="{{ ingrediente.imagen.url|cloudinary_jpg }}" id="img-preview"
                style="display:block;width:6rem;height:6rem;object-fit:cover;border-radius:8px;
                       border:1px solid var(--gray-200);margin-bottom:.5rem;">
         {% else %}

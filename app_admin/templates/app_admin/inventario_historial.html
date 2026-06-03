@@ -81,7 +81,7 @@
 <div class="hist-header">
   <div class="hist-avatar">
     {% if producto.imagen %}
-      <img src="{{ producto.imagen.url }}" alt="{{ producto.nombre }}">
+      <img src="{{ producto.imagen.url|cloudinary_jpg }}" alt="{{ producto.nombre }}">
     {% else %}
       <i class="bi bi-box-seam"></i>
     {% endif %}

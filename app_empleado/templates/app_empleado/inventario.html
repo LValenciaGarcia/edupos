@@ -79,7 +79,7 @@
       <div class="inv-card {% if p.sin_stock %}inv-agotado{% elif p.stock_bajo %}inv-bajo{% endif %}">
         <div class="inv-card-img">
           {% if p.imagen %}
-            <img src="{{ p.imagen.url }}" alt="{{ p.nombre }}">
+            <img src="{{ p.imagen.url|cloudinary_jpg }}" alt="{{ p.nombre }}">
           {% else %}
             <i class="bi bi-bag" style="font-size:1.8rem;color:var(--fog);"></i>
           {% endif %}

@@ -1,3 +1,4 @@
+{% load filtros %}
 {% extends 'app_admin/base_admin.html' %}
 {% block title %}{{ accion }} Insumo{% endblock %}
 {% block page_title %}{{ accion }} insumo{% endblock %}
@@ -67,7 +68,7 @@
             <label>Imagen</label>
             {% if insumo.imagen %}
             <div style="margin-bottom:0.5rem;">
-              <img src="{{ insumo.imagen.url }}" alt="{{ insumo.nombre }}"
+              <img src="{{ insumo.imagen.url|cloudinary_jpg }}" alt="{{ insumo.nombre }}"
                    style="width:5rem;height:5rem;object-fit:cover;border-radius:8px;border:1px solid var(--mist);">
             </div>
             {% endif %}
