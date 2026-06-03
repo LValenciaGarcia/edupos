@@ -1,4 +1,4 @@
-from django.db import migrations
+from django.db import migrations, models
 
 # Mapa: código de alérgeno → clase de Bootstrap Icon (sin el prefijo "bi-")
 ICONO_MAP = {
@@ -36,5 +36,11 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # Ampliar el campo antes de insertar valores más largos que 10 chars
+        migrations.AlterField(
+            model_name='alergeno',
+            name='icono',
+            field=models.CharField(blank=True, help_text='Emoji o clase Bootstrap Icon', max_length=40),
+        ),
         migrations.RunPython(actualizar_iconos, revertir_iconos),
     ]
