@@ -148,11 +148,13 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 MEDIA_URL     = '/media/'
 MEDIA_ROOT    = BASE_DIR / 'media'
 
+_use_cloudinary = bool(CLOUDINARY_STORAGE.get('CLOUD_NAME') and CLOUDINARY_STORAGE.get('API_KEY'))
+
 STORAGES = {
     'default': {
         'BACKEND': (
             'cloudinary_storage.storage.MediaCloudinaryStorage'
-            if not DEBUG
+            if _use_cloudinary
             else 'django.core.files.storage.FileSystemStorage'
         ),
     },
