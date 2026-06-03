@@ -26,7 +26,7 @@ ALLOWED_HOSTS = env('ALLOWED_HOSTS') + ['.railway.app']
 CSRF_TRUSTED_ORIGINS = env.list(
     'CSRF_TRUSTED_ORIGINS',
     default=['http://localhost', 'http://127.0.0.1', 'https://cohesive-salutary-irritable.ngrok-free.dev']
-)
+) + ['https://*.railway.app']
 
 # ─── Cloudinary ──────────────────────────────────────────────────────────────
 CLOUDINARY_STORAGE = {
