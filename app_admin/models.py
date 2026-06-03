@@ -43,7 +43,7 @@ class Categoria(models.Model):
     ]
     nombre      = models.CharField(max_length=30, choices=NOMBRE_CHOICES, unique=True)
     descripcion = models.TextField(blank=True)
-    icono       = models.CharField(max_length=10, blank=True, default='')
+    icono       = models.CharField(max_length=40, blank=True, default='')
     activa      = models.BooleanField(default=True)
 
     def __str__(self):
@@ -74,7 +74,7 @@ class Alergeno(models.Model):
         ('otro',      'Otro'),
     ]
     codigo = models.CharField(max_length=20, choices=CODIGO_CHOICES, unique=True)
-    icono  = models.CharField(max_length=10, blank=True, help_text='Emoji o clase Bootstrap Icon')
+    icono  = models.CharField(max_length=40, blank=True, help_text='Emoji o clase Bootstrap Icon')
 
     def __str__(self):
         return self.get_codigo_display()
