@@ -265,23 +265,22 @@ structlog.configure(
 )
 
 # ─── django-allauth ───────────────────────────────────────────────────────────
-ACCOUNT_EMAIL_VERIFICATION = 'none'
-SOCIALACCOUNT_AUTO_SIGNUP  = True
-SOCIALACCOUNT_LOGIN_ON_GET = True
-SOCIALACCOUNT_ADAPTER      = 'authentication.adapters.RolSocialAccountAdapter'
-ACCOUNT_ADAPTER            = 'allauth.account.adapter.DefaultAccountAdapter'
+ACCOUNT_LOGIN_METHODS           = {'email'}      # allauth v65+: reemplaza ACCOUNT_AUTHENTICATION_METHOD
+ACCOUNT_EMAIL_REQUIRED          = True
+ACCOUNT_USERNAME_REQUIRED       = False
+ACCOUNT_EMAIL_VERIFICATION      = 'none'
+ACCOUNT_SIGNUP_PASSWORD_ENTER_TWICE = False
+SOCIALACCOUNT_AUTO_SIGNUP       = True
+SOCIALACCOUNT_LOGIN_ON_GET      = True
+SOCIALACCOUNT_ADAPTER           = 'authentication.adapters.RolSocialAccountAdapter'
+ACCOUNT_ADAPTER                 = 'allauth.account.adapter.DefaultAccountAdapter'
 
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
-        'APP': {
-            'client_id': env('GOOGLE_CLIENT_ID'),
-            'secret': env('GOOGLE_SECRET'),
-            'key': ''
-        },
         'SCOPE': ['profile', 'email'],
         'AUTH_PARAMS': {
             'access_type': 'online',
-            'prompt': 'select_account consent',  
+            'prompt': 'select_account consent',
         },
         'OAUTH_PKCE_ENABLED': True,
     }
