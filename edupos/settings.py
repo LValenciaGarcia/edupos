@@ -292,10 +292,9 @@ SOCIALACCOUNT_PROVIDERS = {
 GOOGLE_CLIENT_ID     = env('GOOGLE_CLIENT_ID', default='')
 GOOGLE_CLIENT_SECRET = env('GOOGLE_SECRET', default='')
 
-# ─── ngrok (solo en desarrollo) ──────────────────────────────────────────────
-if DEBUG:
-    USE_X_FORWARDED_HOST = True
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+# ─── Proxy SSL (ngrok en dev, Railway en prod) ───────────────────────────────
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # ─── MercadoPago ─────────────────────────────────────────────────────────────
 MERCADOPAGO_ACCESS_TOKEN  = env('MERCADOPAGO_ACCESS_TOKEN',  default='')
