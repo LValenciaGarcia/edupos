@@ -15,15 +15,34 @@
   </div>
   <div class="stat-card amber">
     <div class="stat-label">Gasto este mes</div>
-    <div class="stat-val">${{ gasto_mes|floatformat:0 }}</div>
+    <div class="stat-val">${{ gasto_mes|miles }}</div>
     <div class="stat-sub">en pedidos entregados</div>
   </div>
   <div class="stat-card blue">
     <div class="stat-label">Recargado este mes</div>
-    <div class="stat-val">${{ recargado_mes|floatformat:0 }}</div>
-    <div class="stat-sub">por tu acudiente</div>
+    <div class="stat-val">${{ recargado_mes|miles }}</div>
+    <div class="stat-sub">total acreditado</div>
   </div>
 </div>
+
+<!-- Botón recargar / aviso -->
+{% if estudiante.puede_recargar_autonomo %}
+<div style="margin-bottom:1.25rem;display:flex;align-items:center;gap:1rem;background:var(--leaf-pale);border:1px solid var(--leaf-tint);border-radius:10px;padding:1rem 1.2rem;">
+  <i class="bi bi-credit-card-2-front-fill" style="font-size:1.4rem;color:var(--leaf);flex-shrink:0;"></i>
+  <div style="flex:1">
+    <div style="font-weight:700;font-size:0.9rem;color:var(--leaf-dark);">Recarga autónoma activada</div>
+    <div style="font-size:0.76rem;color:var(--stone);margin-top:0.1rem;">Tu acudiente ha habilitado que recargues tu saldo directamente.</div>
+  </div>
+  <a href="{% url 'app_estudiante:recargar_saldo' %}" class="btn btn-primary" style="white-space:nowrap;flex-shrink:0;">
+    <i class="bi bi-plus-circle"></i> Recargar saldo
+  </a>
+</div>
+{% else %}
+<div style="margin-bottom:1.25rem;display:flex;align-items:center;gap:0.75rem;background:var(--cream);border:1px solid var(--fog);border-radius:10px;padding:0.85rem 1.1rem;">
+  <i class="bi bi-lock" style="font-size:1.1rem;color:var(--ash);flex-shrink:0;"></i>
+  <span style="font-size:0.8rem;color:var(--stone);">Las recargas autónomas no están habilitadas. Pídele a tu acudiente que las active desde su panel.</span>
+</div>
+{% endif %}
 
 <!-- Límites activos -->
 {% if limites_data %}
@@ -38,8 +57,8 @@
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem">
           <span style="font-weight:600;font-size:0.84rem">{{ ld.limite.get_tipo_display }}</span>
           <span style="font-size:0.78rem;color:var(--stone)">
-            ${{ ld.gasto|floatformat:0 }} / ${{ ld.limite.monto|floatformat:0 }}
-            <span style="color:var(--ash)"> · disponible ${{ ld.disponible|floatformat:0 }}</span>
+            ${{ ld.gasto|miles }} / ${{ ld.limite.monto|miles }}
+            <span style="color:var(--ash)"> · disponible ${{ ld.disponible|miles }}</span>
           </span>
         </div>
         <div class="progress-bar">
@@ -55,18 +74,18 @@
 
 <div class="grid-2">
 
-  <!-- Recargas recientes -->
+  <!-- Recargas del acudiente -->
   <div class="card">
     <div class="card-head">
-      <span class="card-title">Recargas recientes</span>
+      <span class="card-title">Recargas del acudiente</span>
     </div>
     <div style="overflow-x:auto">
       <table class="tbl">
         <thead><tr><th>Monto</th><th>Estado</th><th>Fecha</th></tr></thead>
         <tbody>
-          {% for r in recargas %}
+          {% for r in recargas_padre %}
           <tr>
-            <td style="font-weight:700;color:var(--leaf)">${{ r.monto|floatformat:0 }}</td>
+            <td style="font-weight:700;color:var(--leaf)">${{ r.monto|miles }}</td>
             <td><span class="badge badge-{{ r.estado }}">{{ r.get_estado_display }}</span></td>
             <td style="font-size:0.76rem;color:var(--ash)">{{ r.fecha|date:"d/m/Y" }}</td>
           </tr>
@@ -74,7 +93,7 @@
           <tr><td colspan="3">
             <div class="empty-state" style="padding:1.5rem">
               <i class="bi bi-wallet2 es-icon"></i>
-              <p>Sin recargas registradas.</p>
+              <p>Sin recargas del acudiente.</p>
             </div>
           </td></tr>
           {% endfor %}
@@ -83,7 +102,40 @@
     </div>
   </div>
 
-  <!-- Últimos pedidos (movimientos de salida) -->
+  {% if estudiante.puede_recargar_autonomo %}
+  <!-- Mis recargas propias -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Mis recargas</span>
+      <a href="{% url 'app_estudiante:recargar_saldo' %}" class="btn btn-sm btn-ghost">
+        <i class="bi bi-plus"></i> Nueva
+      </a>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Monto</th><th>Estado</th><th>Fecha</th></tr></thead>
+        <tbody>
+          {% for r in recargas_propias %}
+          <tr>
+            <td style="font-weight:700;color:var(--leaf)">${{ r.monto|miles }}</td>
+            <td><span class="badge badge-{{ r.estado }}">{{ r.get_estado_display }}</span></td>
+            <td style="font-size:0.76rem;color:var(--ash)">{{ r.fecha|date:"d/m/Y" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3">
+            <div class="empty-state" style="padding:1.5rem">
+              <i class="bi bi-credit-card es-icon"></i>
+              <p>Sin recargas propias aún.</p>
+              <a href="{% url 'app_estudiante:recargar_saldo' %}" class="btn btn-sm btn-primary" style="margin-top:0.5rem">Recargar ahora</a>
+            </div>
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <!-- Últimos pedidos -->
   <div class="card">
     <div class="card-head">
       <span class="card-title">Últimos pedidos</span>
@@ -95,7 +147,7 @@
           {% for p in pedidos_recientes %}
           <tr>
             <td style="font-family:monospace;font-size:0.78rem">{{ p.ticket }}</td>
-            <td style="font-weight:600;color:var(--red)">-${{ p.total|floatformat:0 }}</td>
+            <td style="font-weight:600;color:var(--red)">-${{ p.total|miles }}</td>
             <td><span class="badge badge-{{ p.estado }}">{{ p.get_estado_display }}</span></td>
             <td style="font-size:0.76rem;color:var(--ash)">{{ p.fecha_pedido|date:"d/m/Y" }}</td>
           </tr>
@@ -111,6 +163,39 @@
       </table>
     </div>
   </div>
+  {% endif %}
 
 </div>
+
+{% if estudiante.puede_recargar_autonomo %}
+<!-- Últimos pedidos (segunda fila cuando hay recargas propias) -->
+<div class="card" style="margin-top:1.25rem">
+  <div class="card-head">
+    <span class="card-title">Últimos pedidos</span>
+  </div>
+  <div style="overflow-x:auto">
+    <table class="tbl">
+      <thead><tr><th>Ticket</th><th>Total</th><th>Estado</th><th>Fecha</th></tr></thead>
+      <tbody>
+        {% for p in pedidos_recientes %}
+        <tr>
+          <td style="font-family:monospace;font-size:0.78rem">{{ p.ticket }}</td>
+          <td style="font-weight:600;color:var(--red)">-${{ p.total|miles }}</td>
+          <td><span class="badge badge-{{ p.estado }}">{{ p.get_estado_display }}</span></td>
+          <td style="font-size:0.76rem;color:var(--ash)">{{ p.fecha_pedido|date:"d/m/Y" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4">
+          <div class="empty-state" style="padding:1.5rem">
+            <i class="bi bi-receipt es-icon"></i>
+            <p>Sin pedidos registrados.</p>
+          </div>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
 {% endblock %}

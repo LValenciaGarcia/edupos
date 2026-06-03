@@ -31,7 +31,7 @@ Django admin (superuser only): `/django-admin/`
 `authentication.Perfil` extends Django `User` with a `rol` field: `admin`, `padre`, `estudiante`, `docente`. Each role has a companion model with extended fields.
 
 - Estudiante accounts are created by their Padre, not self-registered
-- Docente supports fiado (credit) system: `limite_fiado` / `deuda_fiado` fields
+- Docente solo paga con saldo propio recargado (sin sistema de crédito/fiado)
 
 ## Custom Template Filter
 

@@ -7,47 +7,47 @@
 
 {% block extra_css %}
 <style>
-/* ── Nuevo empleado ──────────────────────────────────────────────────────── */
+/* ── Layout ──────────────────────────────────────────────────────────────── */
 .new-emp-wrap { max-width: 640px; display: flex; flex-direction: column; gap: 1.1rem; }
 
-/* Hero banner */
+/* ── Hero ──────────────────────────────────────────────────────────────── */
 .new-emp-hero {
   background: var(--ivory); border: 1px solid var(--mist);
-  border-radius: var(--radius); padding: 1.25rem 1.5rem;
+  border-radius: 12px; padding: 1.4rem 1.6rem;
   display: flex; align-items: center; gap: 1rem;
+  position: relative; overflow: hidden;
+}
+.new-emp-hero::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+  background: var(--leaf); border-radius: 99px 0 0 99px;
 }
 .new-emp-hero-ico {
-  width: 3rem; height: 3rem; background: var(--leaf-tint); color: var(--leaf);
+  width: 3rem; height: 3rem; background: var(--leaf-tint); color: var(--leaf-dark);
   border-radius: 50%; display: flex; align-items: center; justify-content: center;
   font-size: 1.25rem; flex-shrink: 0;
 }
-.new-emp-hero h2 { font-family: var(--serif); font-size: 1.2rem; }
+.new-emp-hero h2 { font-family: var(--serif); font-size: 1.2rem; color: var(--ink); }
 .new-emp-hero p  { font-size: var(--text-sm); color: var(--ash); margin-top: .2rem; }
 
-/* Form sections */
+/* ── Form sections ─────────────────────────────────────────────────────── */
 .form-section {
-  background: var(--ivory);
-  border: 1px solid var(--mist);
-  border-radius: var(--radius);
-  overflow: hidden;
+  background: var(--ivory); border: 1px solid var(--mist);
+  border-radius: 12px; overflow: hidden;
 }
 .form-section-head {
-  padding: .75rem 1.25rem;
-  border-bottom: 1px solid var(--mist);
-  font-size: var(--text-2xs); font-weight: 700;
-  letter-spacing: .08em; text-transform: uppercase; color: var(--stone);
+  padding: .8rem 1.25rem; border-bottom: 1px solid var(--mist);
+  font-size: .67rem; font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--ash);
   display: flex; align-items: center; gap: .45rem;
+  background: var(--cream);
 }
-.form-section-body {
-  padding: 1.25rem;
-  display: flex; flex-direction: column; gap: .9rem;
-}
+.form-section-body { padding: 1.25rem; display: flex; flex-direction: column; gap: .9rem; }
 
-/* Sede toggles */
+/* ── Sede toggles ─────────────────────────────────────────────────────── */
 .sede-toggle {
   display: flex; align-items: center; gap: .75rem;
   padding: .6rem .9rem;
-  border: 1px solid var(--mist); border-radius: var(--radius);
+  border: 1px solid var(--mist); border-radius: 8px;
   cursor: pointer; background: var(--cream);
   transition: background .11s, border-color .11s;
   font-size: var(--text-sm);
@@ -55,25 +55,36 @@
 .sede-toggle:hover { border-color: var(--leaf); background: var(--leaf-pale); }
 .sede-toggle input[type="checkbox"] { accent-color: var(--leaf); width: 1rem; height: 1rem; flex-shrink: 0; }
 
-/* Global toggle */
 .global-toggle {
   display: flex; align-items: flex-start; gap: .75rem;
   padding: .75rem .9rem;
-  border: 1px solid var(--mist); border-radius: var(--radius);
-  cursor: pointer; background: var(--ivory);
+  border: 1px solid var(--mist); border-radius: 8px;
+  cursor: pointer; background: var(--cream);
+  transition: background .11s, border-color .11s;
 }
+.global-toggle:hover { border-color: var(--sky); background: var(--sky-tint); }
 .global-toggle input { accent-color: var(--sky); width: 1rem; height: 1rem; flex-shrink: 0; margin-top: .12rem; }
-.global-toggle-text strong { font-size: var(--text-sm); }
+.global-toggle-text strong { font-size: var(--text-sm); font-weight: 600; }
 .global-toggle-text p { font-size: var(--text-xs); color: var(--ash); margin-top: .15rem; line-height: 1.45; }
 
-/* Credentials notice */
+html[data-theme="dark"] input[type="checkbox"] { accent-color: var(--leaf-bright) !important; }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) input[type="checkbox"] { accent-color: var(--leaf-bright) !important; }
+}
+
+/* ── Credentials notice ────────────────────────────────────────────────── */
 .creds-notice {
   display: flex; gap: .75rem;
   background: var(--amber-pale); border: 1px solid var(--amber-tint);
-  border-radius: var(--radius); padding: .9rem 1rem;
-  font-size: var(--text-sm); color: var(--amber-dark); line-height: 1.5;
+  border-radius: 8px; padding: .9rem 1rem;
+  font-size: var(--text-sm); color: var(--amber-dark); line-height: 1.55;
 }
-.creds-notice i { font-size: 1.05rem; flex-shrink: 0; margin-top: .15rem; }
+.creds-notice i { font-size: 1rem; flex-shrink: 0; margin-top: .15rem; }
+
+/* ── Footer actions ─────────────────────────────────────────────────────── */
+.form-actions {
+  display: flex; gap: .75rem; padding-top: .25rem;
+}
 </style>
 {% endblock %}
 
@@ -101,8 +112,7 @@
     <!-- Datos personales -->
     <div class="form-section">
       <div class="form-section-head">
-        <i class="bi bi-person" style="color:var(--ash);"></i>
-        Datos personales
+        <i class="bi bi-person"></i> Datos personales
       </div>
       <div class="form-section-body">
         <div class="form-grid">
@@ -145,14 +155,13 @@
     <!-- Acceso y sedes -->
     <div class="form-section">
       <div class="form-section-head">
-        <i class="bi bi-geo-alt" style="color:var(--ash);"></i>
-        Acceso y sedes
+        <i class="bi bi-geo-alt"></i> Acceso y sedes
       </div>
       <div class="form-section-body">
         {% if sedes %}
         <div class="field">
           <label class="field-label" style="margin-bottom:.5rem;">Sedes asignadas</label>
-          <div style="display:flex;flex-direction:column;gap:.4rem;">
+          <div style="display:flex;flex-direction:column;gap:.35rem;">
             {% for s in sedes %}
             <label class="sede-toggle">
               <input type="checkbox" name="sedes" value="{{ s.pk }}">
@@ -164,7 +173,7 @@
           </div>
         </div>
         {% else %}
-        <div style="color:var(--ash);font-size:var(--text-sm);">
+        <div style="color:var(--ash);font-size:var(--text-sm);padding:.5rem 0;">
           No hay sedes activas.
           <a href="{% url 'app_admin:sedes' %}" style="color:var(--leaf);">Crear una sede</a>
         </div>
@@ -180,18 +189,31 @@
       </div>
     </div>
 
-    <!-- Aviso credenciales -->
-    <div class="creds-notice">
-      <i class="bi bi-key-fill"></i>
-      <div>
-        <strong>Credenciales automáticas</strong><br>
-        El nombre de usuario y la contraseña se generan automáticamente al crear el empleado.
-        Se mostrarán una sola vez — guárdalos y compártelos de forma segura.
+    <!-- Contraseña -->
+    <div class="form-section">
+      <div class="form-section-head">
+        <i class="bi bi-key"></i> Contraseña de acceso
+      </div>
+      <div class="form-section-body">
+        <div class="creds-notice">
+          <i class="bi bi-info-circle-fill"></i>
+          <span>El empleado usará estas credenciales para iniciar sesión en el sistema.</span>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label class="field-label">Contraseña <span style="color:var(--red);">*</span></label>
+            <input type="password" name="password" class="form-input" required minlength="6" placeholder="Mínimo 6 caracteres">
+          </div>
+          <div class="field">
+            <label class="field-label">Confirmar contraseña <span style="color:var(--red);">*</span></label>
+            <input type="password" name="password2" class="form-input" required minlength="6" placeholder="Repite la contraseña">
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Acciones -->
-    <div style="display:flex;gap:.75rem;">
+    <div class="form-actions">
       <button type="submit" class="btn btn-primary">
         <i class="bi bi-person-plus"></i> Crear empleado
       </button>

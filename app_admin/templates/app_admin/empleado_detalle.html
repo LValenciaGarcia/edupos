@@ -1,22 +1,31 @@
 {% extends 'app_admin/base_admin.html' %}
 {% load static %}
+{% load filtros %}
 
-{% block title %}{{ empleado.perfil.user.get_full_name|default:get_full_name|default:empleado.perfil.user.email }}{% endblock %}
+{% block title %}{{ empleado.perfil.user.get_full_name|default:empleado.perfil.user.email }}{% endblock %}
 {% block page_title %}Detalle Empleado{% endblock %}
 {% block nav_empleados %}active{% endblock %}
 
 {% block extra_css %}
 <style>
-/* ── Detalle empleado ────────────────────────────────────────────────────── */
-
-/* Profile header */
+/* ── Hero ────────────────────────────────────────────────────────────────── */
 .emp-hero {
   background: var(--ivory); border: 1px solid var(--mist);
-  border-radius: var(--radius); padding: 1.4rem 1.5rem;
+  border-radius: 12px; padding: 1.5rem 1.6rem;
   display: flex; align-items: center; gap: 1.25rem;
+  position: relative; overflow: hidden;
 }
+.emp-hero::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+}
+.emp-hero.hc-cajero::before    { background: var(--amber); }
+.emp-hero.hc-atencion::before  { background: var(--sky); }
+.emp-hero.hc-supervisor::before{ background: var(--violet); }
+.emp-hero.hc-default::before   { background: var(--leaf); }
+
 .emp-hero-av {
-  width: 3.75rem; height: 3.75rem; border-radius: 50%;
+  width: 4rem; height: 4rem; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   font-family: var(--serif); font-size: 1.5rem; font-weight: 700;
   flex-shrink: 0; user-select: none;
@@ -26,29 +35,44 @@
 .av-supervisor{ background: var(--violet-tint); color: var(--violet-dark); }
 .av-default   { background: var(--leaf-tint);  color: var(--leaf-dark); }
 
-.emp-hero-name { font-family: var(--serif); font-size: 1.3rem; line-height: 1.2; }
-.emp-hero-sub  { font-size: var(--text-sm); color: var(--ash); margin-top: .2rem; }
-.emp-hero-tags { margin-top: .65rem; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.emp-hero-name { font-family: var(--serif); font-size: 1.25rem; line-height: 1.2; color: var(--ink); }
+.emp-hero-sub  { font-size: var(--text-sm); color: var(--ash); margin-top: .25rem; }
+.emp-hero-tags { margin-top: .65rem; display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; }
 
-/* Cargo pill */
-.cargo-pill {
+/* Cargo badge */
+.cargo-badge {
   display: inline-flex; align-items: center;
   padding: .22rem .65rem; border-radius: 99px;
-  font-size: var(--text-2xs); font-weight: 700;
-  letter-spacing: .07em; text-transform: uppercase;
+  font-size: .67rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
 }
-.cp-cajero    { background: var(--amber-tint); color: var(--amber-dark); }
-.cp-atencion  { background: var(--sky-tint);   color: var(--sky-dark); }
-.cp-supervisor{ background: var(--violet-tint); color: var(--violet-dark); }
-.cp-default   { background: var(--leaf-tint);  color: var(--leaf-dark); }
+.cb-cajero    { background: var(--amber-tint); color: var(--amber-dark); }
+.cb-atencion  { background: var(--sky-tint);   color: var(--sky-dark); }
+.cb-supervisor{ background: var(--violet-tint); color: var(--violet-dark); }
+.cb-default   { background: var(--leaf-tint);  color: var(--leaf-dark); }
 
-/* Form sections */
-.form-section { background: var(--ivory); border: 1px solid var(--mist); border-radius: var(--radius); overflow: hidden; }
+/* Status badge */
+.status-badge {
+  display: inline-flex; align-items: center; gap: .3rem;
+  padding: .22rem .65rem; border-radius: 99px;
+  font-size: .67rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+}
+.status-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+.sb-active   { background: var(--leaf-tint); color: var(--leaf-dark); }
+.sb-active   .status-dot { background: var(--leaf); }
+.sb-inactive { background: var(--red-tint);  color: #991b1b; }
+.sb-inactive .status-dot { background: var(--red); }
+
+/* ── Form sections ──────────────────────────────────────────────────────── */
+.form-section {
+  background: var(--ivory); border: 1px solid var(--mist);
+  border-radius: 12px; overflow: hidden;
+}
 .form-section-head {
-  padding: .75rem 1.25rem; border-bottom: 1px solid var(--mist);
-  font-size: var(--text-2xs); font-weight: 700; letter-spacing: .08em;
-  text-transform: uppercase; color: var(--stone);
+  padding: .8rem 1.25rem; border-bottom: 1px solid var(--mist);
+  font-size: .67rem; font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--ash);
   display: flex; align-items: center; gap: .45rem;
+  background: var(--cream);
 }
 .form-section-body { padding: 1.25rem; display: flex; flex-direction: column; gap: .9rem; }
 
@@ -56,7 +80,7 @@
 .sede-toggle {
   display: flex; align-items: center; gap: .75rem;
   padding: .55rem .9rem;
-  border: 1px solid var(--mist); border-radius: var(--radius);
+  border: 1px solid var(--mist); border-radius: 8px;
   cursor: pointer; background: var(--cream);
   transition: background .11s, border-color .11s;
   font-size: var(--text-sm);
@@ -65,36 +89,57 @@
 .sede-toggle input[type="checkbox"] { accent-color: var(--leaf); width: 1rem; height: 1rem; flex-shrink: 0; }
 .sede-toggle .sede-badge-inactive { font-size: var(--text-2xs); color: var(--ash); margin-left: .35rem; }
 
-/* Sidebar cards */
+html[data-theme="dark"] input[type="checkbox"] { accent-color: var(--leaf-bright) !important; }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) input[type="checkbox"] { accent-color: var(--leaf-bright) !important; }
+}
+
+/* ── Sidebar cards ──────────────────────────────────────────────────────── */
 .sb-card {
   background: var(--ivory); border: 1px solid var(--mist);
-  border-radius: var(--radius); padding: 1.1rem 1.25rem;
+  border-radius: 12px; overflow: hidden;
 }
 .sb-card-head {
-  font-size: var(--text-2xs); font-weight: 700; letter-spacing: .08em;
-  text-transform: uppercase; color: var(--stone); margin-bottom: .75rem;
+  padding: .8rem 1.25rem; border-bottom: 1px solid var(--mist);
+  font-size: .67rem; font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--ash);
+  display: flex; align-items: center; gap: .4rem;
+  background: var(--cream);
 }
+.sb-card-body { padding: 1.1rem 1.25rem; display: flex; flex-direction: column; gap: .65rem; }
 
 /* Info rows */
 .info-row {
   display: flex; align-items: center; justify-content: space-between;
-  font-size: var(--text-xs); padding: .22rem 0;
+  font-size: var(--text-xs); padding: .25rem 0;
   border-bottom: 1px solid var(--cream);
 }
 .info-row:last-child { border-bottom: none; }
 .info-row-label { color: var(--ash); }
-.info-row-val   { color: var(--stone); font-weight: 500; }
+.info-row-val   { color: var(--ink); font-weight: 500; }
 
-/* Empty ventas */
+/* ── Recent sales table ─────────────────────────────────────────────────── */
+.tbl { width: 100%; border-collapse: collapse; }
+.tbl thead th {
+  padding: .55rem .9rem; text-align: left;
+  font-size: .64rem; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--ash); background: var(--cream);
+  border-bottom: 1px solid var(--mist);
+}
+.tbl tbody tr { border-bottom: 1px solid var(--mist); transition: background .1s; }
+.tbl tbody tr:last-child { border-bottom: none; }
+.tbl tbody tr:hover { background: var(--cream); }
+.tbl td { padding: .6rem .9rem; vertical-align: middle; font-size: .81rem; }
+
 .ventas-empty {
-  padding: 1.75rem; text-align: center;
+  padding: 2rem; text-align: center;
   color: var(--ash); font-size: var(--text-sm);
 }
 </style>
 {% endblock %}
 
 {% block content %}
-<div style="display:grid;grid-template-columns:1fr 296px;gap:1.25rem;align-items:start;">
+<div style="display:grid;grid-template-columns:1fr 288px;gap:1.25rem;align-items:start;">
 
   <!-- Columna principal -->
   <div style="display:flex;flex-direction:column;gap:1.1rem;">
@@ -105,41 +150,39 @@
       </a>
     </div>
 
-    <!-- Hero del perfil -->
-    <div class="emp-hero">
-      {% with cargo=empleado.cargo %}
+    <!-- Hero -->
+    {% with cargo=empleado.cargo %}
+    <div class="emp-hero
+      {% if cargo == 'cajero' %}hc-cajero
+      {% elif cargo == 'atencion' %}hc-atencion
+      {% elif cargo == 'supervisor' %}hc-supervisor
+      {% else %}hc-default{% endif %}">
       <div class="emp-hero-av
         {% if cargo == 'cajero' %}av-cajero
         {% elif cargo == 'atencion' %}av-atencion
         {% elif cargo == 'supervisor' %}av-supervisor
         {% else %}av-default{% endif %}">
-        {{ empleado.perfil.user.get_full_name|default:get_full_name|default:empleado.perfil.user.email|slice:":1"|upper }}
+        {{ empleado.perfil.user.get_full_name|default:empleado.perfil.user.email|slice:":1"|upper }}
       </div>
-      {% endwith %}
-
       <div style="flex:1;min-width:0;">
         <div class="emp-hero-name">
-          {{ empleado.perfil.user.get_full_name|default:get_full_name|default:empleado.perfil.user.email }}
+          {{ empleado.perfil.user.get_full_name|default:empleado.perfil.user.email }}
         </div>
         <div class="emp-hero-sub">
-          {{ empleado.perfil.user.email }}
-          {% if empleado.documento %} · {{ empleado.documento }}{% endif %}
+          {{ empleado.perfil.user.email }}{% if empleado.documento %} · {{ empleado.documento }}{% endif %}
         </div>
         <div class="emp-hero-tags">
-          {% with cargo=empleado.cargo %}
-          <span class="cargo-pill
-            {% if cargo == 'cajero' %}cp-cajero
-            {% elif cargo == 'atencion' %}cp-atencion
-            {% elif cargo == 'supervisor' %}cp-supervisor
-            {% else %}cp-default{% endif %}">
+          <span class="cargo-badge
+            {% if cargo == 'cajero' %}cb-cajero
+            {% elif cargo == 'atencion' %}cb-atencion
+            {% elif cargo == 'supervisor' %}cb-supervisor
+            {% else %}cb-default{% endif %}">
             {{ empleado.get_cargo_display }}
           </span>
-          {% endwith %}
-          {% if empleado.perfil.activo %}
-            <span class="badge badge-activo">Activo</span>
-          {% else %}
-            <span class="badge badge-inactivo">Inactivo</span>
-          {% endif %}
+          <span class="status-badge {% if empleado.perfil.activo %}sb-active{% else %}sb-inactive{% endif %}">
+            <span class="status-dot"></span>
+            {% if empleado.perfil.activo %}Activo{% else %}Inactivo{% endif %}
+          </span>
           {% if empleado.es_global %}
           <span style="font-size:var(--text-xs);color:var(--sky);font-weight:600;">
             <i class="bi bi-globe"></i> Acceso global
@@ -148,6 +191,7 @@
         </div>
       </div>
     </div>
+    {% endwith %}
 
     <!-- Formulario edición -->
     <form method="post" style="display:flex;flex-direction:column;gap:1rem;">
@@ -157,8 +201,7 @@
       <!-- Datos personales -->
       <div class="form-section">
         <div class="form-section-head">
-          <i class="bi bi-person" style="color:var(--ash);"></i>
-          Datos personales
+          <i class="bi bi-person"></i> Datos personales
         </div>
         <div class="form-section-body">
           <div class="form-grid">
@@ -201,13 +244,12 @@
       <!-- Sedes y acceso -->
       <div class="form-section">
         <div class="form-section-head">
-          <i class="bi bi-geo-alt" style="color:var(--ash);"></i>
-          Sedes y acceso
+          <i class="bi bi-geo-alt"></i> Sedes y acceso
         </div>
         <div class="form-section-body">
           <div class="field">
             <label class="field-label" style="margin-bottom:.5rem;">Sedes asignadas</label>
-            <div style="display:flex;flex-direction:column;gap:.4rem;">
+            <div style="display:flex;flex-direction:column;gap:.35rem;">
               {% for s in sedes %}
               <label class="sede-toggle">
                 <input type="checkbox" name="sedes" value="{{ s.pk }}"
@@ -225,7 +267,7 @@
 
           <label style="display:flex;align-items:flex-start;gap:.75rem;cursor:pointer;
                         padding:.65rem .9rem;border:1px solid var(--mist);
-                        border-radius:var(--radius);background:var(--cream);">
+                        border-radius:8px;background:var(--cream);">
             <input type="checkbox" name="es_global"
                    {% if empleado.es_global %}checked{% endif %}
                    style="accent-color:var(--sky);width:1rem;height:1rem;flex-shrink:0;margin-top:.12rem;">
@@ -249,19 +291,18 @@
     <!-- Ventas recientes -->
     <div class="form-section">
       <div class="form-section-head">
-        <i class="bi bi-receipt" style="color:var(--ash);"></i>
-        Ventas recientes
+        <i class="bi bi-receipt"></i> Ventas recientes
       </div>
       {% if ventas_recientes %}
-      <div class="table-wrap">
-        <table class="table">
+      <div style="overflow-x:auto;">
+        <table class="tbl">
           <thead>
             <tr><th>Ticket</th><th>Pago</th><th>Total</th><th>Fecha</th></tr>
           </thead>
           <tbody>
             {% for v in ventas_recientes %}
             <tr>
-              <td style="font-family:var(--serif);font-weight:600;font-size:var(--text-sm);">{{ v.ticket }}</td>
+              <td style="font-family:var(--serif);font-weight:600;">{{ v.ticket }}</td>
               <td>
                 {% if v.tipo_pago == 'efectivo' %}
                   <span class="badge badge-ok">Efectivo</span>
@@ -271,7 +312,7 @@
                   <span class="badge" style="background:var(--violet-pale);color:var(--violet-dark);">Docente</span>
                 {% endif %}
               </td>
-              <td style="font-weight:600;">${{ v.total|floatformat:0 }}</td>
+              <td style="font-weight:600;">${{ v.total|miles }}</td>
               <td style="font-size:var(--text-xs);color:var(--ash);">{{ v.fecha|date:"d/m/y H:i" }}</td>
             </tr>
             {% endfor %}
@@ -293,37 +334,44 @@
 
     <!-- Acciones -->
     <div class="sb-card">
-      <div class="sb-card-head">Acciones</div>
-      <div style="display:flex;flex-direction:column;gap:.5rem;">
+      <div class="sb-card-head"><i class="bi bi-lightning"></i> Acciones</div>
+      <div class="sb-card-body">
         <a href="{% url 'app_admin:empleado_toggle' empleado.pk %}"
            class="btn {% if empleado.perfil.activo %}btn-ghost{% else %}btn-amber{% endif %} btn-sm"
-           onclick="return confirm('¿Confirmas el cambio de estado?')">
+           style="width:100%;justify-content:center;"
+           data-pa-confirm="¿Confirmas el cambio de estado?" data-pa-type="warn" data-pa-ok="Cambiar estado">
           <i class="bi bi-{% if empleado.perfil.activo %}pause-circle{% else %}play-circle{% endif %}"></i>
           {% if empleado.perfil.activo %}Desactivar cuenta{% else %}Activar cuenta{% endif %}
         </a>
       </div>
     </div>
 
-    <!-- Seguridad -->
+    <!-- Cambiar contraseña -->
     <div class="sb-card">
-      <div class="sb-card-head">Seguridad</div>
-      <p style="font-size:var(--text-xs);color:var(--ash);margin-bottom:.85rem;line-height:1.5;">
-        Genera una nueva contraseña temporal. La contraseña actual quedará inactiva de inmediato.
-      </p>
-      <form method="post">
-        {% csrf_token %}
-        <input type="hidden" name="accion" value="reset_password">
-        <button type="submit" class="btn btn-danger btn-sm" style="width:100%;"
-                onclick="return confirm('¿Restablecer la contraseña de este empleado?')">
-          <i class="bi bi-key"></i> Restablecer contraseña
-        </button>
-      </form>
+      <div class="sb-card-head"><i class="bi bi-key"></i> Cambiar contraseña</div>
+      <div class="sb-card-body">
+        <form method="post" style="display:flex;flex-direction:column;gap:.65rem;">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="reset_password">
+          <div class="field">
+            <label class="field-label" style="font-size:var(--text-xs);">Nueva contraseña</label>
+            <input type="password" name="nueva_password" class="form-input" minlength="6" placeholder="Mínimo 6 caracteres" required>
+          </div>
+          <div class="field">
+            <label class="field-label" style="font-size:var(--text-xs);">Confirmar contraseña</label>
+            <input type="password" name="nueva_password2" class="form-input" minlength="6" placeholder="Repite la contraseña" required>
+          </div>
+          <button type="submit" class="btn btn-danger btn-sm" style="width:100%;justify-content:center;">
+            <i class="bi bi-key"></i> Actualizar contraseña
+          </button>
+        </form>
+      </div>
     </div>
 
     <!-- Info técnica -->
     <div class="sb-card">
-      <div class="sb-card-head">Información</div>
-      <div>
+      <div class="sb-card-head"><i class="bi bi-info-circle"></i> Información</div>
+      <div class="sb-card-body" style="padding-top:.75rem;padding-bottom:.75rem;">
         <div class="info-row">
           <span class="info-row-label">ID empleado</span>
           <span class="info-row-val">#{{ empleado.pk }}</span>
@@ -338,9 +386,7 @@
         </div>
         <div class="info-row">
           <span class="info-row-label">Sedes</span>
-          <span class="info-row-val">
-            {% if empleado.es_global %}Global{% else %}{{ empleado.sedes.count }}{% endif %}
-          </span>
+          <span class="info-row-val">{% if empleado.es_global %}Global{% else %}{{ empleado.sedes.count }}{% endif %}</span>
         </div>
       </div>
     </div>

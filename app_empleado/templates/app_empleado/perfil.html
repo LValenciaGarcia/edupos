@@ -6,58 +6,66 @@
 {% block nav_perfil %}active{% endblock %}
 
 {% block content %}
-<div style="max-width:560px;display:flex;flex-direction:column;gap:1.25rem;">
+<div class="emp-page emp-narrow-sm">
 
-  <!-- Tarjeta de identidad -->
-  <div class="card anim-1" style="padding:1.5rem;">
-    <div style="display:flex;align-items:center;gap:1.1rem;margin-bottom:1.5rem;">
+  <div class="emp-hero">
+    <div style="display:flex;align-items:center;gap:1rem;">
       <div class="perfil-avatar">
-        {{ request.user.username|slice:":1"|upper }}
+        {{ request.user.first_name|slice:":1"|upper }}
       </div>
       <div>
-        <div style="font-family:var(--serif);font-size:1.2rem;color:var(--ink);">
-          {{ request.user.get_full_name|default:request.user.email }}
-        </div>
-        <div style="color:var(--emp);font-size:var(--text-xs);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:.15rem;">
-          {{ empleado.get_cargo_display }}
+        <div class="emp-hero-eyebrow"><i class="bi bi-person"></i> Cuenta</div>
+        <div class="emp-hero-title">{{ request.user.get_full_name|default:request.user.email }}</div>
+        <div class="emp-hero-sub">{{ empleado.get_cargo_display }}
+          {% if empleado.es_global %} &mdash; Acceso global{% endif %}
         </div>
       </div>
     </div>
+  </div>
 
-    <div style="display:flex;flex-direction:column;gap:0;">
-      <div class="perfil-info-row">
-        <span class="perfil-info-label"><i class="bi bi-person" style="margin-right:.35rem;"></i>Usuario</span>
-        <span class="perfil-info-val">{{ request.user.email }}</span>
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Información del perfil</span>
+    </div>
+    <div style="padding:0 1.25rem;">
+      <div class="perfil-row">
+        <span class="perfil-row-label"><i class="bi bi-person"></i> Usuario</span>
+        <span class="perfil-row-val">{{ request.user.email }}</span>
       </div>
-      <div class="perfil-info-row">
-        <span class="perfil-info-label"><i class="bi bi-card-text" style="margin-right:.35rem;"></i>Documento</span>
-        <span class="perfil-info-val">{{ empleado.documento|default:"—" }}</span>
+      <div class="perfil-row">
+        <span class="perfil-row-label"><i class="bi bi-card-text"></i> Documento</span>
+        <span class="perfil-row-val">{{ empleado.documento|default:"—" }}</span>
       </div>
-      <div class="perfil-info-row">
-        <span class="perfil-info-label"><i class="bi bi-geo-alt" style="margin-right:.35rem;"></i>Sedes</span>
-        <span class="perfil-info-val">
+      <div class="perfil-row">
+        <span class="perfil-row-label"><i class="bi bi-briefcase"></i> Cargo</span>
+        <span class="perfil-row-val">{{ empleado.get_cargo_display }}</span>
+      </div>
+      <div class="perfil-row">
+        <span class="perfil-row-label"><i class="bi bi-geo-alt"></i> Sedes</span>
+        <span class="perfil-row-val">
           {% if empleado.es_global %}
-            <span style="color:var(--emp);">Acceso global</span>
+            <span style="color:var(--leaf);">Acceso global</span>
           {% else %}
             {% for s in empleado.sedes.all %}{{ s.nombre }}{% if not forloop.last %}, {% endif %}{% empty %}<span style="color:var(--ash);">Sin sede</span>{% endfor %}
           {% endif %}
         </span>
       </div>
-      <div class="perfil-info-row">
-        <span class="perfil-info-label"><i class="bi bi-telephone" style="margin-right:.35rem;"></i>Teléfono</span>
-        <span class="perfil-info-val">{{ request.user.perfil.telefono|default:"—" }}</span>
+      <div class="perfil-row">
+        <span class="perfil-row-label"><i class="bi bi-telephone"></i> Teléfono</span>
+        <span class="perfil-row-val">{{ request.user.perfil.telefono|default:"—" }}</span>
       </div>
-      <div class="perfil-info-row" style="border:none;">
-        <span class="perfil-info-label"><i class="bi bi-envelope" style="margin-right:.35rem;"></i>Correo</span>
-        <span class="perfil-info-val">{{ request.user.email|default:"—" }}</span>
+      <div class="perfil-row">
+        <span class="perfil-row-label"><i class="bi bi-envelope"></i> Correo</span>
+        <span class="perfil-row-val">{{ request.user.email|default:"—" }}</span>
       </div>
     </div>
   </div>
 
-  <!-- Editar -->
-  <div class="card anim-2">
-    <div class="card-head">Actualizar datos de contacto</div>
-    <form method="post" style="padding:1.25rem;display:flex;flex-direction:column;gap:.75rem;">
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Actualizar datos de contacto</span>
+    </div>
+    <form method="post" style="padding:1.25rem;display:flex;flex-direction:column;gap:.85rem;">
       {% csrf_token %}
       <div class="field">
         <label class="field-label">Teléfono</label>

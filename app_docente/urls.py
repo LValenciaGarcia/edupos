@@ -45,6 +45,9 @@ urlpatterns = [
     # ── Perfil ─────────────────────────────────────────────────────────────
     path('perfil/',                       views.perfil,              name='perfil'),
 
+    # ── Mi QR (carnet digital) ─────────────────────────────────────────────
+    path('qr/',                           views.mi_qr,               name='mi_qr'),
+
     # ── API Notificaciones ─────────────────────────────────────────────────
     path('api/notificaciones/',           views.api_notificaciones,  name='api_notificaciones'),
 ]

@@ -1,14 +1,116 @@
 {% extends 'app_empleado/base_empleado.html' %}
 {% load static %}
+{% load filtros %}
 
 {% block title %}Caja{% endblock %}
-{% block page_title %}Caja / POS{% endblock %}
+{% block page_title %}Caja{% endblock %}
 {% block nav_caja %}active{% endblock %}
 
 {% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="{% static 'js/qr_scanner.js' %}"></script>
 <style>
   /* Caja ocupa todo el alto disponible */
   .page-body { padding: 0.75rem; }
+
+  /* ── Botón QR en barra de búsqueda cliente ── */
+  .cliente-search-row { display:flex; gap:.4rem; align-items:stretch; }
+  .cliente-search-row .cliente-search-wrap { flex:1; }
+  .btn-qr-toggle {
+    background: var(--violet, #7c3aed);
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    padding: 0 .75rem;
+    font-size: 1.1rem;
+    cursor: pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition: filter .15s;
+  }
+  .btn-qr-toggle:hover { filter: brightness(1.1); }
+  .btn-qr-toggle:disabled { opacity:.5; cursor:not-allowed; }
+
+  /* ── Flash animación cliente identificado por QR ── */
+  @keyframes qrFlash {
+    0%   { box-shadow: 0 0 0 0 rgba(22,101,52,.0), background-color: transparent; }
+    15%  { box-shadow: 0 0 0 6px rgba(22,101,52,.35); background-color: #dcfce7; }
+    60%  { box-shadow: 0 0 0 4px rgba(22,101,52,.2); background-color: #f0fdf4; }
+    100% { box-shadow: none; background-color: transparent; }
+  }
+  .cliente-selected.qr-identified {
+    animation: qrFlash 1.4s ease-out forwards;
+    border-radius: 8px;
+  }
+
+  /* ── Modal escáner QR ── */
+  .qr-overlay {
+    position:fixed; inset:0; background:rgba(15,15,14,.55);
+    display:none; align-items:center; justify-content:center;
+    z-index:1100; padding:1rem;
+  }
+  .qr-overlay.open { display:flex; }
+  .qr-box {
+    background: var(--ivory, #fff);
+    border-radius: 14px;
+    padding: 1.25rem;
+    max-width: 460px; width:100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,.3);
+    position: relative;
+  }
+  .qr-title { font-family:var(--serif, serif); font-size:1.2rem; margin-bottom:.2rem; }
+  .qr-sub   { color:var(--ash, #888); font-size:.82rem; margin-bottom:.85rem; }
+  .qr-video-wrap {
+    position:relative; width:100%; aspect-ratio:1/1;
+    background:#000; border-radius:10px; overflow:hidden;
+    margin-bottom:.75rem;
+  }
+  .qr-video-wrap video { width:100%; height:100%; object-fit:cover; display:block; }
+  .qr-video-wrap canvas { display:none; }
+  .qr-frame {
+    position:absolute; inset:14%;
+    border:3px solid rgba(255,255,255,.85);
+    border-radius:12px;
+    box-shadow:0 0 0 9999px rgba(0,0,0,.35);
+    pointer-events:none;
+  }
+  .qr-status { font-size:.85rem; min-height:1.4rem; margin-bottom:.85rem; color:var(--stone, #555); text-align:center; }
+  .qr-status.ok    { color:#166534; font-weight:600; }
+  .qr-status.error { color:#991b1b; font-weight:600; }
+  .qr-actions { display:flex; gap:.5rem; }
+
+  /* ── Capa de éxito sobre el modal escáner ── */
+  .qr-success-veil {
+    position:absolute; inset:0;
+    background: rgba(255,255,255,.96);
+    display:none; flex-direction:column; align-items:center; justify-content:center;
+    border-radius: 14px;
+    text-align:center; padding:1.25rem;
+    animation: qrSuccessFade .25s ease-out;
+  }
+  .qr-success-veil.show { display:flex; }
+  .qr-success-icon {
+    width: 5rem; height: 5rem; border-radius: 50%;
+    background: #16a34a; color: #fff;
+    display:flex; align-items:center; justify-content:center;
+    font-size: 2.6rem; margin-bottom:.75rem;
+    animation: qrSuccessPop .35s cubic-bezier(.2,1.4,.4,1) both;
+  }
+  .qr-success-title {
+    font-family: var(--serif, serif); font-size: 1.35rem;
+    color: #166534; margin-bottom:.25rem;
+  }
+  .qr-success-name {
+    font-size: 1.05rem; font-weight:700; color:#0f0f0e;
+  }
+  .qr-success-meta {
+    font-size:.8rem; color:#666; margin-top:.25rem;
+  }
+  @keyframes qrSuccessFade { from { opacity:0; } to { opacity:1; } }
+  @keyframes qrSuccessPop {
+    0%   { transform: scale(0); }
+    70%  { transform: scale(1.1); }
+    100% { transform: scale(1); }
+  }
 </style>
 {% endblock %}
 
@@ -52,12 +154,10 @@
         <div class="pos-item-badge" id="badge-{{ p.pk }}">0</div>
         <div class="pos-item-body">
           <div class="pos-item-name">{{ p.nombre }}</div>
-          <div class="pos-item-price">${{ p.precio_venta|floatformat:0 }}</div>
-          {% if p.tipo == 'simple' %}
+          <div class="pos-item-price">${{ p.precio_venta|miles }}</div>
           <div class="pos-item-stock">
             {% if p.sin_stock %}Agotado{% else %}Stock: {{ p.stock }}{% endif %}
           </div>
-          {% endif %}
         </div>
       </div>
       {% endfor %}
@@ -110,21 +210,28 @@
             <button class="btn-clear-cliente" onclick="limpiarCliente()"><i class="bi bi-x"></i></button>
           </div>
         </div>
-        <div id="clienteSearchWrap" class="cliente-search-wrap">
-          <input type="text" class="cliente-search-input" id="clienteInput"
-                 placeholder="Buscar por nombre o código..."
-                 oninput="buscarCliente(this.value)" autocomplete="off">
-          <div class="cliente-results" id="clienteResults"></div>
+        <div class="cliente-search-row" id="clienteSearchWrap">
+          <div class="cliente-search-wrap" style="position:relative;">
+            <input type="text" class="cliente-search-input" id="clienteInput"
+                   placeholder="Buscar por nombre o código..."
+                   oninput="buscarCliente(this.value)" autocomplete="off">
+            <div class="cliente-results" id="clienteResults"></div>
+          </div>
+          <button class="btn-qr-toggle" id="btnQR" type="button"
+                  onclick="abrirEscanerQR()" title="Escanear carnet QR">
+            <i class="bi bi-qr-code-scan"></i>
+          </button>
         </div>
       </div>
 
       <!-- Calculadora de cambio (solo efectivo) -->
-      <div id="cambioWrap" style="display:none;">
+      <div id="cambioWrap">
         <div style="font-size:var(--text-xs);color:var(--stone);font-weight:600;margin-bottom:.25rem;">Recibido del cliente</div>
         <div style="display:flex;gap:.35rem;align-items:center;">
           <span style="font-size:var(--text-sm);color:var(--stone);">$</span>
-          <input type="number" id="efectivoRecibido" class="form-input"
-                 placeholder="0" min="0" oninput="calcularCambio()"
+          <input type="text" id="efectivoRecibido" class="form-input"
+                 placeholder="0" inputmode="numeric"
+                 oninput="fmtEfectivo(this);calcularCambio()"
                  style="font-size:var(--text-sm);padding:.35rem .6rem;flex:1;">
         </div>
         <div id="cambioDisplay" style="display:none;" class="cambio-display">
@@ -145,8 +252,33 @@
 
 </div>
 
+<!-- ══ MODAL ESCÁNER QR ══ -->
+<div class="qr-overlay" id="qrOverlay">
+  <div class="qr-box">
+    <div class="qr-title">Escanear carnet</div>
+    <div class="qr-sub">Apunta la cámara al QR del estudiante o docente.</div>
+    <div class="qr-video-wrap">
+      <video id="qrVideo" playsinline muted></video>
+      <canvas id="qrCanvas"></canvas>
+      <div class="qr-frame"></div>
+    </div>
+    <div class="qr-status" id="qrStatus">Iniciando cámara…</div>
+    <div class="qr-actions">
+      <button class="btn btn-ghost btn-full" onclick="cerrarQR()">Cancelar</button>
+    </div>
+
+    <!-- Capa de confirmación al detectar QR -->
+    <div class="qr-success-veil" id="qrSuccessVeil">
+      <div class="qr-success-icon"><i class="bi bi-check-lg"></i></div>
+      <div class="qr-success-title">Usuario detectado</div>
+      <div class="qr-success-name" id="qrSuccessName"></div>
+      <div class="qr-success-meta" id="qrSuccessMeta"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ══ RECIBO MODAL ══ -->
-<div class="recibo-overlay" id="reciboOverlay">
+<div class="recibo-overlay" id="reciboOverlay" onclick="if(event.target===this)cerrarRecibo()">
   <div class="recibo-box">
     <div class="recibo-head">
       <div class="recibo-check"><i class="bi bi-check-lg"></i></div>
@@ -161,34 +293,30 @@
   </div>
 </div>
 {% endblock %}
-
 {% block extra_js %}
 <script>
 const CSRF = '{{ csrf_token }}';
-const URL_VENTA  = '{% url "app_empleado:procesar_venta" %}';
-const URL_CLIENTE = '{% url "app_empleado:buscar_cliente" %}';
+const URL_VENTA                = '{% url "app_empleado:procesar_venta" %}';
+const URL_CLIENTE              = '{% url "app_empleado:buscar_cliente" %}';
+const URL_CLIENTE_CODIGO       = '{% url "app_empleado:cliente_por_codigo" %}';
+const URL_CLIENTE_RESTRICCIONES= '{% url "app_empleado:cliente_restricciones" %}';
 
-// ── Estado ────────────────────────────────────────────────────────────────────
-let carrito     = {};   // { id: { nombre, precio, cantidad } }
+// Mapa de alérgenos por producto: { productId: ['gluten', 'lacteos', ...] }
+const ALERGENOS_MAP = {{ alergenos_map|safe }};
+
+// ── Estado ─────────────────────────────────────────────────────────────────
+let carrito     = {};
 let tipoPago    = 'efectivo';
-let cliente     = null; // { id, nombre, tipo, saldo, credito? }
+let cliente     = null;
 let tipoCliente = 'estudiante';
 let catActiva   = 'todos';
 
-// Mostrar calculadora de cambio al inicio (efectivo es el default)
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('cambioWrap').style.display = 'block';
-});
-
-// ── Catálogo ──────────────────────────────────────────────────────────────────
+// ── Catálogo ───────────────────────────────────────────────────────────────
 function filtrarProductos() {
-  const q    = document.getElementById('posSearch').value.toLowerCase();
-  const items = document.querySelectorAll('.pos-item');
-  items.forEach(item => {
-    const nombre = item.dataset.nombre.toLowerCase();
-    const cat    = item.dataset.cat;
-    const matchQ = nombre.includes(q);
-    const matchC = catActiva === 'todos' || cat === catActiva;
+  const q = document.getElementById('posSearch').value.toLowerCase();
+  document.querySelectorAll('.pos-item').forEach(item => {
+    const matchQ = item.dataset.nombre.toLowerCase().includes(q);
+    const matchC = catActiva === 'todos' || item.dataset.cat === catActiva;
     item.style.display = (matchQ && matchC) ? '' : 'none';
   });
 }
@@ -200,16 +328,17 @@ function filtrarCategoria(btn, cat) {
   filtrarProductos();
 }
 
-// ── Carrito ───────────────────────────────────────────────────────────────────
+// ── Carrito ────────────────────────────────────────────────────────────────
 function agregarAlCarrito(id) {
-  const el      = document.querySelector(`.pos-item[data-id="${id}"]`);
-  const nombre  = el.dataset.nombre;
-  const precio  = parseFloat(el.dataset.precio);
-  const stock   = parseInt(el.dataset.stock);
-  const tipo    = el.dataset.tipo;
+  const el = document.querySelector(`.pos-item[data-id="${id}"]`);
+  if (el.classList.contains('pos-restringido')) return;
+  const nombre = el.dataset.nombre;
+  const precio = parseFloat(el.dataset.precio);
+  const stock  = parseInt(el.dataset.stock);
+  const tipo   = el.dataset.tipo;
 
   if (carrito[id]) {
-    if (tipo === 'simple' && carrito[id].cantidad >= stock) return;
+    if (carrito[id].cantidad >= stock) return;
     carrito[id].cantidad++;
   } else {
     carrito[id] = { nombre, precio, cantidad: 1, stock, tipo };
@@ -221,7 +350,7 @@ function cambiarCantidad(id, delta) {
   if (!carrito[id]) return;
   carrito[id].cantidad += delta;
   if (carrito[id].cantidad <= 0) { delete carrito[id]; }
-  else if (carrito[id].tipo === 'simple' && carrito[id].cantidad > carrito[id].stock) {
+  else if (carrito[id].cantidad > carrito[id].stock) {
     carrito[id].cantidad = carrito[id].stock;
   }
   renderCarrito();
@@ -236,19 +365,23 @@ function fmtPeso(n) {
   return '$' + Math.round(n).toLocaleString('es-CO');
 }
 
+function fmtEfectivo(el) {
+  const raw = el.value.replace(/\./g, '').replace(/[^\d]/g, '');
+  if (!raw) { el.value = ''; return; }
+  el.value = parseInt(raw, 10).toLocaleString('es-CO');
+}
+
+function parsePesos(s) {
+  return parseFloat(String(s).replace(/\./g, '')) || 0;
+}
+
 function renderCarrito() {
-  const ids    = Object.keys(carrito);
-  const total  = ids.reduce((s, id) => s + carrito[id].precio * carrito[id].cantidad, 0);
-  const items  = document.getElementById('cartItems');
-  const empty  = document.getElementById('cartEmpty');
-  const count  = document.getElementById('cartCount');
-  const totEl  = document.getElementById('cartTotal');
-  const btnCob = document.getElementById('btnCobrar');
+  const ids   = Object.keys(carrito);
+  const total = ids.reduce((s, id) => s + carrito[id].precio * carrito[id].cantidad, 0);
 
-  count.textContent = ids.reduce((s, id) => s + carrito[id].cantidad, 0);
-  totEl.textContent = fmtPeso(total);
+  document.getElementById('cartCount').textContent = ids.reduce((s, id) => s + carrito[id].cantidad, 0);
+  document.getElementById('cartTotal').textContent = fmtPeso(total);
 
-  // Badges en productos
   document.querySelectorAll('.pos-item').forEach(el => {
     const id  = el.dataset.id;
     const bdg = document.getElementById('badge-' + id);
@@ -261,14 +394,17 @@ function renderCarrito() {
     }
   });
 
+  const items  = document.getElementById('cartItems');
+  const emptyEl = document.getElementById('cartEmpty');
+
   if (ids.length === 0) {
     items.innerHTML = '';
-    empty.style.display = 'flex';
-    btnCob.disabled = true;
+    if (emptyEl) emptyEl.style.display = 'flex';
+    document.getElementById('btnCobrar').disabled = true;
     return;
   }
 
-  empty.style.display = 'none';
+  if (emptyEl) emptyEl.style.display = 'none';
   items.innerHTML = ids.map(id => {
     const it = carrito[id];
     return `<div class="cart-row">
@@ -283,10 +419,10 @@ function renderCarrito() {
     </div>`;
   }).join('');
 
-  btnCob.disabled = (tipoPago !== 'efectivo' && !cliente);
+  document.getElementById('btnCobrar').disabled = (tipoPago !== 'efectivo' && !cliente);
 }
 
-// ── Tipo de pago ──────────────────────────────────────────────────────────────
+// ── Tipo de pago ───────────────────────────────────────────────────────────
 function selPago(btn, pago) {
   tipoPago = pago;
   document.querySelectorAll('.pago-tab').forEach(b => b.classList.remove('active'));
@@ -310,28 +446,80 @@ function selPago(btn, pago) {
   renderCarrito();
 }
 
-// ── Calculadora de cambio ─────────────────────────────────────────────────────
+// ── Calculadora de cambio ──────────────────────────────────────────────────
 function calcularCambio() {
-  const ids    = Object.keys(carrito);
-  const total  = ids.reduce((s, id) => s + carrito[id].precio * carrito[id].cantidad, 0);
-  const recib  = parseFloat(document.getElementById('efectivoRecibido').value) || 0;
+  const ids   = Object.keys(carrito);
+  const total = ids.reduce((s, id) => s + carrito[id].precio * carrito[id].cantidad, 0);
+  const recib = parsePesos(document.getElementById('efectivoRecibido').value);
   const dispEl = document.getElementById('cambioDisplay');
   const valEl  = document.getElementById('cambioVal');
 
   if (recib > 0) {
     const cambio = recib - total;
-    valEl.textContent = fmtPeso(Math.max(0, cambio));
+    valEl.textContent = cambio >= 0 ? fmtPeso(cambio) : '— falta ' + fmtPeso(Math.abs(cambio));
     valEl.style.color = cambio >= 0 ? 'var(--leaf)' : 'var(--red)';
-    if (cambio < 0) {
-      valEl.textContent = '— falta ' + fmtPeso(Math.abs(cambio));
-    }
     dispEl.style.display = 'flex';
   } else {
     dispEl.style.display = 'none';
   }
 }
 
-// ── Búsqueda cliente ──────────────────────────────────────────────────────────
+// ── Filtro de catálogo por alergias / restricciones ───────────────────────
+
+function aplicarFiltroCliente(c) {
+  if (!c || c.tipo !== 'estudiante') return;
+
+  const restricProd = new Set((c.restricciones_productos || []).map(Number));
+  const restricCat  = new Set(c.restricciones_categorias || []);
+  const alergias    = (c.alergias || []).filter(a => a.alergeno_codigo);
+
+  document.querySelectorAll('.pos-item').forEach(el => {
+    const id        = parseInt(el.dataset.id);
+    const cat       = el.dataset.cat;
+    const prodAlerg = ALERGENOS_MAP[id] || [];
+    const body      = el.querySelector('.pos-item-body');
+
+    // Limpiar estado previo
+    el.querySelector('.pos-item-restriction')?.remove();
+    el.classList.remove('pos-restringido', 'pos-alergia');
+
+    // 1. Producto o categoría prohibidos por el padre
+    if (restricProd.has(id) || restricCat.has(cat)) {
+      el.classList.add('pos-restringido');
+      if (body) {
+        const lbl = document.createElement('div');
+        lbl.className = 'pos-item-restriction restriction-block';
+        lbl.innerHTML = '<i class="bi bi-slash-circle-fill"></i> Prohibido';
+        lbl.title = restricCat.has(cat) ? 'Categoría restringida por el padre' : 'Producto restringido por el padre';
+        body.appendChild(lbl);
+      }
+      return;
+    }
+
+    // 2. Producto contiene alérgenos del estudiante → también prohibido
+    const coinciden = alergias.filter(a => prodAlerg.includes(a.alergeno_codigo));
+    if (coinciden.length > 0) {
+      el.classList.add('pos-restringido');
+      if (body) {
+        const lbl = document.createElement('div');
+        lbl.className = 'pos-item-restriction restriction-block';
+        const nombres = coinciden.map(a => a.nombre).join(', ');
+        lbl.innerHTML = '<i class="bi bi-slash-circle-fill"></i> Prohibido';
+        lbl.title = `Contiene: ${nombres}`;
+        body.appendChild(lbl);
+      }
+    }
+  });
+}
+
+function limpiarFiltroCliente() {
+  document.querySelectorAll('.pos-item').forEach(el => {
+    el.querySelector('.pos-item-restriction')?.remove();
+    el.classList.remove('pos-restringido', 'pos-alergia');
+  });
+}
+
+// ── Búsqueda cliente ───────────────────────────────────────────────────────
 let buscarTimer = null;
 function buscarCliente(q) {
   clearTimeout(buscarTimer);
@@ -357,18 +545,31 @@ function buscarCliente(q) {
   }, 280);
 }
 
-function selCliente(c) {
+async function selCliente(c) {
   cliente = { ...c, tipo: tipoCliente };
   document.getElementById('clienteResults').classList.remove('open');
   document.getElementById('clienteSearchWrap').style.display = 'none';
   document.getElementById('clienteSelectedWrap').style.display = 'block';
   document.getElementById('clienteSelectedName').textContent = c.nombre;
-
   const saldoDisp = tipoCliente === 'estudiante'
     ? `Saldo: ${fmtPeso(c.saldo)}`
     : `Saldo: ${fmtPeso(c.saldo)} · Crédito: ${fmtPeso(c.credito||0)}`;
   document.getElementById('clienteSelectedSaldo').textContent = saldoDisp;
 
+  // Si el cliente viene de búsqueda (sin datos de restricciones), los pedimos
+  if (tipoCliente === 'estudiante' && !('alergias' in cliente)) {
+    try {
+      const r = await fetch(`${URL_CLIENTE_RESTRICCIONES}?tipo=estudiante&id=${cliente.id}`);
+      const d = await r.json();
+      if (d.ok) {
+        cliente.alergias                = d.alergias;
+        cliente.restricciones_productos = d.restricciones_productos;
+        cliente.restricciones_categorias= d.restricciones_categorias;
+      }
+    } catch (_) {}
+  }
+
+  aplicarFiltroCliente(cliente);
   renderCarrito();
 }
 
@@ -378,6 +579,7 @@ function limpiarCliente() {
   document.getElementById('clienteResults').classList.remove('open');
   document.getElementById('clienteSearchWrap').style.display = 'block';
   document.getElementById('clienteSelectedWrap').style.display = 'none';
+  limpiarFiltroCliente();
   renderCarrito();
 }
 
@@ -387,7 +589,7 @@ document.addEventListener('click', function(e) {
   if (res && wrap && !wrap.contains(e.target)) res.classList.remove('open');
 });
 
-// ── Procesar venta ────────────────────────────────────────────────────────────
+// ── Procesar venta ─────────────────────────────────────────────────────────
 async function procesarVenta() {
   const ids = Object.keys(carrito);
   if (ids.length === 0) return;
@@ -397,10 +599,10 @@ async function procesarVenta() {
   btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Procesando...';
 
   const payload = {
-    items:       ids.map(id => ({ id: parseInt(id), cantidad: carrito[id].cantidad })),
-    tipo_pago:   tipoPago,
-    nota:        document.getElementById('notaInput').value,
-    cliente_id:  cliente ? cliente.id : null,
+    items:        ids.map(id => ({ id: parseInt(id), cantidad: carrito[id].cantidad })),
+    tipo_pago:    tipoPago,
+    nota:         document.getElementById('notaInput').value,
+    cliente_id:   cliente ? cliente.id : null,
     tipo_cliente: tipoCliente,
   };
 
@@ -411,17 +613,16 @@ async function procesarVenta() {
       body:    JSON.stringify(payload),
     });
     const d = await r.json();
-
     if (d.ok) {
       mostrarRecibo(d);
       limpiarCarrito();
     } else {
-      alert('Error: ' + d.error);
+      paShowToast('Error: ' + d.error, 'error');
       btn.disabled = false;
       btn.innerHTML = '<i class="bi bi-check2-circle"></i> Cobrar';
     }
   } catch (e) {
-    alert('Error de conexión. Intenta nuevamente.');
+    paShowToast('Error de conexión. Intenta nuevamente.', 'error');
     btn.disabled = false;
     btn.innerHTML = '<i class="bi bi-check2-circle"></i> Cobrar';
   }
@@ -442,35 +643,48 @@ function limpiarCarrito() {
   renderCarrito();
 }
 
-// ── Recibo ────────────────────────────────────────────────────────────────────
+// ── Recibo ─────────────────────────────────────────────────────────────────
+function actualizarStockUI() {
+  Object.keys(carrito).forEach(id => {
+    const it = carrito[id];
+    const el = document.querySelector(`.pos-item[data-id="${id}"]`);
+    if (!el) return;
+    const newStock = parseInt(el.dataset.stock) - it.cantidad;
+    el.dataset.stock = newStock;
+    const stockEl = el.querySelector('.pos-item-stock');
+    if (newStock <= 0) {
+      el.classList.add('agotado');
+      if (stockEl) stockEl.textContent = 'Agotado';
+    } else {
+      if (stockEl) stockEl.textContent = `Stock: ${newStock}`;
+    }
+  });
+}
+
 function mostrarRecibo(d) {
+  actualizarStockUI();
   const pagoLabel = { efectivo: 'Efectivo', cuenta_estudiante: 'Cuenta Estudiante', cuenta_docente: 'Cuenta Docente' };
-
   document.getElementById('reciboTicketLabel').textContent = d.ticket;
-
   const detallesHtml = (d.detalles || []).map(item =>
     `<div class="recibo-row">
       <span class="recibo-row-label">${item.nombre} ×${item.cantidad}</span>
       <span class="recibo-row-val">${fmtPeso(item.subtotal)}</span>
     </div>`
   ).join('');
-
   let cambioHtml = '';
   if (tipoPago === 'efectivo') {
-    const recib = parseFloat(document.getElementById('efectivoRecibido').value) || 0;
+    const recib = parsePesos(document.getElementById('efectivoRecibido').value);
     if (recib > 0) {
       const cambio = recib - d.total;
       cambioHtml = `<div class="recibo-row" style="margin-top:.25rem;">
-        <span class="recibo-row-label">Recibido</span>
-        <span class="recibo-row-val">${fmtPeso(recib)}</span>
+        <span class="recibo-row-label">Recibido</span><span class="recibo-row-val">${fmtPeso(recib)}</span>
       </div>
       <div class="recibo-row">
         <span class="recibo-row-label">Cambio</span>
-        <span class="recibo-row-val" style="color:var(--leaf);font-weight:700;">${fmtPeso(Math.max(0, cambio))}</span>
+        <span class="recibo-row-val" style="color:var(--leaf);font-weight:700;">${fmtPeso(Math.max(0,cambio))}</span>
       </div>`;
     }
   }
-
   document.getElementById('reciboBody').innerHTML = `
     ${detallesHtml}
     <div class="recibo-row" style="border-top:1px solid var(--mist);padding-top:.5rem;margin-top:.25rem;">
@@ -488,8 +702,154 @@ function mostrarRecibo(d) {
 
 function cerrarRecibo() {
   document.getElementById('reciboOverlay').classList.remove('open');
-  // Recargar para reflejar stock actualizado
-  setTimeout(() => location.reload(), 100);
+}
+
+window.addEventListener('pageshow', function(e) {
+  if (e.persisted) document.getElementById('reciboOverlay').classList.remove('open');
+});
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') cerrarRecibo();
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// ESCÁNER QR — BarcodeDetector nativo con fallback automático a jsQR
+// ══════════════════════════════════════════════════════════════════════════
+let qrScanner     = null;   // instancia de QRScanner (qr_scanner.js)
+let qrLockBusy    = false;
+let qrLastScanned = '';
+let qrLastAt      = 0;
+
+function setQRStatus(txt, cls) {
+  const el = document.getElementById('qrStatus');
+  el.textContent = txt;
+  el.className = 'qr-status' + (cls ? ' ' + cls : '');
+}
+
+function mostrarVeloExito(nombre, meta) {
+  document.getElementById('qrSuccessName').textContent = nombre || '';
+  document.getElementById('qrSuccessMeta').textContent = meta || '';
+  document.getElementById('qrSuccessVeil').classList.add('show');
+}
+
+function ocultarVeloExito() {
+  document.getElementById('qrSuccessVeil').classList.remove('show');
+}
+
+async function abrirEscanerQR() {
+  qrLockBusy = false;
+  ocultarVeloExito();
+  document.getElementById('qrOverlay').classList.add('open');
+  setQRStatus('Iniciando cámara…');
+
+  const videoEl  = document.getElementById('qrVideo');
+  const canvasEl = document.getElementById('qrCanvas');
+
+  // Detener escáner anterior si quedó activo
+  if (qrScanner) { try { qrScanner.stop(); } catch(_){} qrScanner = null; }
+
+  qrScanner = new QRScanner({
+    videoEl,
+    canvasEl,
+    facingMode: 'environment',
+    onDetect: (rawData) => {
+      if (qrLockBusy) return;
+      const codigo = (rawData || '').trim();
+      if (!codigo) return;
+      const now = Date.now();
+      if (codigo === qrLastScanned && (now - qrLastAt) < 1500) return;
+      qrLastScanned = codigo;
+      qrLastAt = now;
+      onQRDetected(codigo);
+    },
+    onError: (err) => {
+      setQRStatus('Error de cámara: ' + (err.message || err), 'error');
+    },
+  });
+
+  try {
+    await qrScanner.start();
+    setQRStatus('Apunta al QR del carnet…');
+  } catch (e) {
+    setQRStatus(e.message || 'No se pudo iniciar el escáner.', 'error');
+    qrScanner = null;
+  }
+}
+
+async function onQRDetected(codigo) {
+  if (qrLockBusy) return;
+  qrLockBusy = true;
+
+  // Pausar el escaneo mientras consultamos
+  if (qrScanner) { try { qrScanner.stop(); } catch(_){} }
+
+  setQRStatus('Buscando usuario…');
+  try {
+    const r = await fetch(`${URL_CLIENTE_CODIGO}?codigo=${encodeURIComponent(codigo)}`);
+    const d = await r.json();
+
+    if (!d.ok) {
+      setQRStatus(d.error || 'No se encontró ningún usuario.', 'error');
+      // Reanudar escáner para reintentar
+      qrLockBusy = false;
+      if (qrScanner) { try { await qrScanner.start(); } catch(_){} }
+      else { await abrirEscanerQR(); }
+      return;
+    }
+
+    // Auto-cambiar pestaña de pago según el tipo detectado.
+    // tipoCliente se fija ANTES de llamar selPago para que limpiarCliente()
+    // (llamado internamente) ya use el tipo correcto.
+    const tipoDetectado = d.tipo || 'estudiante';
+    tipoCliente = tipoDetectado;
+
+    if (tipoPago === 'efectivo') {
+      const pestañaSel = tipoDetectado === 'docente' ? 'cuenta_docente' : 'cuenta_estudiante';
+      const btn = document.querySelector(`.pago-tab[data-pago="${pestañaSel}"]`);
+      if (btn) selPago(btn, pestañaSel);   // limpiarCliente() ocurre aquí — aún no hemos asignado cliente, OK
+    } else if (tipoDetectado === 'docente' && tipoPago !== 'cuenta_docente') {
+      const btn = document.querySelector('.pago-tab[data-pago="cuenta_docente"]');
+      if (btn) selPago(btn, 'cuenta_docente');
+    } else if (tipoDetectado === 'estudiante' && tipoPago !== 'cuenta_estudiante') {
+      const btn = document.querySelector('.pago-tab[data-pago="cuenta_estudiante"]');
+      if (btn) selPago(btn, 'cuenta_estudiante');
+    }
+
+    // Asignar cliente DESPUÉS de selPago para que no lo pise limpiarCliente()
+    selCliente(d.cliente);
+    const meta = tipoDetectado === 'docente'
+      ? `Docente · Saldo ${fmtPeso(d.cliente.saldo)}`
+      : `Estudiante · Cód ${d.cliente.codigo || ''} · Saldo ${fmtPeso(d.cliente.saldo)}`;
+    mostrarVeloExito(d.cliente.nombre, meta);
+
+    const nombreCliente = d.cliente.nombre;
+    setTimeout(() => {
+      cerrarQR();
+      const sel = document.querySelector('.cliente-selected');
+      if (sel) {
+        sel.classList.remove('qr-identified');
+        void sel.offsetWidth;
+        sel.classList.add('qr-identified');
+      }
+      try { paShowToast(`Usuario vinculado: ${nombreCliente}`, 'success'); } catch(_) {}
+    }, 1200);
+
+  } catch (e) {
+    setQRStatus('Error de red: ' + e.message, 'error');
+    qrLockBusy = false;
+    if (qrScanner) { try { await qrScanner.start(); } catch(_){} }
+  }
+}
+
+function cerrarQR() {
+  qrLockBusy = true;
+  if (qrScanner) {
+    try { qrScanner.stop(); } catch (_) {}
+    qrScanner = null;
+  }
+  qrLockBusy = false;
+  ocultarVeloExito();
+  document.getElementById('qrOverlay').classList.remove('open');
 }
 </script>
 {% endblock %}

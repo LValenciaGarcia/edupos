@@ -177,7 +177,7 @@
             <div>
               {% if p.estado == 'pendiente' %}
               <form method="post" action="{% url 'app_estudiante:cancelar_pedido' p.pk %}"
-                    onsubmit="return confirm('¿Cancelar el pedido {{ p.ticket }}? Se devolvera el saldo a tu cuenta.')">
+                    data-pa-confirm="¿Cancelar el pedido {{ p.ticket }}? Se devolverá el saldo a tu cuenta." data-pa-ok="Cancelar pedido">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-danger btn-xs">
                   <i class="bi bi-x-circle"></i> Cancelar pedido

@@ -1,4 +1,5 @@
 {% extends 'app_docente/base_docente.html' %}
+{% load filtros %}
 {% block title %}Confirmar pedido{% endblock %}
 {% block topbar_title %}Confirmar pedido{% endblock %}
 
@@ -25,12 +26,12 @@
         <tr>
           <td>
             <div style="font-weight:600; font-size:.83rem;">{{ item.producto.nombre }}</div>
-            <div style="font-size:.67rem; color:var(--stone);">${{ item.producto.precio_venta|floatformat:0 }} c/u</div>
+            <div style="font-size:.67rem; color:var(--stone);">${{ item.producto.precio_venta|miles }} c/u</div>
           </td>
           <td style="text-align:center;">
             <span style="background:var(--cream); border:1px solid var(--mist); border-radius:5px; padding:.15rem .55rem; font-weight:700; font-size:.82rem;">{{ item.cantidad }}</span>
           </td>
-          <td style="text-align:right; font-weight:700; font-family:var(--serif); font-size:.92rem;">${{ item.subtotal|floatformat:0 }}</td>
+          <td style="text-align:right; font-weight:700; font-family:var(--serif); font-size:.92rem;">${{ item.subtotal|miles }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -38,7 +39,7 @@
         <tr>
           <td colspan="2" style="font-weight:700; text-align:right; font-size:.85rem; color:var(--stone);">Total del pedido</td>
           <td style="text-align:right; border-top:2px solid var(--mist); padding-top:.9rem;">
-            <span style="font-family:var(--serif); font-size:1.4rem; color:var(--leaf);">${{ total|floatformat:0 }}</span>
+            <span style="font-family:var(--serif); font-size:1.4rem; color:var(--leaf);">${{ total|miles }}</span>
           </td>
         </tr>
       </tfoot>
@@ -49,67 +50,29 @@
   <div>
     <div class="card card-flat" style="overflow:hidden;">
       <div class="card-head" style="background:linear-gradient(135deg,rgba(22,163,74,.06),transparent);">
-        <span class="card-title">Forma de pago</span>
+        <span class="card-title">Pago con saldo</span>
       </div>
       <div style="padding:1.1rem 1.25rem;">
         <!-- Saldo disponible -->
-        <div style="display:flex; gap:.75rem; margin-bottom:1rem;">
-          <div style="flex:1; background:var(--leaf-pale); border:1px solid var(--leaf-tint); border-radius:9px; padding:.7rem .9rem; text-align:center;">
-            <div style="font-size:.6rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--stone); margin-bottom:.2rem;">Saldo</div>
-            <div style="font-family:var(--serif); font-size:1.15rem; color:var(--leaf);">${{ docente.saldo|floatformat:0 }}</div>
-          </div>
-          <div style="flex:1; background:var(--amber-pale); border:1px solid var(--amber-tint); border-radius:9px; padding:.7rem .9rem; text-align:center;">
-            <div style="font-size:.6rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--stone); margin-bottom:.2rem;">Crédito</div>
-            <div style="font-family:var(--serif); font-size:1.15rem; color:var(--amber);">${{ docente.credito_disponible|floatformat:0 }}</div>
-          </div>
+        <div style="background:var(--leaf-pale); border:1px solid var(--leaf-tint); border-radius:9px; padding:.75rem .9rem; text-align:center; margin-bottom:1rem;">
+          <div style="font-size:.6rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--stone); margin-bottom:.2rem;">Saldo disponible</div>
+          <div style="font-family:var(--serif); font-size:1.3rem; color:var(--leaf);">${{ docente.saldo|miles }}</div>
         </div>
 
-        <form action="{% url 'app_docente:confirmar_pedido' %}" method="post">
+        {% if docente.saldo < total %}
+        <div style="background:var(--red-pale); border:1px solid var(--red-tint); border-radius:8px; padding:.75rem .85rem; font-size:.78rem; color:var(--red); margin-bottom:1rem; display:flex; gap:.5rem; align-items:flex-start;">
+          <i class="bi bi-exclamation-triangle-fill" style="flex-shrink:0; margin-top:.1rem;"></i>
+          <div>
+            <div style="font-weight:700; margin-bottom:.15rem;">Saldo insuficiente</div>
+            <div>Te faltan ${{ docente.saldo|add:total|miles }}. <a href="{% url 'app_docente:recargar_saldo' %}" style="color:var(--red); text-decoration:underline;">Recarga tu saldo</a> antes de confirmar.</div>
+          </div>
+        </div>
+        {% endif %}
+
+        <form action="{% url 'app_docente:confirmar_pedido' %}" method="post" id="form-confirmar">
           {% csrf_token %}
-
-          <div class="field" style="margin-bottom:1rem;">
-            <label>Tipo de pago</label>
-            <div style="display:flex; flex-direction:column; gap:.5rem; margin-top:.3rem;">
-              <label style="display:flex; align-items:center; gap:.65rem; padding:.65rem .85rem; border:1.5px solid var(--fog); border-radius:8px; cursor:pointer; transition:all .14s;" id="opt-saldo">
-                <input type="radio" name="tipo_pago" value="saldo"
-                  {% if docente.saldo >= total %}checked{% endif %}
-                  {% if docente.saldo < total %}disabled{% endif %}
-                  onchange="highlightOpt(this)">
-                <div>
-                  <div style="display:flex; align-items:center; gap:.4rem; font-size:.82rem; font-weight:700;">
-                    <i class="bi bi-wallet2" style="color:var(--leaf);"></i> Pagar con saldo
-                  </div>
-                  {% if docente.saldo < total %}
-                  <div style="font-size:.67rem; color:var(--red); margin-top:.1rem;">Saldo insuficiente</div>
-                  {% endif %}
-                </div>
-              </label>
-              <label style="display:flex; align-items:center; gap:.65rem; padding:.65rem .85rem; border:1.5px solid var(--fog); border-radius:8px; cursor:pointer; transition:all .14s;" id="opt-fiado">
-                <input type="radio" name="tipo_pago" value="fiado"
-                  {% if docente.saldo < total %}checked{% endif %}
-                  {% if docente.credito_disponible < total %}disabled{% endif %}
-                  onchange="highlightOpt(this)">
-                <div>
-                  <div style="display:flex; align-items:center; gap:.4rem; font-size:.82rem; font-weight:700;">
-                    <i class="bi bi-receipt" style="color:var(--amber);"></i> Pagar con fiado
-                  </div>
-                  {% if docente.credito_disponible < total %}
-                  <div style="font-size:.67rem; color:var(--red); margin-top:.1rem;">Crédito insuficiente</div>
-                  {% endif %}
-                </div>
-              </label>
-            </div>
-          </div>
-
-          {% if docente.saldo < total and docente.credito_disponible < total %}
-          <div style="background:var(--red-pale); border:1px solid var(--red-tint); border-radius:8px; padding:.65rem .85rem; font-size:.75rem; color:var(--red); margin-bottom:1rem; display:flex; gap:.5rem; align-items:flex-start;">
-            <i class="bi bi-exclamation-triangle-fill" style="flex-shrink:0; margin-top:.1rem;"></i>
-            Saldo y crédito insuficientes para este pedido.
-          </div>
-          {% endif %}
-
-          <button type="submit" class="btn btn-primary btn-full" style="font-size:.86rem;"
-            {% if docente.saldo < total and docente.credito_disponible < total %}disabled{% endif %}>
+          <button type="submit" class="btn btn-primary btn-full" style="font-size:.86rem;" id="btn-confirmar"
+            {% if docente.saldo < total %}disabled{% endif %}>
             <i class="bi bi-send"></i> Confirmar pedido
           </button>
         </form>
@@ -122,23 +85,14 @@
 
 {% block extra_js %}
 <script>
-function highlightOpt(radio) {
-  document.querySelectorAll('[id^="opt-"]').forEach(l => {
-    l.style.borderColor = 'var(--fog)';
-    l.style.background = 'transparent';
-  });
-  if (!radio.disabled) {
-    const parent = radio.closest('label');
-    if (radio.value === 'saldo') {
-      parent.style.borderColor = 'var(--leaf)';
-      parent.style.background  = 'var(--leaf-pale)';
-    } else {
-      parent.style.borderColor = 'var(--amber)';
-      parent.style.background  = 'var(--amber-pale)';
-    }
+  // Evita doble envío del formulario.
+  const form = document.getElementById('form-confirmar');
+  const btn  = document.getElementById('btn-confirmar');
+  if (form && btn) {
+    form.addEventListener('submit', () => {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Procesando...';
+    });
   }
-}
-// Init
-document.querySelector('input[type=radio]:checked')?.dispatchEvent(new Event('change'));
 </script>
 {% endblock %}

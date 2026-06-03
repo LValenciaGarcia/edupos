@@ -79,8 +79,6 @@ class VentaEmpleado(models.Model):
         null=True, blank=True, related_name='ventas_empleado'
     )
     total       = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    fiado_usado = models.DecimalField(max_digits=10, decimal_places=2, default=0,
-                                      help_text='Monto cargado a fiado en ventas de docente')
     anulada     = models.BooleanField(default=False)
     fecha       = models.DateTimeField(default=timezone.now)
     nota        = models.TextField(blank=True)

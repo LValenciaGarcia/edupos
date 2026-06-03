@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db import transaction
@@ -8,6 +9,9 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 from datetime import date, timedelta
 import json
+import hmac
+import hashlib
+from django.conf import settings
 
 from authentication.models import Perfil, Estudiante, Padre, Docente
 from .models import (
@@ -18,6 +22,7 @@ from .models import (
     MovimientoInventario, MovimientoIngrediente,
     Insumo, MovimientoInsumo,
     PerfilAdmin, Alergeno,
+    GoogleCalendarToken,
     descontar_fifo, verificar_lotes_vencidos,
 )
 from .forms import LoteIngredienteForm, ProduccionForm
@@ -85,6 +90,15 @@ def _get_alertas():
         'vence_pronto': vence_pronto,
         'pedidos_pend': pedidos_pend,
     }
+
+
+def _ical_token():
+    """Token estable derivado de SECRET_KEY para autenticar el feed iCal."""
+    return hmac.new(
+        settings.SECRET_KEY.encode(),
+        b'ical_feed_puntoasis',
+        hashlib.sha256,
+    ).hexdigest()[:40]
 
 
 def _ctx(extra=None):
@@ -270,13 +284,14 @@ def producto_editar(request, pk):
         producto.save()
 
         if producto.tipo == 'elaborado':
-            producto.receta.all().delete()
-            for i_id, i_cant in zip(
-                request.POST.getlist('ingrediente_id'),
-                request.POST.getlist('ingrediente_cant')
-            ):
-                if i_id and i_cant:
-                    RecetaIngrediente.objects.create(producto=producto, ingrediente_id=i_id, cantidad=i_cant)
+            with transaction.atomic():
+                producto.receta.all().delete()
+                for i_id, i_cant in zip(
+                    request.POST.getlist('ingrediente_id'),
+                    request.POST.getlist('ingrediente_cant')
+                ):
+                    if i_id and i_cant:
+                        RecetaIngrediente.objects.create(producto=producto, ingrediente_id=i_id, cantidad=i_cant)
 
         messages.success(request, f'Producto "{producto.nombre}" actualizado.')
         return redirect('app_admin:productos')
@@ -479,10 +494,13 @@ def entrada_stock(request, pk=None):
         item_ids     = request.POST.getlist('item_id')
         item_cants   = request.POST.getlist('item_cantidad')
         item_precios = request.POST.getlist('item_precio')
+        item_vencs   = request.POST.getlist('item_vencimiento')
 
-        # Pre-validar todos los ítems antes de tocar la BD
+        # Pre-validar todos los ítems antes de tocar la BD.
+        # Conservamos el índice original para resolver el vencimiento posicional
+        # incluso cuando el mismo ítem aparece varias veces (Bug #2c).
         lineas_validas = []
-        for tipo, id_, cant, precio in zip(item_tipos, item_ids, item_cants, item_precios):
+        for idx, (tipo, id_, cant, precio) in enumerate(zip(item_tipos, item_ids, item_cants, item_precios)):
             if not (id_ and cant and precio):
                 continue
             if tipo not in ('producto', 'ingrediente'):
@@ -496,7 +514,12 @@ def entrada_stock(request, pk=None):
             except (ValueError, TypeError):
                 messages.error(request, 'Cantidad y precio deben ser números positivos.')
                 return redirect('app_admin:entrada_stock')
-            lineas_validas.append((tipo, id_, cant_f, precio_f))
+            # Bug #6/7: productos simples solo aceptan unidades enteras
+            if tipo == 'producto' and cant_f != int(cant_f):
+                messages.error(request, 'Los productos se compran en unidades enteras.')
+                return redirect('app_admin:entrada_stock')
+            venc = item_vencs[idx] if idx < len(item_vencs) else ''
+            lineas_validas.append((tipo, id_, cant_f, precio_f, venc))
 
         if not lineas_validas:
             messages.error(request, 'No hay ítems válidos en la entrada.')
@@ -508,7 +531,7 @@ def entrada_stock(request, pk=None):
                 proveedor_id=prov_id, fecha=fecha, nota=nota
             )
             total = 0
-            for tipo, id_, cant_f, precio_f in lineas_validas:
+            for tipo, id_, cant_f, precio_f, venc in lineas_validas:
                 det = DetalleCompra(compra=compra, cantidad=cant_f, precio_unitario=precio_f)
                 if tipo == 'producto':
                     prod = get_object_or_404(Producto, pk=id_)
@@ -524,14 +547,7 @@ def entrada_stock(request, pk=None):
                 else:
                     ing = get_object_or_404(Ingrediente, pk=id_)
                     det.ingrediente_id = ing.pk
-                    # Fecha de vencimiento del lote (may come per-line from the form)
-                    f_venc_key = f'item_vencimiento_{item_ids.index(id_)}'
-                    f_venc = request.POST.get(f_venc_key, '').strip() or None
-                    if not f_venc:
-                        # Fall back to a field named item_vencimiento[] positional
-                        item_vencs = request.POST.getlist('item_vencimiento')
-                        idx = item_ids.index(id_)
-                        f_venc = item_vencs[idx] if idx < len(item_vencs) else None
+                    f_venc = venc.strip() if venc else None
                     if not f_venc:
                         from datetime import date as _date
                         f_venc = str(_date.today().replace(year=_date.today().year + 1))
@@ -606,17 +622,29 @@ def salida_stock(request):
             try:
                 if tipo_item == 'producto':
                     prod = get_object_or_404(Producto, pk=item_id)
-                    # Para productos: usar enteros (truncar cantidad)
+                    # Bug #6/7: productos se manejan en unidades enteras
+                    if cantidad != int(cantidad):
+                        messages.error(request, f'Los productos se retiran en unidades enteras (ingresaste {cantidad}).')
+                        return redirect('app_admin:salida_stock')
                     cantidad_int = int(cantidad)
-                    prod.stock = max(0, prod.stock - cantidad_int)
+                    # Bug #8: rechazar salida cuando excede el stock disponible
+                    if cantidad_int > prod.stock:
+                        messages.error(request, f'No puedes retirar {cantidad_int} unidades de "{prod.nombre}". Stock disponible: {prod.stock}.')
+                        return redirect('app_admin:salida_stock')
+                    prod.stock -= cantidad_int
                     prod.save(update_fields=['stock'])
                     MovimientoInventario.objects.create(
                         producto=prod, tipo=motivo,
-                        cantidad=cantidad, nota=nota
+                        cantidad=cantidad_int, nota=nota
                     )
                     messages.success(request, f'Salida de "{prod.nombre}" registrada. Stock actual: {prod.stock}')
                 else:
                     ing = get_object_or_404(Ingrediente, pk=item_id)
+                    # Bug #8: rechazar salida cuando excede stock real (suma de lotes)
+                    disponible = float(ing.stock_real)
+                    if cantidad > disponible:
+                        messages.error(request, f'No puedes retirar {cantidad:.2f} {ing.get_unidad_base_display()} de "{ing.nombre}". Disponible: {disponible:.2f}.')
+                        return redirect('app_admin:salida_stock')
                     with transaction.atomic():
                         resto = descontar_fifo(ing, cantidad, nota=nota)
                         descontado = cantidad - resto
@@ -911,52 +939,96 @@ def produccion_nueva(request):
 
         if not errores:
             prod = get_object_or_404(Producto, pk=prod_id, tipo='elaborado')
-            # Validate ingredient availability for requested quantity
-            for receta_ing in prod.receta.select_related('ingrediente').all():
-                needed = float(receta_ing.cantidad) * cantidad
-                disponible = receta_ing.ingrediente.stock_real
-                if disponible < needed:
-                    errores.append(
-                        f'Stock insuficiente de {receta_ing.ingrediente.nombre}: '
-                        f'necesitas {needed:.2f} {receta_ing.ingrediente.get_unidad_base_display()}, '
-                        f'hay {disponible:.2f}.'
-                    )
-
-        if errores:
-            for e in errores:
-                messages.error(request, e)
-        else:
+            nuevo_stock = None
             with transaction.atomic():
-                costo_total = 0
-                for receta_ing in prod.receta.select_related('ingrediente').all():
+                receta_items = list(prod.receta.select_related('ingrediente').all())
+                # Bug #3/#9b: producción por tandas — para ingredientes
+                # con unidad_base='unidad' (huevos, etc.) la cantidad necesaria
+                # debe ser un entero, si no la receta exige fraccionar lo no fraccionable.
+                for receta_ing in receta_items:
                     needed = float(receta_ing.cantidad) * cantidad
-                    costo_total += needed * receta_ing.ingrediente.costo_unitario_real
-                    descontar_fifo(receta_ing.ingrediente, needed,
-                                   nota=f'Producción {cantidad}× {prod.nombre}')
-                    MovimientoIngrediente.objects.create(
+                    if receta_ing.ingrediente.unidad_base == 'unidad' and abs(needed - round(needed)) > 1e-6:
+                        # Calcular el menor múltiplo de tanda que daría enteros
+                        cant_receta = float(receta_ing.cantidad)
+                        sugerido = None
+                        if cant_receta > 0:
+                            for batch in range(1, 1001):
+                                if abs((batch * cant_receta) - round(batch * cant_receta)) < 1e-6:
+                                    sugerido = batch
+                                    break
+                        msg = (
+                            f'No puedes producir {cantidad} unidad(es) porque exigiría '
+                            f'{needed:.3f} {receta_ing.ingrediente.get_unidad_base_display()} '
+                            f'de {receta_ing.ingrediente.nombre} (debe ser entero).'
+                        )
+                        if sugerido:
+                            msg += f' Tanda mínima sugerida: múltiplos de {sugerido}.'
+                        errores.append(msg)
+                # Lock lotes inside transaction to prevent race conditions (Bug #8)
+                # and avoid N+1 property calls (Bug #3)
+                for receta_ing in receta_items:
+                    needed = float(receta_ing.cantidad) * cantidad
+                    lotes = LoteIngrediente.objects.select_for_update().filter(
                         ingrediente=receta_ing.ingrediente,
-                        tipo='salida',
-                        cantidad=needed,
-                        nota=f'Producción {cantidad}× {prod.nombre}',
+                        cantidad_base__gt=0,
+                        fecha_vencimiento__gte=date.today()
                     )
+                    disponible = sum(float(l.cantidad_base) for l in lotes)
+                    if disponible < needed:
+                        errores.append(
+                            f'Stock insuficiente de {receta_ing.ingrediente.nombre}: '
+                            f'necesitas {needed:.2f} {receta_ing.ingrediente.get_unidad_base_display()}, '
+                            f'hay {disponible:.2f}.'
+                        )
 
-                prod.stock += cantidad
-                prod.save(update_fields=['stock'])
-                MovimientoInventario.objects.create(
-                    producto=prod, tipo='entrada',
-                    cantidad=cantidad,
-                    nota=f'Producción registrada por {request.user.get_full_name() or request.user.username}',
-                )
-                ProduccionElaborado.objects.create(
-                    producto=prod,
-                    cantidad_producida=cantidad,
-                    responsable=request.user,
-                    costo_total=round(costo_total, 2),
-                    nota=nota,
-                )
+                if errores:
+                    transaction.set_rollback(True)
+                else:
+                    costo_total = 0
+                    for receta_ing in receta_items:
+                        needed = float(receta_ing.cantidad) * cantidad
+                        costo_total += needed * receta_ing.ingrediente.costo_unitario_real
+                        resto = descontar_fifo(receta_ing.ingrediente, needed,
+                                               nota=f'Producción {cantidad}× {prod.nombre}')
+                        if resto > 0:
+                            # FIFO deduction was incomplete despite validation — race condition escaped (Bug #7)
+                            errores.append(
+                                f'FIFO incompleto para {receta_ing.ingrediente.nombre}: '
+                                f'{resto:.3f} {receta_ing.ingrediente.get_unidad_base_display()} sin cubrir.'
+                            )
+                            transaction.set_rollback(True)
+                            break
+                        MovimientoIngrediente.objects.create(
+                            ingrediente=receta_ing.ingrediente,
+                            tipo='salida',
+                            cantidad=needed,
+                            nota=f'Producción {cantidad}× {prod.nombre}',
+                        )
 
-            messages.success(request, f'Producción registrada: {cantidad}× {prod.nombre}. Stock ahora: {prod.stock}.')
-            return redirect('app_admin:producciones')
+                    if not errores:
+                        prod_locked = Producto.objects.select_for_update().get(pk=prod.pk)
+                        prod_locked.stock += cantidad
+                        prod_locked.save(update_fields=['stock'])
+                        nuevo_stock = prod_locked.stock
+                        MovimientoInventario.objects.create(
+                            producto=prod_locked, tipo='entrada',
+                            cantidad=cantidad,
+                            nota=f'Producción registrada por {request.user.get_full_name() or request.user.username}',
+                        )
+                        ProduccionElaborado.objects.create(
+                            producto=prod_locked,
+                            cantidad_producida=cantidad,
+                            responsable=request.user,
+                            costo_total=round(costo_total, 2),
+                            nota=nota,
+                        )
+
+            if not errores:
+                messages.success(request, f'Producción registrada: {cantidad}× {prod.nombre}. Stock ahora: {nuevo_stock}.')
+                return redirect('app_admin:producciones')
+
+        for e in errores:
+            messages.error(request, e)
 
     # Build ingredient summary for each elaborated product (for JS preview)
     prods_data = []
@@ -967,6 +1039,8 @@ def produccion_nueva(request):
                 'cantidad': float(r.cantidad),
                 'unidad': r.ingrediente.get_unidad_base_display(),
                 'stock_real': r.ingrediente.stock_real,
+                # Bug #3/#9b: marcamos los ingredientes que solo aceptan unidades enteras
+                'unitario': r.ingrediente.unidad_base == 'unidad',
             }
             for r in p.receta.select_related('ingrediente').all()
         ]
@@ -974,12 +1048,22 @@ def produccion_nueva(request):
             (r['stock_real'] // r['cantidad'] if r['cantidad'] else 0)
             for r in receta
         ) if receta else 0
+        # Bug #3/#9b: tanda mínima — menor batch entero tal que cant*recetas dé enteros
+        # en TODOS los ingredientes "unitarios" simultáneamente
+        unitarios = [r for r in receta if r['unitario'] and r['cantidad'] > 0]
+        tanda_min = 1
+        if unitarios:
+            for b in range(1, 1001):
+                if all(abs((b * r['cantidad']) - round(b * r['cantidad'])) < 1e-6 for r in unitarios):
+                    tanda_min = b
+                    break
         prods_data.append({
             'id': p.pk,
             'nombre': p.nombre,
             'stock': p.stock,
             'receta': receta,
             'max_producible': int(max_producible),
+            'tanda_min': tanda_min,
         })
 
     return render(request, 'app_admin/produccion_form.html', _ctx({
@@ -1195,7 +1279,19 @@ def historial_api(request):
 
 @admin_required
 def calendario(request):
-    return render(request, 'app_admin/calendario.html', _ctx())
+    token    = _ical_token()
+    ical_url = request.build_absolute_uri(
+        reverse('app_admin:calendario_ical', args=[token])
+    )
+    padmin, _ = PerfilAdmin.objects.get_or_create(perfil=request.user.perfil)
+    try:
+        gcal_token = padmin.gcal
+    except GoogleCalendarToken.DoesNotExist:
+        gcal_token = None
+    return render(request, 'app_admin/calendario.html', _ctx({
+        'ical_url':   ical_url,
+        'gcal_token': gcal_token,
+    }))
 
 
 @admin_required
@@ -1282,6 +1378,418 @@ def calendario_api(request):
         })
 
     return JsonResponse(eventos, safe=False)
+
+
+def calendario_ical(request, token):
+    """Feed iCal de movimientos — accesible sin sesión mediante token."""
+    if token != _ical_token():
+        return HttpResponse('Acceso no autorizado.', status=401,
+                            content_type='text/plain; charset=utf-8')
+
+    hoy   = date.today()
+    desde = (hoy - timedelta(days=60)).isoformat()
+    hasta = (hoy + timedelta(days=60)).isoformat()
+
+    def esc(s):
+        return str(s).replace('\\', '\\\\').replace(';', '\\;').replace(',', '\\,').replace('\n', '\\n')
+
+    def vdate(d):
+        return d.strftime('%Y%m%d')
+
+    lines = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Punto Asis//Cafeteria Escolar//ES',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+        'X-WR-CALNAME:Punto Asis',
+        'X-WR-TIMEZONE:America/Bogota',
+    ]
+
+    # Entradas de producto
+    for m in MovimientoInventario.objects.filter(
+        fecha__date__gte=desde, fecha__date__lte=hasta, tipo='entrada'
+    ).select_related('producto').order_by('fecha'):
+        d = timezone.localtime(m.fecha).date()
+        lines += [
+            'BEGIN:VEVENT',
+            f'UID:prod-ent-{m.pk}@puntoasis',
+            f'DTSTART;VALUE=DATE:{vdate(d)}',
+            f'DTEND;VALUE=DATE:{vdate(d)}',
+            f'SUMMARY:{esc(f"Entrada: {m.producto.nombre} +{int(m.cantidad)}")}',
+            'CATEGORIES:Inventario',
+            'END:VEVENT',
+        ]
+
+    # Salidas / merma de producto
+    for m in MovimientoInventario.objects.filter(
+        fecha__date__gte=desde, fecha__date__lte=hasta, tipo__in=['salida', 'merma']
+    ).select_related('producto').order_by('fecha'):
+        d = timezone.localtime(m.fecha).date()
+        lines += [
+            'BEGIN:VEVENT',
+            f'UID:prod-sal-{m.pk}@puntoasis',
+            f'DTSTART;VALUE=DATE:{vdate(d)}',
+            f'DTEND;VALUE=DATE:{vdate(d)}',
+            f'SUMMARY:{esc(f"{m.get_tipo_display()}: {m.producto.nombre} -{int(m.cantidad)}")}',
+            'CATEGORIES:Inventario',
+            'END:VEVENT',
+        ]
+
+    # Movimientos de ingredientes
+    for m in MovimientoIngrediente.objects.filter(
+        fecha__date__gte=desde, fecha__date__lte=hasta
+    ).select_related('ingrediente').order_by('fecha'):
+        d = timezone.localtime(m.fecha).date()
+        lines += [
+            'BEGIN:VEVENT',
+            f'UID:ing-{m.tipo}-{m.pk}@puntoasis',
+            f'DTSTART;VALUE=DATE:{vdate(d)}',
+            f'DTEND;VALUE=DATE:{vdate(d)}',
+            f'SUMMARY:{esc(f"Ing {m.get_tipo_display()}: {m.ingrediente.nombre}")}',
+            'CATEGORIES:Ingredientes',
+            'END:VEVENT',
+        ]
+
+    # Pedidos estudiante entregados
+    for p in Pedido.objects.filter(
+        fecha_pedido__date__gte=desde, fecha_pedido__date__lte=hasta, estado='entregado'
+    ).select_related('estudiante__perfil__user').order_by('fecha_pedido'):
+        d = timezone.localtime(p.fecha_pedido).date()
+        nombre = p.estudiante.perfil.user.get_full_name() if p.estudiante_id else 'Estudiante'
+        lines += [
+            'BEGIN:VEVENT',
+            f'UID:pedido-{p.pk}@puntoasis',
+            f'DTSTART;VALUE=DATE:{vdate(d)}',
+            f'DTEND;VALUE=DATE:{vdate(d)}',
+            f'SUMMARY:{esc(f"Pedido {p.ticket} — {nombre}")}',
+            'CATEGORIES:Pedidos',
+            'END:VEVENT',
+        ]
+
+    # Pedidos docente entregados
+    for p in PedidoDocente.objects.filter(
+        fecha_pedido__date__gte=desde, fecha_pedido__date__lte=hasta, estado='entregado'
+    ).select_related('docente__perfil__user').order_by('fecha_pedido'):
+        d = timezone.localtime(p.fecha_pedido).date()
+        nombre = p.docente.perfil.user.get_full_name() if p.docente_id else 'Docente'
+        lines += [
+            'BEGIN:VEVENT',
+            f'UID:pedido-doc-{p.pk}@puntoasis',
+            f'DTSTART;VALUE=DATE:{vdate(d)}',
+            f'DTEND;VALUE=DATE:{vdate(d)}',
+            f'SUMMARY:{esc(f"Pedido docente {p.ticket} — {nombre}")}',
+            'CATEGORIES:Pedidos',
+            'END:VEVENT',
+        ]
+
+    lines.append('END:VCALENDAR')
+    content = '\r\n'.join(lines) + '\r\n'
+
+    response = HttpResponse(content, content_type='text/calendar; charset=utf-8')
+    response['Content-Disposition'] = 'attachment; filename="puntoasis.ics"'
+    return response
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GOOGLE CALENDAR — OAuth2 + sync
+# ══════════════════════════════════════════════════════════════════════════════
+
+_GCAL_SCOPES = ['https://www.googleapis.com/auth/calendar']
+
+def _gcal_flow(redirect_uri, state=None):
+    """Construye un Flow de google-auth-oauthlib."""
+    from google_auth_oauthlib.flow import Flow
+    cfg = {
+        'web': {
+            'client_id':     settings.GOOGLE_CLIENT_ID,
+            'client_secret': settings.GOOGLE_CLIENT_SECRET,
+            'auth_uri':      'https://accounts.google.com/o/oauth2/auth',
+            'token_uri':     'https://oauth2.googleapis.com/token',
+            'redirect_uris': [redirect_uri],
+        }
+    }
+    kwargs = {'state': state} if state else {}
+    flow = Flow.from_client_config(cfg, scopes=_GCAL_SCOPES, **kwargs)
+    flow.redirect_uri = redirect_uri
+    return flow
+
+
+@admin_required
+def calendario_google_auth(request):
+    """Inicia el flujo OAuth2 para conectar Google Calendar."""
+    import secrets
+    try:
+        from google_auth_oauthlib.flow import Flow  # noqa — solo para validar instalación
+    except ImportError:
+        messages.error(request, 'Paquetes de Google no instalados. Ejecuta: pip install google-auth google-auth-oauthlib google-api-python-client')
+        return redirect('app_admin:calendario')
+
+    redirect_uri = request.build_absolute_uri(
+        reverse('app_admin:calendario_google_callback')
+    )
+    state = secrets.token_urlsafe(16)
+    request.session['gcal_state']        = state
+    request.session['gcal_redirect_uri'] = redirect_uri
+
+    import hashlib, base64
+    code_verifier  = secrets.token_urlsafe(64)
+    code_challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(code_verifier.encode()).digest()
+    ).rstrip(b'=').decode()
+    request.session['gcal_code_verifier'] = code_verifier
+
+    flow = _gcal_flow(redirect_uri)
+    auth_url, _ = flow.authorization_url(
+        access_type='offline',
+        prompt='consent',
+        state=state,
+        include_granted_scopes='false',
+        code_challenge=code_challenge,
+        code_challenge_method='S256',
+    )
+    return redirect(auth_url)
+
+
+@admin_required
+def calendario_google_callback(request):
+    """Recibe el callback de Google y guarda el token."""
+    state        = request.session.get('gcal_state')
+    redirect_uri = request.session.get('gcal_redirect_uri')
+
+    if not state or request.GET.get('state') != state or not redirect_uri:
+        messages.error(request, 'Estado OAuth inválido. Intenta de nuevo.')
+        return redirect('app_admin:calendario')
+
+    if 'error' in request.GET:
+        messages.error(request, f'Google rechazó el acceso: {request.GET["error"]}')
+        return redirect('app_admin:calendario')
+
+    code_verifier = request.session.get('gcal_code_verifier')
+    try:
+        flow = _gcal_flow(redirect_uri, state=state)
+        flow.fetch_token(code=request.GET.get('code'), code_verifier=code_verifier)
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        messages.error(request, f'Error al obtener el token de Google: {e}')
+        return redirect('app_admin:calendario')
+
+    creds  = flow.credentials
+    padmin, _ = PerfilAdmin.objects.get_or_create(perfil=request.user.perfil)
+    token, _  = GoogleCalendarToken.objects.get_or_create(admin=padmin)
+    token.access_token  = creds.token
+    if creds.refresh_token:
+        token.refresh_token = creds.refresh_token
+    token.token_expiry  = creds.expiry
+    token.gcal_id       = 'primary'   # se asigna en el primer sync
+    token.save()
+
+    request.session.pop('gcal_state', None)
+    request.session.pop('gcal_redirect_uri', None)
+    request.session.pop('gcal_code_verifier', None)
+
+    messages.success(request, 'Google Calendar conectado. Haz clic en Sincronizar para enviar los eventos.')
+    return redirect('app_admin:calendario')
+
+
+@admin_required
+def calendario_google_sync(request):
+    """Sincroniza eventos del app con Google Calendar (POST)."""
+    if request.method != 'POST':
+        return redirect('app_admin:calendario')
+
+    try:
+        from google.oauth2.credentials import Credentials
+        from google.auth.transport.requests import Request as GRequest
+        from googleapiclient.discovery import build
+        from googleapiclient.errors import HttpError
+    except ImportError:
+        messages.error(request, 'Paquetes de Google no instalados. Ejecuta: pip install google-auth google-auth-oauthlib google-api-python-client')
+        return redirect('app_admin:calendario')
+
+    padmin, _ = PerfilAdmin.objects.get_or_create(perfil=request.user.perfil)
+    try:
+        gtoken = padmin.gcal
+    except GoogleCalendarToken.DoesNotExist:
+        messages.error(request, 'Conecta Google Calendar primero.')
+        return redirect('app_admin:calendario')
+
+    # Construir credenciales y refrescar si es necesario
+    creds = Credentials(
+        token=gtoken.access_token,
+        refresh_token=gtoken.refresh_token or None,
+        token_uri='https://oauth2.googleapis.com/token',
+        client_id=settings.GOOGLE_CLIENT_ID,
+        client_secret=settings.GOOGLE_CLIENT_SECRET,
+        scopes=_GCAL_SCOPES,
+    )
+    if creds.expired and creds.refresh_token:
+        try:
+            creds.refresh(GRequest())
+            gtoken.access_token = creds.token
+            gtoken.token_expiry = creds.expiry
+            gtoken.save(update_fields=['access_token', 'token_expiry'])
+        except Exception:
+            messages.error(request, 'El token de Google expiró. Reconecta tu cuenta.')
+            gtoken.delete()
+            return redirect('app_admin:calendario')
+
+    service = build('calendar', 'v3', credentials=creds)
+
+    # Crear o recuperar el calendario "Punto Asis"
+    if not gtoken.gcal_id or gtoken.gcal_id == 'primary':
+        try:
+            cal_list  = service.calendarList().list().execute()
+            asis_cal  = next(
+                (c for c in cal_list.get('items', []) if c.get('summary') == 'Punto Asis'),
+                None,
+            )
+            if asis_cal:
+                gtoken.gcal_id = asis_cal['id']
+            else:
+                new_cal = service.calendars().insert(body={
+                    'summary':     'Punto Asis',
+                    'description': 'Eventos de la cafetería escolar Punto Asis',
+                    'timeZone':    'America/Bogota',
+                }).execute()
+                gtoken.gcal_id = new_cal['id']
+            gtoken.save(update_fields=['gcal_id'])
+        except Exception:
+            messages.error(request, 'No se pudo crear el calendario en Google. Verifica los permisos.')
+            return redirect('app_admin:calendario')
+
+    gcal_id = gtoken.gcal_id
+    hoy   = date.today()
+    desde = (hoy - timedelta(days=30)).isoformat()
+    hasta = (hoy + timedelta(days=60)).isoformat()
+
+    # Leer eventos existentes de Google Calendar marcados con source=puntoasis
+    existing = {}   # uid → google event id
+    page_token = None
+    while True:
+        try:
+            result = service.events().list(
+                calendarId=gcal_id,
+                timeMin=f'{desde}T00:00:00-05:00',
+                timeMax=f'{hasta}T23:59:59-05:00',
+                privateExtendedProperty='source=puntoasis',
+                pageToken=page_token,
+                maxResults=500,
+            ).execute()
+        except Exception:
+            break
+        for ev in result.get('items', []):
+            uid = ev.get('extendedProperties', {}).get('private', {}).get('uid', '')
+            if uid:
+                existing[uid] = ev['id']
+        page_token = result.get('nextPageToken')
+        if not page_token:
+            break
+
+    # Construir lista de eventos del app
+    COLOR = {
+        'prod_ent': '2',   # sage
+        'prod_sal': '11',  # tomato
+        'ing_ent':  '7',   # peacock
+        'ing_sal':  '6',   # tangerine
+        'pedido':   '3',   # grape
+        'ped_doc':  '4',   # flamingo
+    }
+
+    app_events = []
+    for m in MovimientoInventario.objects.filter(
+        fecha__date__gte=desde, fecha__date__lte=hasta, tipo='entrada'
+    ).select_related('producto'):
+        d = timezone.localtime(m.fecha).date()
+        app_events.append({'uid': f'prod-ent-{m.pk}', 'colorId': COLOR['prod_ent'],
+                           'summary': f'Entrada: {m.producto.nombre} +{int(m.cantidad)}',
+                           'date': d.isoformat()})
+
+    for m in MovimientoInventario.objects.filter(
+        fecha__date__gte=desde, fecha__date__lte=hasta, tipo__in=['salida', 'merma']
+    ).select_related('producto'):
+        d = timezone.localtime(m.fecha).date()
+        app_events.append({'uid': f'prod-sal-{m.pk}', 'colorId': COLOR['prod_sal'],
+                           'summary': f'{m.get_tipo_display()}: {m.producto.nombre} -{int(m.cantidad)}',
+                           'date': d.isoformat()})
+
+    for m in MovimientoIngrediente.objects.filter(
+        fecha__date__gte=desde, fecha__date__lte=hasta
+    ).select_related('ingrediente'):
+        d    = timezone.localtime(m.fecha).date()
+        key  = 'ing_ent' if m.tipo == 'entrada' else 'ing_sal'
+        app_events.append({'uid': f'ing-{m.tipo}-{m.pk}', 'colorId': COLOR[key],
+                           'summary': f'Ing {m.get_tipo_display()}: {m.ingrediente.nombre}',
+                           'date': d.isoformat()})
+
+    for p in Pedido.objects.filter(
+        fecha_pedido__date__gte=desde, fecha_pedido__date__lte=hasta, estado='entregado'
+    ).select_related('estudiante__perfil__user'):
+        d      = timezone.localtime(p.fecha_pedido).date()
+        nombre = p.estudiante.perfil.user.get_full_name() if p.estudiante_id else 'Estudiante'
+        app_events.append({'uid': f'pedido-{p.pk}', 'colorId': COLOR['pedido'],
+                           'summary': f'Pedido {p.ticket} — {nombre}',
+                           'date': d.isoformat()})
+
+    for p in PedidoDocente.objects.filter(
+        fecha_pedido__date__gte=desde, fecha_pedido__date__lte=hasta, estado='entregado'
+    ).select_related('docente__perfil__user'):
+        d      = timezone.localtime(p.fecha_pedido).date()
+        nombre = p.docente.perfil.user.get_full_name() if p.docente_id else 'Docente'
+        app_events.append({'uid': f'ped-doc-{p.pk}', 'colorId': COLOR['ped_doc'],
+                           'summary': f'Pedido docente {p.ticket} — {nombre}',
+                           'date': d.isoformat()})
+
+    app_uids = {e['uid'] for e in app_events}
+    created  = 0
+    deleted  = 0
+
+    for ev in app_events:
+        if ev['uid'] not in existing:
+            try:
+                service.events().insert(
+                    calendarId=gcal_id,
+                    body={
+                        'summary': ev['summary'],
+                        'start':   {'date': ev['date']},
+                        'end':     {'date': ev['date']},
+                        'colorId': ev['colorId'],
+                        'extendedProperties': {
+                            'private': {'source': 'puntoasis', 'uid': ev['uid']}
+                        },
+                    },
+                ).execute()
+                created += 1
+            except HttpError:
+                pass
+
+    for uid, gev_id in existing.items():
+        if uid not in app_uids:
+            try:
+                service.events().delete(calendarId=gcal_id, eventId=gev_id).execute()
+                deleted += 1
+            except HttpError:
+                pass
+
+    gtoken.synced_at = timezone.now()
+    gtoken.save(update_fields=['synced_at'])
+
+    messages.success(request, f'Sincronizado: {created} evento(s) creado(s), {deleted} eliminado(s).')
+    return redirect('app_admin:calendario')
+
+
+@admin_required
+def calendario_google_disconnect(request):
+    """Elimina la conexión con Google Calendar (POST)."""
+    if request.method != 'POST':
+        return redirect('app_admin:calendario')
+    padmin, _ = PerfilAdmin.objects.get_or_create(perfil=request.user.perfil)
+    try:
+        padmin.gcal.delete()
+        messages.success(request, 'Google Calendar desconectado.')
+    except GoogleCalendarToken.DoesNotExist:
+        pass
+    return redirect('app_admin:calendario')
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1421,28 +1929,47 @@ def pedidos(request):
     fecha = request.GET.get('fecha', str(hoy))
     q     = request.GET.get('q', '').strip()
 
-    qs = Pedido.objects.filter(fecha_pedido__date=fecha).select_related(
-        'estudiante__perfil__user'
-    ).prefetch_related('detalles__producto')
+    qs_est = list(
+        Pedido.objects.filter(fecha_pedido__date=fecha)
+        .select_related('estudiante__perfil__user')
+        .prefetch_related('detalles__producto')
+    )
+    qs_doc = list(
+        PedidoDocente.objects.filter(fecha_pedido__date=fecha)
+        .select_related('docente__perfil__user')
+        .prefetch_related('detalles__producto')
+    )
+
+    for p in qs_est:
+        p.tipo       = 'estudiante'
+        p.detalle_url = reverse('app_admin:pedido_detalle', args=[p.pk])
+        p.estado_url  = reverse('app_admin:pedido_estado', args=[p.pk])
+        p.nombre      = p.estudiante.perfil.user.get_full_name() or p.estudiante.perfil.user.email
+        p.subtitulo   = f'Grado {p.estudiante.grado}'
+
+    for p in qs_doc:
+        p.tipo        = 'docente'
+        p.detalle_url = reverse('app_admin:pedido_docente_detalle', args=[p.pk])
+        p.estado_url  = reverse('app_admin:pedido_docente_estado', args=[p.pk])
+        p.nombre      = p.docente.perfil.user.get_full_name() or p.docente.perfil.user.email
+        p.subtitulo   = p.docente.materia
+
+    todos = sorted(qs_est + qs_doc, key=lambda p: p.fecha_pedido)
 
     if q:
-        qs = qs.filter(
-            Q(ticket__icontains=q) |
-            Q(estudiante__perfil__user__first_name__icontains=q) |
-            Q(estudiante__perfil__user__last_name__icontains=q)
-        )
+        ql = q.lower()
+        todos = [p for p in todos if ql in p.ticket.lower() or ql in p.nombre.lower()]
 
     kanban = {
-        'pendiente':  qs.filter(estado='pendiente'),
-        'preparando': qs.filter(estado='preparando'),
-        'listo':      qs.filter(estado='listo'),
-        'entregado':  qs.filter(estado='entregado'),
-        'cancelado':  qs.filter(estado='cancelado'),
+        'pendiente':  [p for p in todos if p.estado == 'pendiente'],
+        'preparando': [p for p in todos if p.estado == 'preparando'],
+        'listo':      [p for p in todos if p.estado == 'listo'],
+        'entregado':  [p for p in todos if p.estado == 'entregado'],
+        'cancelado':  [p for p in todos if p.estado == 'cancelado'],
     }
     return render(request, 'app_admin/pedidos.html', _ctx({
         'kanban':    kanban,
-        'pedidos':   qs,
-        'estados':   Pedido.ESTADO_CHOICES,
+        'pedidos':   todos,
         'fecha':     fecha,
         'fecha_hoy': hoy,
         'q':         q,
@@ -1463,7 +1990,7 @@ TRANSICIONES_VALIDAS = {
     'pendiente':  ['preparando', 'cancelado'],
     'preparando': ['listo', 'pendiente', 'cancelado'],
     'listo':      ['entregado', 'pendiente'],
-    'entregado':  [],
+    'entregado':  ['cancelado'],  # Bug #1: permite anular una entrega y restaurar stock
     'cancelado':  [],
 }
 
@@ -1499,12 +2026,33 @@ def pedido_estado(request, pk):
                 pedido_locked.fecha_entrega = timezone.now()
                 for detalle in pedido_locked.detalles.select_related('producto').all():
                     prod = Producto.objects.select_for_update().get(pk=detalle.producto.pk)
-                    prod.stock = max(0, prod.stock - detalle.cantidad)
+                    real_deducido = min(prod.stock, detalle.cantidad)
+                    deficit = detalle.cantidad - real_deducido
+                    prod.stock -= real_deducido
                     prod.save(update_fields=['stock'])
                     MovimientoInventario.objects.create(
                         producto=prod, tipo='salida',
-                        cantidad=detalle.cantidad,
+                        cantidad=real_deducido,
                         nota=f'Pedido {pedido_locked.ticket}'
+                    )
+                    if deficit > 0:
+                        # Stock insuficiente al entregar — registrar discrepancia (Bug #2)
+                        MovimientoInventario.objects.create(
+                            producto=prod, tipo='merma',
+                            cantidad=deficit,
+                            nota=f'Déficit en pedido {pedido_locked.ticket} — {deficit} unidad(es) sin stock'
+                        )
+
+            elif nuevo == 'cancelado' and pedido_locked.estado == 'entregado':
+                # Anulación de entrega — restaurar stock (Bug #1)
+                for detalle in pedido_locked.detalles.select_related('producto').all():
+                    prod = Producto.objects.select_for_update().get(pk=detalle.producto.pk)
+                    prod.stock += detalle.cantidad
+                    prod.save(update_fields=['stock'])
+                    MovimientoInventario.objects.create(
+                        producto=prod, tipo='ajuste',
+                        cantidad=detalle.cantidad,
+                        nota=f'Devolución por anulación de pedido {pedido_locked.ticket}'
                     )
 
             pedido_locked.save(update_fields=['estado', 'fecha_entrega'])
@@ -1514,41 +2062,12 @@ def pedido_estado(request, pk):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PEDIDOS DOCENTES
+# PEDIDOS DOCENTES — redirige al panel unificado
 # ══════════════════════════════════════════════════════════════════════════════
 
 @admin_required
 def pedidos_docentes(request):
-    hoy = date.today()
-    fecha = request.GET.get('fecha', str(hoy))
-    q = request.GET.get('q', '').strip()
-
-    qs = PedidoDocente.objects.filter(
-        fecha_pedido__date=fecha
-    ).select_related('docente__perfil__user').prefetch_related('detalles__producto')
-
-    if q:
-        qs = qs.filter(
-            Q(ticket__icontains=q) |
-            Q(docente__perfil__user__first_name__icontains=q) |
-            Q(docente__perfil__user__last_name__icontains=q)
-        )
-
-    kanban = {
-        'pendiente':  qs.filter(estado='pendiente'),
-        'preparando': qs.filter(estado='preparando'),
-        'listo':      qs.filter(estado='listo'),
-        'entregado':  qs.filter(estado='entregado'),
-        'cancelado':  qs.filter(estado='cancelado'),
-    }
-    return render(request, 'app_admin/pedidos_docentes.html', _ctx({
-        'kanban':    kanban,
-        'pedidos':   qs,
-        'estados':   PedidoDocente.ESTADO_CHOICES,
-        'fecha':     fecha,
-        'fecha_hoy': hoy,
-        'q':         q,
-    }))
+    return redirect(reverse('app_admin:pedidos'))
 
 
 @admin_required
@@ -1573,7 +2092,7 @@ TRANSICIONES_VALIDAS_DOCENTE = {
 @admin_required
 def pedido_docente_estado(request, pk):
     pedido = get_object_or_404(PedidoDocente, pk=pk)
-    next_url = request.POST.get('next', 'app_admin:pedidos_docentes')
+    next_url = request.POST.get('next', reverse('app_admin:pedidos'))
     if request.method == 'POST':
         nuevo = request.POST.get('estado')
         estados_validos = [e[0] for e in PedidoDocente.ESTADO_CHOICES]
@@ -2182,6 +2701,175 @@ def usuario_bulk(request):
         else:
             messages.error(request, 'Acción inválida.')
     return redirect('app_admin:usuarios')
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CARNETS QR (impresión)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@admin_required
+def carnets(request):
+    """Lista de estudiantes o docentes para imprimir carnets QR."""
+    tipo = request.GET.get('tipo', 'estudiante')
+    q    = request.GET.get('q', '').strip()
+
+    total_est = Estudiante.objects.filter(perfil__activo=True).count()
+    total_doc = Docente.objects.filter(perfil__activo=True).count()
+
+    if tipo == 'docente':
+        qs = Docente.objects.select_related('perfil__user').filter(perfil__activo=True)
+        if q:
+            qs = qs.filter(
+                Q(documento__icontains=q) |
+                Q(perfil__user__first_name__icontains=q) |
+                Q(perfil__user__last_name__icontains=q)
+            )
+        qs = qs.order_by('perfil__user__last_name', 'perfil__user__first_name')
+        return render(request, 'app_admin/carnets.html', _ctx({
+            'tipo':      'docente',
+            'docentes':  qs,
+            'q':         q,
+            'total_est': total_est,
+            'total_doc': qs.count(),
+        }))
+
+    # estudiante (default)
+    grado = request.GET.get('grado', '').strip()
+    qs = Estudiante.objects.select_related('perfil__user').filter(perfil__activo=True)
+    if q:
+        qs = qs.filter(
+            Q(codigo__icontains=q) |
+            Q(perfil__user__first_name__icontains=q) |
+            Q(perfil__user__last_name__icontains=q)
+        )
+    if grado:
+        qs = qs.filter(grado=grado)
+    qs = qs.order_by('grado', 'perfil__user__last_name', 'perfil__user__first_name')
+    grados_disponibles = (
+        Estudiante.objects.filter(perfil__activo=True)
+        .values_list('grado', flat=True).distinct().order_by('grado')
+    )
+    return render(request, 'app_admin/carnets.html', _ctx({
+        'tipo':               'estudiante',
+        'estudiantes':        qs,
+        'q':                  q,
+        'grado_f':            grado,
+        'grados_disponibles': list(grados_disponibles),
+        'total_est':          qs.count(),
+        'total_doc':          total_doc,
+    }))
+
+
+@admin_required
+def carnets_pdf(request):
+    """Genera un PDF imprimible con los carnets seleccionados (8 por A4)."""
+    import io
+    import qrcode
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen import canvas as pdfcanvas
+    from reportlab.lib.utils import ImageReader
+
+    tipo = request.GET.get('tipo', 'estudiante')
+    pks  = request.GET.getlist('pk') or request.POST.getlist('pk')
+    if not pks:
+        messages.warning(request, 'No seleccionaste ningún registro.')
+        return redirect('app_admin:carnets')
+
+    if tipo == 'docente':
+        personas = list(
+            Docente.objects
+            .select_related('perfil__user')
+            .filter(pk__in=pks, perfil__activo=True)
+            .order_by('perfil__user__last_name', 'perfil__user__first_name')
+        )
+    else:
+        personas = list(
+            Estudiante.objects
+            .select_related('perfil__user')
+            .filter(pk__in=pks, perfil__activo=True)
+            .order_by('grado', 'perfil__user__last_name', 'perfil__user__first_name')
+        )
+
+    buf = io.BytesIO()
+    c = pdfcanvas.Canvas(buf, pagesize=A4)
+    page_w, page_h = A4
+
+    card_w   = 85.6 * mm
+    card_h   = 54   * mm
+    margin_x = (page_w - 2 * card_w) / 3
+    margin_y = (page_h - 4 * card_h) / 5
+
+    def dibujar_carnet(x, y, persona):
+        c.setStrokeColorRGB(0.7, 0.7, 0.7)
+        c.setLineWidth(0.5)
+        c.roundRect(x, y, card_w, card_h, 6, stroke=1, fill=0)
+
+        if tipo == 'docente':
+            qr_data   = f'DOC-{persona.pk}'
+            sub_label = persona.materia or 'Docente'
+            id_label  = f'Doc: {persona.documento}' if persona.documento else ''
+        else:
+            qr_data   = persona.codigo
+            sub_label = f'Grado: {persona.grado}'
+            id_label  = f'Código: {persona.codigo}'
+
+        qr = qrcode.QRCode(box_size=10, border=2)
+        qr.add_data(qr_data)
+        qr.make(fit=True)
+        img     = qr.make_image(fill_color='black', back_color='white')
+        img_buf = io.BytesIO()
+        img.save(img_buf, format='PNG')
+        img_buf.seek(0)
+        qr_size = card_h - 10 * mm
+        c.drawImage(ImageReader(img_buf), x + 4 * mm, y + 5 * mm, qr_size, qr_size)
+
+        text_x      = x + qr_size + 8 * mm
+        nombre      = persona.perfil.user.get_full_name() or persona.perfil.user.username
+        nombre_corto = nombre if len(nombre) <= 28 else nombre[:26] + '…'
+
+        c.setFillColorRGB(0.06, 0.06, 0.05)
+        c.setFont('Helvetica-Bold', 7)
+        c.drawString(text_x, y + card_h - 6 * mm, 'PUNTO ASIS')
+        c.setFont('Helvetica', 6)
+        c.setFillColorRGB(0.45, 0.45, 0.45)
+        c.drawString(text_x, y + card_h - 9.5 * mm, 'Cafetería escolar')
+
+        c.setFillColorRGB(0.06, 0.06, 0.05)
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(text_x, y + card_h - 18 * mm, nombre_corto)
+
+        c.setFont('Helvetica', 7.5)
+        c.setFillColorRGB(0.30, 0.30, 0.30)
+        c.drawString(text_x, y + card_h - 23.5 * mm, sub_label)
+
+        if id_label:
+            c.setFont('Helvetica-Bold', 8)
+            c.setFillColorRGB(0.06, 0.06, 0.05)
+            c.drawString(text_x, y + card_h - 30 * mm, id_label)
+
+        c.setFont('Helvetica', 5.5)
+        c.setFillColorRGB(0.55, 0.55, 0.55)
+        c.drawString(x + 4 * mm, y + 2 * mm, 'Presenta este carnet en caja para identificarte.')
+
+    cards_per_page = 8
+    for i, persona in enumerate(personas):
+        slot = i % cards_per_page
+        col  = slot % 2
+        row  = slot // 2
+        x    = margin_x + col * (card_w + margin_x)
+        y    = page_h - margin_y - (row + 1) * card_h - row * margin_y
+        dibujar_carnet(x, y, persona)
+        if slot == cards_per_page - 1 and i + 1 < len(personas):
+            c.showPage()
+
+    c.save()
+    buf.seek(0)
+
+    fecha    = date.today().strftime('%Y%m%d')
+    response = HttpResponse(buf.read(), content_type='application/pdf')
+    response['Content-Disposition'] = f'inline; filename="carnets_{tipo}_{fecha}.pdf"'
+    return response
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -3083,9 +3771,18 @@ def empleado_nuevo(request):
         es_global  = request.POST.get('es_global') == 'on'
         sede_ids   = request.POST.getlist('sedes')
 
+        password   = request.POST.get('password', '').strip()
+        password2  = request.POST.get('password2', '').strip()
+
         errores = []
         if not first_name or not last_name:
             errores.append('Nombre y apellido son obligatorios.')
+        if not password:
+            errores.append('La contraseña es obligatoria.')
+        elif len(password) < 6:
+            errores.append('La contraseña debe tener al menos 6 caracteres.')
+        elif password != password2:
+            errores.append('Las contraseñas no coinciden.')
         if email and User.objects.filter(email=email).exists():
             errores.append('Ya existe una cuenta registrada con ese correo.')
 
@@ -3093,7 +3790,6 @@ def empleado_nuevo(request):
             for e in errores:
                 messages.error(request, e)
         else:
-            password = _generar_password()
             from authentication.utils import _normalizar
             if email:
                 username = generar_username(email)
@@ -3115,9 +3811,8 @@ def empleado_nuevo(request):
 
             messages.success(
                 request,
-                f'Empleado creado. Correo: <strong>{email}</strong> — '
-                f'Contrasena temporal: <strong>{password}</strong>. '
-                f'Comparte estas credenciales de forma segura.'
+                f'Empleado creado. Correo: <strong>{email}</strong>. '
+                f'Credenciales listas para compartir.'
             )
             return redirect('app_admin:empleado_detalle', pk=empleado.pk)
 
@@ -3161,13 +3856,18 @@ def empleado_detalle(request, pk):
             messages.success(request, 'Empleado actualizado correctamente.')
 
         elif accion == 'reset_password':
-            nueva = _generar_password()
-            empleado.perfil.user.set_password(nueva)
-            empleado.perfil.user.save()
-            messages.success(
-                request,
-                f'Contrasena restablecida: <strong>{nueva}</strong>. Compartela de forma segura.'
-            )
+            nueva   = request.POST.get('nueva_password', '').strip()
+            nueva2  = request.POST.get('nueva_password2', '').strip()
+            if not nueva:
+                messages.error(request, 'Escribe la nueva contraseña.')
+            elif len(nueva) < 6:
+                messages.error(request, 'La contraseña debe tener al menos 6 caracteres.')
+            elif nueva != nueva2:
+                messages.error(request, 'Las contraseñas no coinciden.')
+            else:
+                empleado.perfil.user.set_password(nueva)
+                empleado.perfil.user.save()
+                messages.success(request, 'Contraseña actualizada correctamente.')
 
         return redirect('app_admin:empleado_detalle', pk=pk)
 

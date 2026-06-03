@@ -121,15 +121,21 @@ function actualizarPreview() {
     }
 
     let puedeProd = true;
+    let fraccionUnitario = false; // Bug #3/#9b
     let rows = '';
     for (const ing of prod.receta) {
         const needed = ing.cantidad * cantidad;
         const ok = ing.stock_real >= needed;
         if (cantidad > 0 && !ok) puedeProd = false;
-        const cls = cantidad === 0 ? '' : (ok ? 'ing-ok' : 'ing-err');
+        // Si el ingrediente solo admite enteros y la cantidad necesaria no lo es, marcamos error
+        const necesitaFraccion = ing.unitario && cantidad > 0 && Math.abs(needed - Math.round(needed)) > 1e-6;
+        if (necesitaFraccion) fraccionUnitario = true;
+        let cls = cantidad === 0 ? '' : (ok ? 'ing-ok' : 'ing-err');
+        if (necesitaFraccion) cls = 'ing-err';
+        const tag = ing.unitario ? ' <span style="font-size:.65rem;color:var(--amber);font-weight:600;">[entero]</span>' : '';
         rows += `
         <div class="ing-row">
-            <span class="ing-name">${escHtml(ing.nombre)}</span>
+            <span class="ing-name">${escHtml(ing.nombre)}${tag}</span>
             <span class="ing-need">${cantidad > 0 ? 'Necesita: ' + fmtNum(needed) + ' ' + escHtml(ing.unidad) : '—'}</span>
             <span class="ing-stock ${cls}">Stock: ${fmtNum(ing.stock_real)} ${escHtml(ing.unidad)}</span>
         </div>`;
@@ -137,12 +143,18 @@ function actualizarPreview() {
     body.innerHTML = rows;
     wrap.style.display = '';
 
+    let extraBadge = '';
+    if (fraccionUnitario) {
+        const tm = prod.tanda_min || 1;
+        extraBadge = `<span class="max-badge err" style="margin-left:.4rem;"><i class="bi bi-exclamation-triangle-fill"></i> Tanda mínima: múltiplos de ${tm}</span>`;
+    }
+
     const max = prod.max_producible;
     const badgeCls = max === 0 ? 'err' : (max < 5 ? 'warn' : 'ok');
     const icon = max === 0 ? 'bi-x-circle-fill' : (max < 5 ? 'bi-exclamation-triangle-fill' : 'bi-check-circle-fill');
-    maxWrap.innerHTML = `<span class="max-badge ${badgeCls}"><i class="bi ${icon}"></i> Máx. producibles: ${max}</span>`;
+    maxWrap.innerHTML = `<span class="max-badge ${badgeCls}"><i class="bi ${icon}"></i> Máx. producibles: ${max}</span>${extraBadge}`;
 
-    btnProd.disabled = !(cantidad > 0 && puedeProd && prod.receta.length > 0);
+    btnProd.disabled = !(cantidad > 0 && puedeProd && prod.receta.length > 0 && !fraccionUnitario);
 }
 
 function fmtNum(n) {

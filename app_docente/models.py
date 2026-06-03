@@ -17,15 +17,9 @@ class PedidoDocente(models.Model):
         ('entregado',  'Entregado'),
         ('cancelado',  'Cancelado'),
     ]
-    PAGO_CHOICES = [
-        ('saldo', 'Saldo'),
-        ('fiado', 'Fiado (crédito)'),
-    ]
-
     ticket        = models.CharField(max_length=20, unique=True, editable=False)
     docente       = models.ForeignKey(Docente, on_delete=models.PROTECT, related_name='pedidos')
     estado        = models.CharField(max_length=15, choices=ESTADO_CHOICES, default='pendiente')
-    tipo_pago     = models.CharField(max_length=10, choices=PAGO_CHOICES, default='saldo')
     total         = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     nota          = models.TextField(blank=True)
     pedido_grupal = models.ForeignKey(
@@ -104,7 +98,6 @@ class PedidoProgramadoDocente(models.Model):
     fecha_entrega = models.DateField()
     hora_entrega  = models.TimeField(null=True, blank=True)
     nota          = models.TextField(blank=True)
-    tipo_pago     = models.CharField(max_length=10, choices=PedidoDocente.PAGO_CHOICES, default='saldo')
     estado        = models.CharField(max_length=12, choices=ESTADO_CHOICES, default='activo')
     pedido        = models.ForeignKey(
         PedidoDocente, on_delete=models.SET_NULL,
@@ -239,7 +232,6 @@ class PedidoGrupal(models.Model):
 class NotificacionDocente(models.Model):
     TIPO_CHOICES = [
         ('pedido_listo',    'Pedido Listo'),
-        ('fiado_cerca',     'Límite Fiado Cerca'),
         ('pedido_grupal',   'Pedido Grupal'),
         ('info',            'Información'),
     ]
@@ -277,6 +269,8 @@ class RecargaDocente(models.Model):
     comprobante      = models.ImageField(upload_to='recargas/docentes/', blank=True, null=True, validators=[validate_image])
     nota             = models.CharField(max_length=300, blank=True)
     estado           = models.CharField(max_length=15, choices=ESTADO_CHOICES, default='pendiente')
+    mp_preference_id = models.CharField(max_length=200, blank=True)
+    mp_payment_id    = models.CharField(max_length=100, blank=True)
     nota_admin       = models.CharField(max_length=300, blank=True, verbose_name='Nota del administrador')
     fecha            = models.DateTimeField(auto_now_add=True)
     fecha_resolucion = models.DateTimeField(null=True, blank=True)
@@ -317,36 +311,3 @@ class RecargaDocente(models.Model):
         ordering = ['-fecha']
 
 
-# ─── HISTORIAL DE FIADO ───────────────────────────────────────────────────────
-
-class MovimientoFiado(models.Model):
-    """Registro inmutable de cada cargo o abono al fiado de un docente."""
-    TIPO_CHOICES = [
-        ('cargo',  'Cargo (pedido)'),
-        ('abono',  'Abono (pago)'),
-        ('ajuste', 'Ajuste manual'),
-    ]
-    docente    = models.ForeignKey(
-        Docente, on_delete=models.CASCADE, related_name='movimientos_fiado'
-    )
-    tipo       = models.CharField(max_length=10, choices=TIPO_CHOICES)
-    monto      = models.DecimalField(max_digits=10, decimal_places=2)
-    saldo_post = models.DecimalField(
-        max_digits=10, decimal_places=2,
-        help_text='Deuda total del docente después del movimiento'
-    )
-    referencia = models.ForeignKey(
-        'PedidoDocente', on_delete=models.SET_NULL,
-        null=True, blank=True, related_name='movimientos_fiado',
-        help_text='Pedido que originó el cargo (si aplica)'
-    )
-    nota       = models.TextField(blank=True)
-    fecha      = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f'{self.get_tipo_display()} ${self.monto} — {self.docente} ({self.fecha:%d/%m/%Y})'
-
-    class Meta:
-        verbose_name = 'Movimiento de Fiado'
-        verbose_name_plural = 'Movimientos de Fiado'
-        ordering = ['-fecha']

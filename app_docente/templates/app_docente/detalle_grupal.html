@@ -1,4 +1,5 @@
 {% extends 'app_docente/base_docente.html' %}
+{% load filtros %}
 {% block title %}{{ grupal.titulo }}{% endblock %}
 {% block topbar_title %}Pedido Grupal{% endblock %}
 
@@ -53,7 +54,7 @@
             </div>
             <span style="font-size:.82rem; font-weight:700;">{{ p.docente.perfil.user.get_full_name }}</span>
           </div>
-          <span style="font-family:var(--serif); font-size:.95rem; color:var(--leaf); font-weight:400;">${{ p.total|floatformat:0 }}</span>
+          <span style="font-family:var(--serif); font-size:.95rem; color:var(--leaf); font-weight:400;">${{ p.total|miles }}</span>
         </div>
         <div style="font-size:.7rem; color:var(--stone); padding-left:2.45rem;">
           {% for d in p.detalles.all %}
@@ -69,7 +70,7 @@
       {% endfor %}
       <div style="padding:.85rem 1.25rem; display:flex; justify-content:space-between; align-items:center; background:var(--cream); border-top:1px solid var(--mist);">
         <span style="font-size:.8rem; font-weight:700; color:var(--stone);">Total grupal</span>
-        <span style="font-family:var(--serif); font-size:1.2rem; color:var(--leaf);">${{ grupal.total_grupal|floatformat:0 }}</span>
+        <span style="font-family:var(--serif); font-size:1.2rem; color:var(--leaf);">${{ grupal.total_grupal|miles }}</span>
       </div>
     </div>
 
@@ -102,7 +103,7 @@
               <div style="display:flex; align-items:center; justify-content:space-between; padding:.38rem .55rem; border-radius:7px; transition:background .12s;" onmouseenter="this.style.background='var(--leaf-pale)'" onmouseleave="this.style.background='transparent'">
                 <div>
                   <div style="font-size:.76rem; font-weight:600;">{{ p.nombre }}</div>
-                  <div style="font-size:.63rem; color:var(--stone);">${{ p.precio_venta|floatformat:0 }}</div>
+                  <div style="font-size:.63rem; color:var(--stone);">${{ p.precio_venta|miles }}</div>
                 </div>
                 <div style="display:flex; align-items:center; gap:.25rem;">
                   <button type="button" class="btn btn-ghost btn-xs" onclick="chg({{ p.pk }}, -1)" style="width:1.5rem; height:1.5rem; padding:0; justify-content:center;">−</button>
@@ -111,13 +112,6 @@
                 </div>
               </div>
               {% endfor %}
-            </div>
-            <div class="field" style="margin-bottom:.75rem;">
-              <label>Pago</label>
-              <select name="tipo_pago">
-                <option value="saldo">Saldo</option>
-                <option value="fiado">Fiado</option>
-              </select>
             </div>
             <div class="field" style="margin-bottom:1rem;">
               <label>Nota (opcional)</label>
@@ -137,7 +131,7 @@
         <div class="section-title" style="margin-bottom:.6rem;">Acciones del organizador</div>
         <p style="font-size:.75rem; color:var(--stone); margin-bottom:.75rem;">Al cerrar el pedido, ya no se aceptarán más participantes y la cafetería lo recibirá.</p>
         <form action="{% url 'app_docente:cerrar_grupal' grupal.pk %}" method="post"
-              onsubmit="return confirm('¿Cerrar el pedido? Ya no se aceptarán más participantes.');">
+              data-pa-confirm="¿Cerrar el pedido? Ya no se aceptarán más participantes." data-pa-type="warn" data-pa-ok="Cerrar pedido">
           {% csrf_token %}
           <button type="submit" class="btn btn-danger btn-full btn-sm">
             <i class="bi bi-lock"></i> Cerrar pedido grupal
@@ -170,7 +164,7 @@ function chg(pk, delta, name, price) {
 }
 document.getElementById('unirse-form')?.addEventListener('submit', e => {
   const items = Object.values(gc).filter(i => i.cantidad > 0);
-  if (items.length === 0) { e.preventDefault(); alert('Selecciona al menos un producto.'); return; }
+  if (items.length === 0) { e.preventDefault(); paShowToast('Selecciona al menos un producto.', 'warn'); return; }
   document.getElementById('g-carrito').value = JSON.stringify(items.map(i => ({ id: i.id, cantidad: i.cantidad })));
 });
 </script>

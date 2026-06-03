@@ -1,4 +1,5 @@
 {% extends 'app_docente/base_docente.html' %}
+{% load filtros %}
 {% block title %}Menú{% endblock %}
 {% block topbar_title %}Menú de la Cafetería{% endblock %}
 
@@ -102,12 +103,7 @@
 
 <!-- Saldo strip -->
 <div class="saldo-strip">
-  <span style="color:var(--stone);">Mi saldo: <strong>${{ docente.saldo|floatformat:0 }}</strong></span>
-  {% if docente.credito_disponible %}
-  <span style="color:var(--amber); font-weight:600; display:flex; align-items:center; gap:.3rem;">
-    <i class="bi bi-credit-card"></i> ${{ docente.credito_disponible|floatformat:0 }} crédito fiado
-  </span>
-  {% endif %}
+  <span style="color:var(--stone);">Mi saldo: <strong>${{ docente.saldo|miles }}</strong></span>
   <a href="{% url 'app_docente:recargar_saldo' %}" class="btn btn-outline btn-sm" style="margin-left:auto;">
     <i class="bi bi-plus-circle"></i> Recargar
   </a>
@@ -233,7 +229,7 @@
 
     <!-- Footer -->
     <div class="prod-footer">
-      <span class="prod-price">${{ p.precio_venta|floatformat:0 }}</span>
+      <span class="prod-price">${{ p.precio_venta|miles }}</span>
       <button class="btn btn-primary btn-sm add-cart"
               data-pk="{{ p.pk }}" data-name="{{ p.nombre }}" data-price="{{ p.precio_venta }}">
         <i class="bi bi-plus-lg"></i> Agregar
@@ -296,7 +292,22 @@
 
 {% block extra_js %}
 <script>
+const CARRITO_KEY = 'carrito_doc_{{ docente.pk }}';
 let cart = {};
+
+// ── Restore from localStorage ──
+(function() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(CARRITO_KEY) || '{}');
+    for (const [pk, item] of Object.entries(saved)) {
+      if (item && item.qty > 0) cart[pk] = item;
+    }
+  } catch(e) {}
+})();
+
+function saveCart() {
+  localStorage.setItem(CARRITO_KEY, JSON.stringify(cart));
+}
 
 function updateUI() {
   const count = Object.values(cart).reduce((a, i) => a + i.qty, 0);
@@ -331,6 +342,7 @@ function changeQty(pk, delta) {
   if (!cart[pk]) return;
   cart[pk].qty += delta;
   if (cart[pk].qty <= 0) delete cart[pk];
+  saveCart();
   updateUI();
 }
 
@@ -339,6 +351,7 @@ document.querySelectorAll('.add-cart').forEach(btn => {
     const pk = btn.dataset.pk;
     if (cart[pk]) cart[pk].qty++;
     else cart[pk] = { pk, name: btn.dataset.name, price: parseFloat(btn.dataset.price), qty: 1 };
+    saveCart();
     updateUI();
 
     btn.innerHTML = '<i class="bi bi-check-lg"></i> Listo';
@@ -364,12 +377,16 @@ function closeCart() {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCart(); });
 
 document.getElementById('cart-form').addEventListener('submit', e => {
-  if (Object.keys(cart).length === 0) { e.preventDefault(); alert('El carrito está vacío.'); return; }
+  if (Object.keys(cart).length === 0) { e.preventDefault(); paShowToast('El carrito está vacío.', 'warn'); return; }
   document.getElementById('cart-json').value = JSON.stringify(
     Object.values(cart).map(i => ({ id: i.pk, cantidad: i.qty }))
   );
   document.getElementById('cart-nota-val').value = document.getElementById('cart-nota').value;
+  localStorage.removeItem(CARRITO_KEY);
 });
+
+// Init UI with restored cart
+updateUI();
 
 // Favorites
 document.querySelectorAll('.fav-btn').forEach(btn => {

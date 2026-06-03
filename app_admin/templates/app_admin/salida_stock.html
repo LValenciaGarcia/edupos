@@ -291,6 +291,17 @@ function mostrarInfoItem() {
   document.getElementById('disp-stock').textContent = stockFmt + ' ' + item.unidad;
   bar.classList.add('visible');
 
+  // Bug #6/7 + #8: ajustar restricciones del input según tipo y stock
+  const cantInp = document.getElementById('inp-cantidad');
+  if (currentTipo === 'producto') {
+    cantInp.step = '1';
+    cantInp.min  = '1';
+  } else {
+    cantInp.step = '0.01';
+    cantInp.min  = '0.01';
+  }
+  cantInp.max = item.stock > 0 ? String(item.stock) : '0';
+
   // Habilitar botón
   document.getElementById('btn-submit').disabled = false;
 }
@@ -314,8 +325,23 @@ poblarSelect();
 document.getElementById('form-salida').addEventListener('submit', function(e) {
   const item = document.getElementById('sel-item').value;
   const cant = parseFloat(document.getElementById('inp-cantidad').value);
-  if (!item) { e.preventDefault(); alert('Selecciona un ítem.'); return; }
-  if (!cant || cant <= 0) { e.preventDefault(); alert('La cantidad debe ser mayor a 0.'); return; }
+  if (!item) { e.preventDefault(); paShowToast('Selecciona un ítem.', 'warn'); return; }
+  if (!cant || cant <= 0) { e.preventDefault(); paShowToast('La cantidad debe ser mayor a 0.', 'warn'); return; }
+
+  // Bug #6/7: productos solo aceptan unidades enteras
+  if (currentTipo === 'producto' && cant !== Math.floor(cant)) {
+    e.preventDefault();
+    paShowToast('Los productos se retiran en unidades enteras.', 'warn');
+    return;
+  }
+  // Bug #8: bloquear retiro mayor al stock disponible
+  const lista = currentTipo === 'producto' ? DATA_PRODUCTOS : DATA_INGREDIENTES;
+  const obj   = lista.find(x => String(x.id) === String(item));
+  if (obj && cant > Number(obj.stock)) {
+    e.preventDefault();
+    paShowToast('No puedes retirar más de lo disponible (' + obj.stock + ' ' + obj.unidad + ').', 'warn');
+    return;
+  }
 });
 
 // Enable submit on item select

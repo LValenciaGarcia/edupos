@@ -1,0 +1,255 @@
+{% extends 'app_admin/base_admin.html' %}
+{% load static %}
+{% load filtros %}
+
+{% block title %}Carnets QR{% endblock %}
+{% block page_title %}Carnets QR{% endblock %}
+{% block nav_carnets %}active{% endblock %}
+
+{% block content %}
+<style>
+  .ca-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid var(--mist);
+    margin-bottom: 1.5rem;
+  }
+  .ca-tab {
+    display: flex; align-items: center; gap: .45rem;
+    padding: .65rem 1.25rem;
+    font-size: .83rem; font-weight: 600;
+    color: var(--ash); text-decoration: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: color .15s, border-color .15s;
+    white-space: nowrap;
+  }
+  .ca-tab:hover { color: var(--ink); }
+  .ca-tab.active { color: var(--violet); border-bottom-color: var(--violet); }
+  .ca-tab-badge {
+    background: var(--mist); color: var(--stone);
+    border-radius: 9px; font-size: .65rem; font-weight: 700;
+    padding: .08rem .45rem; min-width: 1.4rem; text-align: center;
+  }
+  .ca-tab.active .ca-tab-badge { background: #ede9fe; color: var(--violet); }
+
+  .ca-info {
+    background: var(--cream); border: 1px solid var(--mist);
+    padding: .7rem 1rem; border-radius: 8px; font-size: .8rem;
+    color: var(--stone); margin-bottom: 1.1rem;
+    display: flex; align-items: flex-start; gap: .6rem;
+  }
+  .ca-info i { color: var(--violet); font-size: 1rem; flex-shrink: 0; margin-top: .05rem; }
+
+  .ca-actions {
+    display: flex; align-items: center; gap: .75rem;
+    padding: .7rem 1.1rem;
+    border-bottom: 1px solid var(--mist);
+  }
+  .ca-actions .ca-sel-label {
+    display: flex; align-items: center; gap: .4rem;
+    font-size: .8rem; cursor: pointer; user-select: none; color: var(--stone);
+  }
+  .ca-actions .ca-sel-label input[type=checkbox] { transform: scale(1.1); cursor: pointer; }
+  .ca-sel-count { font-size: .78rem; color: var(--ash); }
+
+  .code-pill {
+    font-family: var(--serif); font-size: .72rem;
+    background: var(--cream); color: var(--leaf-dark);
+    padding: .1rem .4rem; border-radius: 4px;
+    border: 1px solid var(--mist); letter-spacing: .02em;
+  }
+</style>
+
+<!-- Tabs -->
+<div class="ca-tabs">
+  <a href="?tipo=estudiante{% if q and tipo == 'estudiante' %}&q={{ q }}{% endif %}"
+     class="ca-tab {% if tipo == 'estudiante' %}active{% endif %}">
+    <i class="bi bi-mortarboard"></i>
+    Estudiantes
+    <span class="ca-tab-badge">{{ total_est }}</span>
+  </a>
+  <a href="?tipo=docente{% if q and tipo == 'docente' %}&q={{ q }}{% endif %}"
+     class="ca-tab {% if tipo == 'docente' %}active{% endif %}">
+    <i class="bi bi-person-badge"></i>
+    Docentes
+    <span class="ca-tab-badge">{{ total_doc }}</span>
+  </a>
+</div>
+
+<!-- Info banner -->
+<div class="ca-info">
+  <i class="bi bi-info-circle-fill"></i>
+  <span>
+    Genera un PDF con tarjetas tamaño carnet (8 por hoja A4). Cada tarjeta incluye un QR que,
+    al escanearse en la caja, identifica al
+    <strong>{% if tipo == 'docente' %}docente{% else %}estudiante{% endif %}</strong>
+    y carga su saldo automáticamente.
+    {% if tipo == 'docente' %}
+      El QR codifica <code>DOC-{id}</code> del docente.
+    {% else %}
+      El QR codifica el código único del estudiante.
+    {% endif %}
+  </span>
+</div>
+
+<!-- Filtros -->
+<form method="get" class="filter-bar">
+  <input type="hidden" name="tipo" value="{{ tipo }}">
+  <input type="text" name="q" value="{{ q }}"
+         placeholder="Buscar por nombre{% if tipo == 'estudiante' %} o código{% else %} o documento{% endif %}…"
+         style="flex:1; min-width:200px; max-width:340px;">
+  {% if tipo == 'estudiante' %}
+  <select name="grado">
+    <option value="">Todos los grados</option>
+    {% for g in grados_disponibles %}
+      <option value="{{ g }}" {% if grado_f == g %}selected{% endif %}>Grado {{ g }}</option>
+    {% endfor %}
+  </select>
+  {% endif %}
+  <button type="submit" class="btn btn-ghost btn-sm"><i class="bi bi-funnel"></i> Filtrar</button>
+  {% if q or grado_f %}
+    <a href="?tipo={{ tipo }}" class="btn btn-ghost btn-sm">
+      <i class="bi bi-x"></i> Limpiar
+    </a>
+  {% endif %}
+</form>
+
+<!-- Tabla con selección y generación de PDF -->
+<form method="get" action="{% url 'app_admin:carnets_pdf' %}" target="_blank">
+  <input type="hidden" name="tipo" value="{{ tipo }}">
+
+  <div class="card">
+    <!-- Barra de acciones -->
+    <div class="ca-actions">
+      <label class="ca-sel-label">
+        <input type="checkbox" id="caCheckAll" onclick="toggleAll(this)">
+        Seleccionar todos
+      </label>
+      <span class="ca-sel-count" id="caCount">0 seleccionados</span>
+      <span style="flex:1;"></span>
+      <button type="submit" class="btn btn-primary btn-sm" id="caBtnPdf" disabled>
+        <i class="bi bi-printer"></i> Generar PDF
+      </button>
+    </div>
+
+    <!-- Estudiantes -->
+    {% if tipo == 'estudiante' %}
+      {% if estudiantes %}
+      <div class="table-wrap">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th style="width:38px;"></th>
+              <th>Nombre</th>
+              <th>Código QR</th>
+              <th>Grado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in estudiantes %}
+            <tr>
+              <td>
+                <input type="checkbox" name="pk" value="{{ e.pk }}"
+                       class="ca-pk" onchange="actualizarConteo()">
+              </td>
+              <td>
+                <span style="font-weight:600;">{{ e.perfil.user.get_full_name|default:e.perfil.user.username }}</span>
+              </td>
+              <td><span class="code-pill">{{ e.codigo }}</span></td>
+              <td><span class="badge badge-est">{{ e.grado }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state">
+        <i class="bi bi-mortarboard es-icon"></i>
+        <h3>Sin estudiantes</h3>
+        <p>No hay estudiantes que coincidan con los filtros aplicados.</p>
+        {% if q or grado_f %}
+          <a href="?tipo=estudiante" class="btn btn-ghost btn-sm" style="margin-top:.5rem;">
+            <i class="bi bi-x"></i> Quitar filtros
+          </a>
+        {% endif %}
+      </div>
+      {% endif %}
+
+    <!-- Docentes -->
+    {% else %}
+      {% if docentes %}
+      <div class="table-wrap">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th style="width:38px;"></th>
+              <th>Nombre</th>
+              <th>Documento</th>
+              <th>Materia / Área</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in docentes %}
+            <tr>
+              <td>
+                <input type="checkbox" name="pk" value="{{ d.pk }}"
+                       class="ca-pk" onchange="actualizarConteo()">
+              </td>
+              <td>
+                <span style="font-weight:600;">{{ d.perfil.user.get_full_name|default:d.perfil.user.username }}</span>
+              </td>
+              <td style="color:var(--stone);font-size:.8rem;">{{ d.documento|default:"—" }}</td>
+              <td>
+                {% if d.materia %}
+                  <span class="badge" style="background:#ede9fe;color:var(--violet);border:1px solid #ddd6fe;">
+                    {{ d.materia }}
+                  </span>
+                {% else %}
+                  <span style="color:var(--ash);">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state">
+        <i class="bi bi-person-badge es-icon"></i>
+        <h3>Sin docentes</h3>
+        <p>No hay docentes activos{% if q %} que coincidan con "{{ q }}"{% endif %}.</p>
+        {% if q %}
+          <a href="?tipo=docente" class="btn btn-ghost btn-sm" style="margin-top:.5rem;">
+            <i class="bi bi-x"></i> Quitar filtros
+          </a>
+        {% endif %}
+      </div>
+      {% endif %}
+    {% endif %}
+  </div>
+</form>
+
+<script>
+function toggleAll(master) {
+  document.querySelectorAll('.ca-pk').forEach(c => c.checked = master.checked);
+  actualizarConteo();
+}
+
+function actualizarConteo() {
+  const total    = document.querySelectorAll('.ca-pk').length;
+  const checked  = document.querySelectorAll('.ca-pk:checked').length;
+  const master   = document.getElementById('caCheckAll');
+  const countEl  = document.getElementById('caCount');
+  const btnPdf   = document.getElementById('caBtnPdf');
+
+  countEl.textContent = checked + ' seleccionado' + (checked === 1 ? '' : 's');
+  btnPdf.disabled     = checked === 0;
+
+  if (master) {
+    master.checked       = checked > 0 && checked === total;
+    master.indeterminate = checked > 0 && checked < total;
+  }
+}
+</script>
+{% endblock %}

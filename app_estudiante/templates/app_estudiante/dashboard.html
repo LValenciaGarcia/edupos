@@ -269,6 +269,10 @@
             <i class="bi bi-person-circle"></i>
             Mi perfil
           </a>
+          <a href="{% url 'app_estudiante:mi_qr' %}" class="quick-btn highlight" style="grid-column: span 2;">
+            <i class="bi bi-qr-code"></i>
+            Mostrar mi QR
+          </a>
         </div>
       </div>
     </div>
@@ -290,7 +294,7 @@
         </div>
         <div class="fav-nombre" title="{{ p.producto__nombre }}">{{ p.producto__nombre }}</div>
         <div style="text-align:right;flex-shrink:0;">
-          <div class="fav-precio">${{ p.producto__precio_venta|floatformat:0 }}</div>
+          <div class="fav-precio">${{ p.producto__precio_venta|miles }}</div>
           <div class="fav-veces">x{{ p.veces }} pedido{{ p.veces|pluralize }}</div>
         </div>
       </div>

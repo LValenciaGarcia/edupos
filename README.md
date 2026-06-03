@@ -44,7 +44,7 @@ Cada usuario tiene un `Perfil` con un rol: `admin`, `docente`, `estudiante`, `pa
 
 - **Estudiante:** Cuenta creada por su padre (no self-registered). Saldo de recargas.
 - **Padre:** Crea estudiantes, recarga saldo, ve pedidos del hijo.
-- **Docente:** Acceso a crédito (fiado) con `limite_fiado` y `deuda_fiado`.
+- **Docente:** Pide con su saldo propio recargado (no hay sistema de crédito).
 - **Admin:** Panel de administración completo.
 
 ---

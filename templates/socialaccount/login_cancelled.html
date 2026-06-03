@@ -1,0 +1,118 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Acceso cancelado — Punto Asis · EduPos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --black:       #0a0a0a;
+      --off-black:   #111111;
+      --white:       #f8f8f6;
+      --off-white:   #efefec;
+      --green-dark:  #1a3d2b;
+      --green-mid:   #2d6a4f;
+      --green-vivid: #40c074;
+      --green-pale:  #e8f5ee;
+      --green-light: #b7e4c7;
+      --gray-200:    #e2e2dd;
+      --gray-400:    #b0b0a8;
+      --gray-500:    #8a8a82;
+      --serif: 'DM Serif Display', Georgia, serif;
+      --sans:  'DM Sans', system-ui, sans-serif;
+      --ease:  cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body { font-family: var(--sans); min-height: 100vh; display: grid; grid-template-columns: 46fr 54fr; }
+
+    /* ══ PANEL IZQUIERDO ══ */
+    .left-panel { background: var(--off-black); padding: 3.4rem 4rem 3rem; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; }
+    .left-panel::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--green-vivid), var(--green-mid), transparent); }
+    .left-panel::after  { content: ''; position: absolute; bottom: -120px; left: -80px; width: 440px; height: 440px; background: radial-gradient(circle, rgba(64,192,116,0.07) 0%, transparent 62%); pointer-events: none; }
+    .left-glow { position: absolute; top: -60px; right: -60px; width: 300px; height: 300px; background: radial-gradient(circle, rgba(64,192,116,0.05) 0%, transparent 65%); pointer-events: none; }
+    .left-logo { font-family: var(--serif); font-size: 1.55rem; color: var(--white); text-decoration: none; display: inline-flex; align-items: center; gap: 8px; position: relative; z-index: 1; }
+    .logo-dot  { width: 8px; height: 8px; background: var(--green-vivid); border-radius: 50%; animation: blink 2.5s ease-in-out infinite; }
+    @keyframes blink { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.6); } }
+    .left-content { position: relative; z-index: 1; }
+    .product-chip { display: inline-flex; align-items: center; gap: 7px; background: rgba(64,192,116,0.07); border: 1px solid rgba(64,192,116,0.2); color: var(--green-vivid); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.11em; text-transform: uppercase; padding: 5px 12px; border-radius: 50px; margin-bottom: 1.4rem; }
+    .chip-dot { width: 5px; height: 5px; background: var(--green-vivid); border-radius: 50%; animation: blink 2s infinite; }
+    .left-content h1 { font-family: var(--serif); font-size: clamp(3.2rem, 4.4vw, 4.8rem); color: var(--white); line-height: 1.04; letter-spacing: -0.02em; }
+    .left-content h1 em { font-style: italic; color: var(--green-vivid); }
+    .left-content p { font-weight: 300; color: rgba(255,255,255,0.48); margin-top: 1.4rem; line-height: 1.82; font-size: 1.02rem; }
+    .left-footer { font-size: 0.7rem; font-weight: 300; color: rgba(255,255,255,0.14); position: relative; z-index: 1; }
+
+    /* ══ PANEL DERECHO ══ */
+    .right-panel { background: var(--black); display: flex; align-items: center; justify-content: center; padding: 3rem 3.5rem; position: relative; overflow: hidden; }
+    .right-panel::before { content: ''; position: absolute; bottom: -140px; left: -100px; width: 520px; height: 520px; background: radial-gradient(circle, rgba(64,192,116,0.11) 0%, transparent 65%); pointer-events: none; }
+    .right-panel::after  { content: ''; position: absolute; top: -80px; right: -80px; width: 340px; height: 340px; background: radial-gradient(circle, rgba(64,192,116,0.06) 0%, transparent 65%); pointer-events: none; }
+    .right-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px); background-size: 40px 40px; pointer-events: none; }
+
+    /* ══ CARD ══ */
+    .login-card { width: 100%; max-width: 460px; position: relative; z-index: 1; animation: cardIn 0.9s var(--ease) 0.1s both; }
+    @keyframes cardIn { from { opacity: 0; transform: translateY(36px); } to { opacity: 1; transform: translateY(0); } }
+    .card-logo { display: flex; justify-content: center; margin-bottom: 2rem; }
+    .card-logo img { height: 120px; max-width: 300px; object-fit: contain; filter: drop-shadow(0 8px 24px rgba(64,192,116,0.2)); animation: logoIn 1s var(--ease) 0.2s both; }
+    @keyframes logoIn { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
+    .card-inner { background: var(--white); border-radius: 20px; overflow: hidden; box-shadow: 0 0 0 1px rgba(255,255,255,0.07), 0 24px 64px rgba(0,0,0,0.55), 0 4px 16px rgba(0,0,0,0.35); }
+    .card-band  { height: 5px; background: var(--gray-400); }
+    .card-body  { padding: 2.4rem 2.6rem 2.6rem; text-align: center; }
+    .cancel-icon { width: 64px; height: 64px; background: var(--off-white); border: 2px solid var(--gray-200); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.4rem; }
+    .cancel-icon svg { width: 28px; height: 28px; stroke: var(--gray-400); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .card-body h2 { font-family: var(--serif); font-size: 1.9rem; color: var(--black); letter-spacing: -0.02em; line-height: 1.1; margin-bottom: 0.6rem; }
+    .card-body p  { font-size: 0.9rem; color: var(--gray-500); font-weight: 300; line-height: 1.7; margin-bottom: 2rem; }
+    .btn-primary { display: block; width: 100%; height: 52px; background: var(--black); color: var(--white); border: none; border-radius: 12px; font-family: var(--sans); font-size: 0.97rem; font-weight: 700; cursor: pointer; letter-spacing: 0.02em; text-decoration: none; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; transition: transform 0.18s var(--ease), box-shadow 0.22s var(--ease); }
+    .btn-primary::before { content: ''; position: absolute; inset: 0; background: var(--green-vivid); transform: translateY(100%); transition: transform 0.3s var(--ease); border-radius: 12px; }
+    .btn-primary:hover::before { transform: translateY(0); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(64,192,116,0.28); }
+    .btn-primary span { position: relative; z-index: 1; }
+    .back-link { margin-top: 1rem; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 0.79rem; color: var(--gray-400); text-decoration: none; transition: color 0.18s; }
+    .back-link:hover { color: var(--gray-500); }
+    .back-link svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    @media (max-width: 860px) { body { grid-template-columns: 1fr; } .left-panel { display: none; } .right-panel { padding: 2rem 1.2rem; } }
+  </style>
+</head>
+<body>
+
+<!-- ══ PANEL IZQUIERDO ══ -->
+<div class="left-panel">
+  <div class="left-glow"></div>
+  <a class="left-logo" href="/">EduPos<span class="logo-dot"></span></a>
+  <div class="left-content">
+    <div class="product-chip"><span class="chip-dot"></span>Punto Asis</div>
+    <h1>Tu tienda,<br><em>bajo control</em></h1>
+    <p>El sistema de gestión para tiendas escolares de EduPos. Administra ventas, inventario y reportes desde un solo lugar.</p>
+  </div>
+  <div class="left-footer">© 2025 EduPos · Software Educativo Colombiano</div>
+</div>
+
+<!-- ══ PANEL DERECHO ══ -->
+<div class="right-panel">
+  <div class="right-grid"></div>
+  <div class="login-card">
+    <div class="card-logo">
+      <img src="{% static 'authentication/img/logo.webp' %}" alt="Colegio San Francisco de Asís" />
+    </div>
+    <div class="card-inner">
+      <div class="card-band"></div>
+      <div class="card-body">
+        <div class="cancel-icon">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </div>
+        <h2>Acceso cancelado</h2>
+        <p>Cancelaste el inicio de sesión con Google.<br>Puedes intentarlo de nuevo cuando quieras.</p>
+        <a href="/login/" class="btn-primary"><span>Volver al inicio de sesión</span></a>
+        <a href="/" class="back-link">
+          <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+          Ir al inicio
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

@@ -18,11 +18,7 @@
 
 {% block extra_css %}
 <style>
-  /* ── Layout ── */
-  .menu-layout { display: grid; grid-template-columns: 1fr 295px; gap: 1.4rem; align-items: start; }
-  @media (max-width: 900px) { .menu-layout { grid-template-columns: 1fr; } }
-
-  /* ── Saldo strip (docente style) ── */
+  /* ── Saldo strip ── */
   .saldo-strip {
     display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap;
     background: var(--ivory); border-bottom: 1px solid var(--mist);
@@ -33,8 +29,8 @@
   }
   .saldo-strip strong { font-family: var(--serif); font-size: 1rem; color: var(--leaf); }
 
-  /* ── Category chips (docente style) ── */
-  .cat-chips { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+  /* ── Category chips ── */
+  .cat-chips { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: 1.4rem; }
   .cat-chip {
     padding: .32rem .85rem; border-radius: 99px; font-size: .75rem; font-weight: 600;
     border: 1.5px solid var(--fog); color: var(--stone); background: var(--ivory);
@@ -45,13 +41,14 @@
   .cat-chip.active { background: var(--leaf); color: #fff; border-color: var(--leaf); box-shadow: 0 2px 8px rgba(22,163,74,.22); }
 
   /* ── Product grid ── */
-  .productos-grid {
+  #prod-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1.1rem;
+    margin-bottom: 5rem;
   }
 
-  /* ── Product cards (unified with docente) ── */
+  /* ── Product cards ── */
   .prod-card {
     background: var(--ivory); border: 1px solid var(--mist);
     border-radius: var(--radius); overflow: hidden; position: relative;
@@ -60,6 +57,8 @@
     box-shadow: 0 1px 2px rgba(0,0,0,.04);
   }
   .prod-card:hover { transform: translateY(-4px); box-shadow: 0 4px 16px rgba(22,163,74,.1), 0 2px 8px rgba(0,0,0,.06); }
+
+  /* Restringido */
   .prod-card.restringido { opacity: .42; pointer-events: none; }
   .prod-card.restringido::after {
     content: 'RESTRINGIDO'; position: absolute; inset: 0;
@@ -71,14 +70,14 @@
 
   /* Image */
   .prod-img-wrap {
-    width: 100%; height: 110px; overflow: hidden; flex-shrink: 0; position: relative;
+    width: 100%; height: 130px; overflow: hidden; flex-shrink: 0; position: relative;
     background: linear-gradient(135deg, var(--leaf-pale), var(--cream));
   }
   .prod-img-wrap img { width: 100%; height: 100%; object-fit: cover; transition: transform .38s var(--ease); }
   .prod-card:hover .prod-img-wrap img { transform: scale(1.04); }
   .prod-img-placeholder {
     width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
-    font-size: 2rem; color: var(--leaf); opacity: .45;
+    font-size: 2.2rem; color: var(--leaf); opacity: .45;
   }
 
   /* Image overlay badges */
@@ -93,104 +92,73 @@
   .cat-snacks   { background: rgba(124,58,237,.85); color: #fff; }
   .cat-bebidas  { background: rgba(2,132,199,.85);  color: #fff; }
 
-  .agotado-overlay {
-    position: absolute; bottom: .5rem; right: .5rem;
-    padding: .18rem .52rem; border-radius: 99px; font-size: .57rem; font-weight: 700;
-    background: rgba(254,242,242,.92); color: var(--red);
-    border: 1px solid rgba(220,38,38,.2); z-index: 2;
-  }
-
   /* Card body */
-  .prod-body { padding: .75rem .85rem .6rem; flex: 1; display: flex; flex-direction: column; }
-  .prod-name  { font-family: var(--serif); font-size: .92rem; font-weight: 500; line-height: 1.25; color: var(--ink); }
-  .prod-cat   { font-size: .6rem; color: var(--ash); text-transform: uppercase; letter-spacing: .05em; margin-top: .08rem; }
-  .prod-price { font-family: var(--serif); font-size: 1.08rem; color: var(--leaf); margin-top: .3rem; }
+  .prod-body { padding: .75rem .85rem .5rem; flex: 1; display: flex; flex-direction: column; }
+  .prod-name { font-family: var(--serif); font-size: .92rem; font-weight: 500; line-height: 1.25; color: var(--ink); }
+  .prod-tipo { font-size: .6rem; color: var(--ash); text-transform: uppercase; letter-spacing: .05em; margin-top: .06rem; }
 
-  /* Qty control */
-  .qty-control { display: flex; align-items: center; gap: .38rem; margin-top: .55rem; }
-  .qty-btn {
-    width: 1.6rem; height: 1.6rem; border-radius: 5px; border: 1.5px solid var(--fog);
-    background: var(--cream); cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    font-size: .88rem; color: var(--stone); transition: all .12s; flex-shrink: 0;
-  }
-  .qty-btn:hover { background: var(--leaf-pale); border-color: var(--leaf); color: var(--leaf-dark); }
-  .qty-input {
-    flex: 1; text-align: center; border: 1.5px solid var(--fog); border-radius: 5px;
-    padding: .18rem; font-size: .85rem; font-weight: 700;
-    background: var(--ivory); color: var(--ink); font-family: var(--serif);
-  }
-
-  /* ── Cart sidebar (desktop) ── */
-  .carrito-sidebar { position: sticky; top: calc(var(--topbar-h) + 3.8rem); }
-  .carrito-item {
+  /* Card footer */
+  .prod-footer {
     display: flex; align-items: center; justify-content: space-between;
-    padding: .62rem 1.25rem; border-bottom: 1px solid var(--mist); font-size: .8rem;
+    padding: .6rem .85rem; border-top: 1px solid var(--mist);
+    margin-top: auto;
   }
-  .carrito-item:last-child { border-bottom: none; }
-  .carrito-nombre { font-weight: 600; color: var(--ink); }
-  .carrito-qty    { font-size: .67rem; color: var(--ash); margin-top: .04rem; }
-  .carrito-sub    { font-family: var(--serif); font-size: .9rem; flex-shrink: 0; }
+  .prod-price { font-family: var(--serif); font-size: 1.08rem; color: var(--leaf); }
 
-  /* ── Stagger animation ── */
+  /* ── Animations ── */
   @keyframes cardIn {
-    from { opacity: 0; transform: translateY(10px); }
+    from { opacity: 0; transform: translateY(12px); }
     to   { opacity: 1; transform: translateY(0); }
   }
-  .prod-card { animation: cardIn .28s var(--ease) both; }
-  .prod-card:nth-child(1)   { animation-delay: .02s; }
-  .prod-card:nth-child(2)   { animation-delay: .05s; }
-  .prod-card:nth-child(3)   { animation-delay: .08s; }
-  .prod-card:nth-child(4)   { animation-delay: .11s; }
-  .prod-card:nth-child(5)   { animation-delay: .14s; }
-  .prod-card:nth-child(n+6) { animation-delay: .17s; }
+  @keyframes fabPulse {
+    0%   { box-shadow: 0 4px 20px rgba(22,163,74,.45), 0 0 0 0 rgba(22,163,74,.5); }
+    60%  { box-shadow: 0 4px 20px rgba(22,163,74,.45), 0 0 0 12px rgba(22,163,74,0); }
+    100% { box-shadow: 0 4px 20px rgba(22,163,74,.45), 0 0 0 0 rgba(22,163,74,0); }
+  }
+  .cart-fab.pulse { animation: fabPulse .42s var(--ease); }
 
-  /* ── Mobile: FAB + bottom sheet cart ── */
-  .mob-cart-fab {
-    display: none;
-    position: fixed; bottom: 1.5rem; right: 1.25rem;
-    background: linear-gradient(135deg, var(--leaf), var(--leaf-dark)); color: #fff;
-    width: 3.4rem; height: 3.4rem; border-radius: 50%;
-    align-items: center; justify-content: center;
-    font-size: 1.2rem; cursor: pointer; z-index: 500;
-    box-shadow: 0 4px 20px rgba(22,163,74,.45); border: none;
-    transition: transform .18s var(--ease), box-shadow .18s;
-  }
-  .mob-cart-fab:hover { transform: scale(1.08) translateY(-2px); }
-  .mob-cart-count {
-    position: absolute; top: -.2rem; right: -.2rem;
-    background: var(--red); color: #fff; font-size: .6rem; font-weight: 700;
-    min-width: 1.15rem; height: 1.15rem; border-radius: 99px; padding: 0 .2rem;
-    display: flex; align-items: center; justify-content: center;
-    border: 1.5px solid var(--ivory);
-  }
-  .mob-cart-overlay {
+  .prod-card { animation: cardIn .3s var(--ease) both; }
+  .prod-card:nth-child(1)   { animation-delay: .03s; }
+  .prod-card:nth-child(2)   { animation-delay: .06s; }
+  .prod-card:nth-child(3)   { animation-delay: .09s; }
+  .prod-card:nth-child(4)   { animation-delay: .12s; }
+  .prod-card:nth-child(5)   { animation-delay: .15s; }
+  .prod-card:nth-child(6)   { animation-delay: .18s; }
+  .prod-card:nth-child(n+7) { animation-delay: .21s; }
+
+  /* ── Cart overlay ── */
+  .cart-overlay {
     position: fixed; inset: 0; z-index: 800;
     display: flex; align-items: flex-end; justify-content: center;
-    background: rgba(0,0,0,0); pointer-events: none;
+    background: rgba(0,0,0,0);
+    pointer-events: none;
     transition: background .28s, backdrop-filter .28s;
     backdrop-filter: blur(0px);
   }
-  .mob-cart-overlay.open { background: rgba(0,0,0,.52); pointer-events: all; backdrop-filter: blur(4px); }
-  .mob-cart-sheet {
+  .cart-overlay.open {
+    background: rgba(0,0,0,.52);
+    pointer-events: all;
+    backdrop-filter: blur(4px);
+  }
+  .cart-sheet {
     background: var(--ivory); border-radius: 20px 20px 0 0;
-    width: 100%; max-height: 80vh; overflow-y: auto;
+    width: 100%; max-width: 520px; max-height: 82vh; overflow-y: auto;
     box-shadow: 0 -12px 48px rgba(0,0,0,.15);
     transform: translateY(100%);
     transition: transform .36s var(--ease);
   }
-  .mob-cart-overlay.open .mob-cart-sheet { transform: translateY(0); }
+  .cart-overlay.open .cart-sheet { transform: translateY(0); }
 
-  @media (max-width: 900px) {
-    .carrito-sidebar { display: none; }
-    .mob-cart-fab { display: flex; bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px)); }
+  /* ── Cart item row ── */
+  .cart-item-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: .65rem 0; border-bottom: 1px solid var(--mist);
   }
-  @media (min-width: 901px) {
-    .mob-cart-fab, .mob-cart-overlay { display: none !important; }
-  }
+  .cart-item-row:last-child { border-bottom: none; }
+
   @media (max-width: 640px) {
-    .saldo-strip { padding: .55rem 1rem; margin: -.9rem -.9rem 1.2rem; }
-    .productos-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .75rem; }
+    #prod-grid { grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: .8rem; }
+    .saldo-strip { padding: .55rem 1rem; margin: -.9rem -.9rem 1.25rem; }
   }
 </style>
 {% endblock %}
@@ -200,6 +168,11 @@
 <!-- Saldo strip -->
 <div class="saldo-strip">
   <span style="color:var(--stone);">Mi saldo: <strong>${{ estudiante.saldo|miles }}</strong></span>
+  {% if fuera_de_horario %}
+  <span style="font-size:.72rem; color:var(--red); display:flex; align-items:center; gap:.3rem;">
+    <i class="bi bi-clock-history"></i> Fuera del horario permitido por tu acudiente
+  </span>
+  {% endif %}
   {% if restricciones_prod or restricciones_cat %}
   <span style="font-size:.72rem; color:var(--red); display:flex; align-items:center; gap:.3rem;">
     <i class="bi bi-shield-x"></i> Algunos productos están restringidos por tu acudiente
@@ -209,9 +182,6 @@
     <i class="bi bi-wallet2"></i> Mi saldo
   </a>
 </div>
-
-<form method="post" id="formPedido" novalidate>
-{% csrf_token %}
 
 <!-- Category chips -->
 <div class="cat-chips">
@@ -228,159 +198,108 @@
   {% endfor %}
 </div>
 
-{% if q or cat_activa %}
-<div style="margin-bottom:.85rem; font-size:.76rem; color:var(--ash);">
-  {% if prods_lista %}
-    <strong style="color:var(--ink);">{{ prods_lista|length }}</strong> resultado{{ prods_lista|length|pluralize }}
-    {% if q %}para <em>"{{ q }}"</em>{% endif %}
-    &mdash; <a href="{% url 'app_estudiante:menu' %}" style="color:var(--leaf);text-decoration:none;font-weight:500;">Limpiar</a>
-  {% endif %}
-</div>
-{% endif %}
+<!-- Product grid -->
+<div id="prod-grid">
+  {% for prod, restringido in prods_lista %}
+  <div class="prod-card {% if restringido %}restringido{% endif %}">
 
-<div class="menu-layout">
+    <!-- Image -->
+    <div class="prod-img-wrap">
+      {% if prod.imagen %}
+      <img src="{{ prod.imagen.url }}" alt="{{ prod.nombre }}" loading="lazy">
+      {% else %}
+      <div class="prod-img-placeholder">
+        <i class="bi bi-{% if prod.categoria.nombre == 'desayuno' %}cup-hot{% elif prod.categoria.nombre == 'almuerzo' %}egg-fried{% elif prod.categoria.nombre == 'bebidas' %}cup-straw{% else %}bag{% endif %}"></i>
+      </div>
+      {% endif %}
+      <span class="prod-cat-badge cat-{{ prod.categoria.nombre }}">{{ prod.categoria.get_nombre_display }}</span>
+    </div>
 
-  <!-- Products column -->
-  <div>
-    <div class="productos-grid" id="prodGrid">
-      {% for prod, restringido in prods_lista %}
-      <div class="prod-card {% if restringido %}restringido{% elif prod.sin_stock %}agotado{% endif %}"
-           data-id="{{ prod.pk }}">
-        <div class="prod-img-wrap">
-          {% if prod.imagen %}
-          <img src="{{ prod.imagen.url }}" alt="{{ prod.nombre }}" loading="lazy">
-          {% else %}
-          <div class="prod-img-placeholder">
-            <i class="bi bi-{% if prod.categoria.nombre == 'desayuno' %}cup-hot{% elif prod.categoria.nombre == 'almuerzo' %}egg-fried{% elif prod.categoria.nombre == 'bebidas' %}cup-straw{% else %}bag{% endif %}"></i>
-          </div>
-          {% endif %}
-          <span class="prod-cat-badge cat-{{ prod.categoria.nombre }}">{{ prod.categoria.get_nombre_display }}</span>
-          {% if prod.sin_stock %}<span class="agotado-overlay">Agotado</span>{% endif %}
-        </div>
-        <div class="prod-body">
-          <div class="prod-name">{{ prod.nombre }}</div>
-          <div class="prod-cat">{{ prod.get_tipo_display }}</div>
-          {% if prod.stock_bajo %}
-          <span style="display:inline-flex;align-items:center;gap:.25rem;padding:.13rem .42rem;border-radius:99px;font-size:.58rem;font-weight:700;background:#fef3c7;color:#92400e;margin-bottom:.2rem;">
-            <i class="bi bi-exclamation-triangle-fill" style="font-size:.53rem;"></i> {{ prod.stock }} uds
-          </span>
-          {% else %}
-          <span style="display:inline-flex;align-items:center;gap:.25rem;padding:.13rem .42rem;border-radius:99px;font-size:.58rem;font-weight:700;background:#dcfce7;color:#166534;margin-bottom:.2rem;">
-            <i class="bi bi-check-circle-fill" style="font-size:.53rem;"></i> {{ prod.stock }} uds
-          </span>
-          {% endif %}
-          <div class="prod-price">${{ prod.precio_venta|miles }}</div>
-          {% if not prod.sin_stock and not restringido %}
-          <div class="qty-control">
-            <button type="button" class="qty-btn" onclick="changeQty({{ prod.pk }}, -1)">
-              <i class="bi bi-dash"></i>
-            </button>
-            <input type="number" class="qty-input" name="qty_{{ prod.pk }}" id="qty_{{ prod.pk }}"
-                   value="0" min="0" max="20" readonly
-                   data-precio="{{ prod.precio_venta|stringformat:'f'|cut:',' }}"
-                   data-nombre="{{ prod.nombre }}">
-            <button type="button" class="qty-btn" onclick="changeQty({{ prod.pk }}, +1)">
-              <i class="bi bi-plus"></i>
-            </button>
-          </div>
-          {% endif %}
-        </div>
-      </div>
-      {% empty %}
-      <div style="grid-column:1/-1; padding:3.5rem 1rem; text-align:center; color:var(--ash);">
-        <i class="bi bi-basket2" style="font-size:2.5rem; display:block; margin-bottom:.75rem; opacity:.28;"></i>
-        <div style="font-family:var(--serif); font-size:1.15rem; color:var(--ink); margin-bottom:.35rem;">
-          {% if q %}Sin resultados para "{{ q }}"
-          {% elif cat_activa %}Sin productos en esta categoría
-          {% else %}No hay productos disponibles
-          {% endif %}
-        </div>
-        {% if q or cat_activa %}
-        <a href="{% url 'app_estudiante:menu' %}" class="btn btn-ghost btn-sm" style="margin-top:.75rem;">
-          <i class="bi bi-x"></i> Limpiar filtros
-        </a>
-        {% endif %}
-      </div>
-      {% endfor %}
+    <!-- Body -->
+    <div class="prod-body">
+      <div class="prod-name">{{ prod.nombre }}</div>
+      <div class="prod-tipo">{{ prod.get_tipo_display }}</div>
+      {% if prod.stock_bajo %}
+      <span style="display:inline-flex;align-items:center;gap:.25rem;padding:.15rem .48rem;border-radius:99px;font-size:.6rem;font-weight:700;background:#fef3c7;color:#92400e;margin-bottom:.2rem;margin-top:.3rem;">
+        <i class="bi bi-exclamation-triangle-fill" style="font-size:.55rem;"></i> {{ prod.stock }} uds
+      </span>
+      {% else %}
+      <span style="display:inline-flex;align-items:center;gap:.25rem;padding:.15rem .48rem;border-radius:99px;font-size:.6rem;font-weight:700;background:#dcfce7;color:#166534;margin-bottom:.2rem;margin-top:.3rem;">
+        <i class="bi bi-check-circle-fill" style="font-size:.55rem;"></i> {{ prod.stock }} uds
+      </span>
+      {% endif %}
+    </div>
+
+    <!-- Footer -->
+    <div class="prod-footer">
+      <span class="prod-price">${{ prod.precio_venta|miles }}</span>
+      {% if not restringido %}
+      <button class="btn btn-primary btn-sm add-cart"
+              data-pk="{{ prod.pk }}" data-name="{{ prod.nombre }}" data-price="{{ prod.precio_venta }}">
+        <i class="bi bi-plus-lg"></i> Agregar
+      </button>
+      {% endif %}
     </div>
   </div>
-
-  <!-- Cart sidebar (desktop) -->
-  <div class="carrito-sidebar">
-    <div class="card">
-      <div class="card-head">
-        <span class="card-title" style="font-size:.95rem;">
-          <i class="bi bi-cart3" style="color:var(--leaf); margin-right:.3rem;"></i> Tu pedido
-        </span>
-        <span id="carrito-count" style="font-size:.7rem; color:var(--ash);"></span>
-      </div>
-
-      <div id="carritoItems">
-        <div id="carritoItemsList"></div>
-        <div id="carritoVacio" class="empty-state" style="padding:2rem 1rem;">
-          <i class="bi bi-cart es-icon"></i>
-          <p>Agrega productos al pedido</p>
-        </div>
-      </div>
-
-      <div style="padding:.85rem 1.25rem; border-top:1px solid var(--mist); background:var(--cream);">
-        <div style="display:flex; justify-content:space-between; align-items:baseline;">
-          <span style="font-size:.68rem; font-weight:700; color:var(--stone); text-transform:uppercase; letter-spacing:.07em;">Total</span>
-          <span style="font-family:var(--serif); font-size:1.5rem; color:var(--leaf);" id="totalDisplay">$0</span>
-        </div>
-        <div id="saldo-alerta" style="display:none; font-size:.71rem; color:var(--red); margin-top:.3rem; font-weight:600;">
-          <i class="bi bi-exclamation-triangle-fill"></i> Saldo insuficiente
-        </div>
-      </div>
-
-      <div style="padding:.65rem 1.25rem; border-top:1px solid var(--mist);">
-        <div class="field">
-          <label for="notaPedido">Nota (opcional)</label>
-          <input type="text" id="notaPedido" name="nota" placeholder="Instrucciones especiales..." maxlength="200">
-        </div>
-      </div>
-
-      <div style="padding:0 1.25rem 1.1rem;">
-        <button type="submit" class="btn btn-primary btn-full" id="btnConfirmar" disabled>
-          <i class="bi bi-cart-check"></i> Confirmar pedido
-        </button>
-        <button type="button" class="btn btn-ghost btn-full" style="margin-top:.4rem;" onclick="limpiarCarrito()">
-          <i class="bi bi-x"></i> Limpiar
-        </button>
-      </div>
-    </div>
+  {% empty %}
+  <div style="grid-column:1/-1; text-align:center; padding:3.5rem 1rem; color:var(--ash);">
+    <i class="bi bi-search" style="font-size:2.5rem; opacity:.25; display:block; margin-bottom:.75rem; color:var(--leaf);"></i>
+    <div style="font-family:var(--serif); font-size:1.2rem; color:var(--ink); margin-bottom:.35rem;">Sin resultados</div>
+    <p style="font-size:.82rem;">Prueba con otro término o categoría.</p>
+    <a href="{% url 'app_estudiante:menu' %}" class="btn btn-ghost btn-sm" style="margin-top:.75rem;">
+      <i class="bi bi-x"></i> Limpiar filtros
+    </a>
   </div>
-
+  {% endfor %}
 </div>
-</form>
 
-<!-- Mobile: FAB + bottom sheet -->
-<button class="mob-cart-fab" id="mob-cart-fab" onclick="openMobCart()">
-  <i class="bi bi-cart3"></i>
-  <span class="mob-cart-count" id="mob-cart-count" style="display:none;">0</span>
+<!-- Cart FAB -->
+<button class="cart-fab" id="cart-fab" onclick="openCart()" title="Ver carrito">
+  <i class="bi bi-bag"></i>
+  <span class="cart-count" id="cart-count" style="display:none;">0</span>
 </button>
 
-<div id="mob-cart-overlay" class="mob-cart-overlay" onclick="if(event.target===this)closeMobCart()">
-  <div class="mob-cart-sheet">
+<!-- Cart overlay + slide-up sheet -->
+<div id="cart-overlay" class="cart-overlay" onclick="if(event.target===this)closeCart()">
+  <div class="cart-sheet">
+    <!-- Handle -->
     <div style="padding:.75rem; text-align:center;">
       <div style="width:2.5rem; height:.25rem; background:var(--fog); border-radius:99px; margin:0 auto;"></div>
     </div>
-    <div style="padding:0 1.3rem 1.4rem;">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
-        <h2 style="font-family:var(--serif); font-size:1.25rem; font-weight:400;">Tu pedido</h2>
-        <button onclick="closeMobCart()" class="btn btn-ghost btn-sm"><i class="bi bi-x-lg"></i></button>
+    <div style="padding:0 1.4rem 1.5rem;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.1rem;">
+        <h2 style="font-family:var(--serif); font-size:1.3rem; font-weight:400;">Mi pedido</h2>
+        <button onclick="closeCart()" class="btn btn-ghost btn-sm"><i class="bi bi-x-lg"></i></button>
       </div>
-      <div id="mob-cart-items"></div>
-      <div style="border-top:2px solid var(--mist); padding-top:.75rem; margin:.85rem 0; display:flex; justify-content:space-between; align-items:center;">
-        <span style="font-weight:700; font-size:.9rem;">Total</span>
-        <span style="font-family:var(--serif); font-size:1.3rem; color:var(--leaf);" id="mob-cart-total">$0</span>
-      </div>
-      <div id="mob-saldo-alerta" style="display:none; font-size:.72rem; color:var(--red); margin-bottom:.65rem; font-weight:600;">
+      <div id="cart-items" style="margin-bottom:1rem;"></div>
+      <div id="saldo-alerta" style="display:none; font-size:.72rem; color:var(--red); margin-bottom:.65rem; font-weight:600;">
         <i class="bi bi-exclamation-triangle-fill"></i> Saldo insuficiente
       </div>
-      <button type="button" class="btn btn-primary btn-full" id="mob-btn-confirmar" onclick="submitMobCart()" disabled>
-        <i class="bi bi-cart-check"></i> Confirmar pedido
-      </button>
+      <div style="border-top:2px solid var(--mist); padding-top:.85rem; margin-bottom:.85rem; display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-weight:700; font-size:.9rem;">Total</span>
+        <span id="cart-total" style="font-family:var(--serif); font-size:1.3rem; color:var(--leaf);">$0</span>
+      </div>
+      <div class="form-group" style="margin-bottom:.85rem;">
+        <label class="form-label">Nota (opcional)</label>
+        <textarea id="cart-nota" class="form-textarea" rows="2" placeholder="Ej: Sin azúcar, sin tomate…"></textarea>
+      </div>
+      <form id="cart-form" action="{% url 'app_estudiante:menu' %}" method="post">
+        {% csrf_token %}
+        <input type="hidden" name="nota" id="cart-nota-val">
+        {% if fuera_de_horario %}
+        <button type="submit" class="btn btn-primary btn-full" id="cart-submit" disabled
+                style="background:var(--red);cursor:not-allowed;" title="Fuera de horario permitido">
+          <i class="bi bi-clock-history"></i> Fuera de horario
+        </button>
+        {% else %}
+        <button type="submit" class="btn btn-primary btn-full" id="cart-submit" disabled>
+          <i class="bi bi-send"></i> Confirmar pedido
+        </button>
+        {% endif %}
+        <button type="button" class="btn btn-ghost btn-full" style="margin-top:.4rem;" onclick="clearCart()">
+          <i class="bi bi-x"></i> Limpiar carrito
+        </button>
+      </form>
     </div>
   </div>
 </div>
@@ -389,139 +308,143 @@
 
 {% block extra_js %}
 <script>
-  const carrito = {};
-  const MI_SALDO = {{ estudiante.saldo|floatformat:"0"|default:"0" }};
+const CARRITO_KEY = 'carrito_est_{{ estudiante.pk }}';
+const MI_SALDO = {{ estudiante.saldo|floatformat:"0"|default:"0" }};
+const FUERA_DE_HORARIO = {{ fuera_de_horario|yesno:"true,false" }};
+let cart = {};
 
-  const _vacio  = document.getElementById('carritoVacio');
-  const _lista  = document.getElementById('carritoItemsList');
-  const _count  = document.getElementById('carrito-count');
-  const _total  = document.getElementById('totalDisplay');
-  const _btn    = document.getElementById('btnConfirmar');
-  const _alerta = document.getElementById('saldo-alerta');
-
-  function changeQty(id, delta) {
-    const input = document.getElementById('qty_' + id);
-    if (!input) return;
-    let val = parseInt(input.value || '0') + delta;
-    if (val < 0) val = 0;
-    if (val > 20) val = 20;
-    input.value = val;
-    carrito[id] = { qty: val, precio: parseFloat(input.dataset.precio), nombre: input.dataset.nombre };
-    renderCarrito();
-    syncMobCount();
-  }
-
-  function renderCarrito() {
-    let total = 0, html = '', n = 0;
-    for (const [id, item] of Object.entries(carrito)) {
-      if (item.qty > 0) {
-        n++;
-        const sub = item.qty * item.precio;
-        total += sub;
-        html += `<div class="carrito-item">
-          <div>
-            <div class="carrito-nombre">${item.nombre}</div>
-            <div class="carrito-qty">${item.qty} &times; $${fmt(item.precio)}</div>
-          </div>
-          <div class="carrito-sub">$${fmt(sub)}</div>
-        </div>`;
-      }
+// ── Restore from localStorage ──
+(function() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(CARRITO_KEY) || '{}');
+    for (const [pk, item] of Object.entries(saved)) {
+      if (item && item.qty > 0) cart[pk] = item;
     }
-    _lista.innerHTML = html;
-    _vacio.style.display = n > 0 ? 'none' : '';
-    _count.textContent = n > 0 ? (n + ' producto' + (n > 1 ? 's' : '')) : '';
-    _total.textContent = '$' + fmt(total);
+  } catch(e) {}
+})();
 
-    if (n === 0) {
-      _btn.disabled = true;
-      _btn.innerHTML = '<i class="bi bi-cart-check"></i> Confirmar pedido';
-      _btn.style.background = '';
-      _alerta.style.display = 'none';
-    } else if (total > MI_SALDO) {
-      _btn.disabled = true;
-      _btn.innerHTML = '<i class="bi bi-cart-x"></i> Saldo insuficiente';
-      _btn.style.background = 'var(--red)';
-      _alerta.style.display = '';
-    } else {
-      _btn.disabled = false;
-      _btn.innerHTML = '<i class="bi bi-cart-check"></i> Confirmar pedido';
-      _btn.style.background = '';
-      _alerta.style.display = 'none';
-    }
+function fmt(n) { return Math.floor(n).toLocaleString('es-CO').replace(/,/g, '.'); }
+
+function saveCart() {
+  localStorage.setItem(CARRITO_KEY, JSON.stringify(cart));
+}
+
+function updateUI() {
+  const count  = Object.values(cart).reduce((a, i) => a + i.qty, 0);
+  const total  = Object.values(cart).reduce((a, i) => a + i.qty * i.price, 0);
+  const countEl = document.getElementById('cart-count');
+  countEl.textContent = count;
+  countEl.style.display = count > 0 ? 'flex' : 'none';
+  document.getElementById('cart-total').textContent = '$' + fmt(total);
+
+  // Saldo / horario check
+  const alerta = document.getElementById('saldo-alerta');
+  const btn    = document.getElementById('cart-submit');
+  if (FUERA_DE_HORARIO) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-clock-history"></i> Fuera de horario';
+    btn.style.background = 'var(--red)';
+    alerta.style.display = 'none';
+  } else if (count === 0) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-send"></i> Confirmar pedido';
+    btn.style.background = '';
+    alerta.style.display = 'none';
+  } else if (total > MI_SALDO) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-cart-x"></i> Saldo insuficiente';
+    btn.style.background = 'var(--red)';
+    alerta.style.display = '';
+  } else {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-send"></i> Confirmar pedido';
+    btn.style.background = '';
+    alerta.style.display = 'none';
   }
 
-  function limpiarCarrito() {
-    for (const id of Object.keys(carrito)) {
-      const input = document.getElementById('qty_' + id);
-      if (input) input.value = 0;
-      delete carrito[id];
-    }
-    renderCarrito();
-    syncMobCount();
+  const itemsEl = document.getElementById('cart-items');
+  if (count === 0) {
+    itemsEl.innerHTML = `<div style="text-align:center; padding:2rem; color:var(--ash);">
+      <i class="bi bi-bag" style="font-size:2.2rem; opacity:.28; display:block; margin-bottom:.5rem; color:var(--leaf);"></i>
+      <p style="font-size:.82rem;">El carrito está vacío.</p>
+    </div>`;
+    return;
   }
+  itemsEl.innerHTML = Object.values(cart).map(i => `
+    <div class="cart-item-row">
+      <div style="font-size:.82rem; font-weight:600; flex:1;">${i.name}</div>
+      <div style="display:flex; align-items:center; gap:.42rem; flex-shrink:0;">
+        <button onclick="changeQty(${i.pk},-1)" class="btn btn-ghost btn-xs" style="padding:.12rem .36rem;"><i class="bi bi-dash"></i></button>
+        <span style="font-size:.88rem; font-weight:700; min-width:1.5rem; text-align:center;">${i.qty}</span>
+        <button onclick="changeQty(${i.pk},1)" class="btn btn-ghost btn-xs" style="padding:.12rem .36rem;"><i class="bi bi-plus"></i></button>
+        <span style="font-size:.8rem; color:var(--leaf); font-weight:700; min-width:4.5rem; text-align:right;">$${fmt(i.qty*i.price)}</span>
+      </div>
+    </div>
+  `).join('');
+}
 
-  function fmt(n) { return Math.floor(n).toLocaleString('es-CO').replace(/,/g, '.'); }
+function changeQty(pk, delta) {
+  const key = String(pk);
+  if (!cart[key]) return;
+  cart[key].qty += delta;
+  if (cart[key].qty <= 0) delete cart[key];
+  saveCart();
+  updateUI();
+}
 
-  // Mobile cart
-  function syncMobCount() {
-    const n = Object.values(carrito).filter(i => i.qty > 0).length;
-    const el = document.getElementById('mob-cart-count');
-    if (el) { el.textContent = n; el.style.display = n > 0 ? 'flex' : 'none'; }
+function clearCart() {
+  cart = {};
+  saveCart();
+  updateUI();
+}
+
+document.querySelectorAll('.add-cart').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const pk = btn.dataset.pk;
+    if (cart[pk]) cart[pk].qty++;
+    else cart[pk] = { pk, name: btn.dataset.name, price: parseFloat(btn.dataset.price), qty: 1 };
+    saveCart();
+    updateUI();
+
+    btn.innerHTML = '<i class="bi bi-check-lg"></i> Listo';
+    btn.style.background = 'var(--leaf-dark)';
+    setTimeout(() => { btn.innerHTML = '<i class="bi bi-plus-lg"></i> Agregar'; btn.style.background = ''; }, 900);
+
+    const fab = document.getElementById('cart-fab');
+    fab.classList.remove('pulse');
+    void fab.offsetWidth;
+    fab.classList.add('pulse');
+  });
+});
+
+function openCart() {
+  updateUI();
+  document.getElementById('cart-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeCart() {
+  document.getElementById('cart-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCart(); });
+
+document.getElementById('cart-form').addEventListener('submit', e => {
+  if (Object.keys(cart).length === 0) { e.preventDefault(); return; }
+  // Generate qty hidden inputs from cart
+  const form = document.getElementById('cart-form');
+  for (const [pk, item] of Object.entries(cart)) {
+    const inp = document.createElement('input');
+    inp.type = 'hidden';
+    inp.name = 'qty_' + pk;
+    inp.value = item.qty;
+    form.appendChild(inp);
   }
+  document.getElementById('cart-nota-val').value = document.getElementById('cart-nota').value;
+  // Clear localStorage on submit (order is being placed)
+  localStorage.removeItem(CARRITO_KEY);
+});
 
-  function openMobCart() {
-    let total = 0, html = '', n = 0;
-    for (const [id, item] of Object.entries(carrito)) {
-      if (item.qty > 0) {
-        n++;
-        const sub = item.qty * item.precio;
-        total += sub;
-        html += `<div class="carrito-item">
-          <div>
-            <div class="carrito-nombre">${item.nombre}</div>
-            <div class="carrito-qty">${item.qty} &times; $${fmt(item.precio)}</div>
-          </div>
-          <div class="carrito-sub">$${fmt(sub)}</div>
-        </div>`;
-      }
-    }
-    if (!html) html = `<div class="empty-state" style="padding:2rem 0;"><i class="bi bi-cart es-icon"></i><p>El carrito está vacío</p></div>`;
-    document.getElementById('mob-cart-items').innerHTML = html;
-    document.getElementById('mob-cart-total').textContent = '$' + fmt(total);
-
-    const mobBtn    = document.getElementById('mob-btn-confirmar');
-    const mobAlerta = document.getElementById('mob-saldo-alerta');
-    if (n === 0) {
-      mobBtn.disabled = true;
-      mobBtn.innerHTML = '<i class="bi bi-cart-check"></i> Confirmar pedido';
-      mobBtn.style.background = '';
-      mobAlerta.style.display = 'none';
-    } else if (total > MI_SALDO) {
-      mobBtn.disabled = true;
-      mobBtn.innerHTML = '<i class="bi bi-cart-x"></i> Saldo insuficiente';
-      mobBtn.style.background = 'var(--red)';
-      mobAlerta.style.display = '';
-    } else {
-      mobBtn.disabled = false;
-      mobBtn.innerHTML = '<i class="bi bi-cart-check"></i> Confirmar pedido';
-      mobBtn.style.background = '';
-      mobAlerta.style.display = 'none';
-    }
-
-    document.getElementById('mob-cart-overlay').classList.add('open');
-    document.body.style.overflow = 'hidden';
-  }
-
-  function closeMobCart() {
-    document.getElementById('mob-cart-overlay').classList.remove('open');
-    document.body.style.overflow = '';
-  }
-
-  function submitMobCart() {
-    closeMobCart();
-    document.getElementById('formPedido').submit();
-  }
-
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMobCart(); });
+// Init UI on load
+updateUI();
 </script>
 {% endblock %}

@@ -1,62 +1,68 @@
 {% extends 'app_empleado/base_empleado.html' %}
 {% load static %}
+{% load filtros %}
 
 {% block title %}Mis Ventas{% endblock %}
 {% block page_title %}Mis Ventas{% endblock %}
 {% block nav_ventas %}active{% endblock %}
 
 {% block content %}
-<div style="display:flex;flex-direction:column;gap:1.25rem;">
+<div class="emp-page">
 
-  <!-- Filtros -->
-  <div class="card" style="padding:1rem 1.25rem;" class="anim-1">
-    <form method="get" style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
-      <label style="font-size:var(--text-sm);color:var(--stone);font-weight:500;">Fecha</label>
+  <div class="emp-hero">
+    <div>
+      <div class="emp-hero-eyebrow"><i class="bi bi-receipt"></i> Historial</div>
+      <div class="emp-hero-title">Mis Ventas</div>
+      <div class="emp-hero-sub">Consulta y gestiona las transacciones del día.</div>
+    </div>
+    <div class="emp-hero-right">
+      {% if sede %}
+        <span class="emp-hero-chip"><i class="bi bi-geo-alt"></i> {{ sede.nombre }}</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="filter-bar">
+    <form method="get" style="display:contents;">
+      <label style="font-size:var(--text-sm);color:var(--stone);white-space:nowrap;">Fecha</label>
       <input type="date" name="fecha" value="{{ fecha }}" class="form-input" style="width:auto;">
       <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
       <a href="{% url 'app_empleado:ventas' %}" class="btn btn-ghost btn-sm">Hoy</a>
     </form>
   </div>
 
-  <!-- Stats -->
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:1rem;" class="anim-2">
-    <div class="emp-stat">
-      <div class="emp-stat-icon"><i class="bi bi-receipt"></i></div>
-      <div class="emp-stat-label">Ventas del día</div>
-      <div class="emp-stat-val">{{ ventas|length|add:num_anuladas|add:"-"|add:num_anuladas }}</div>
-      <div class="emp-stat-sub">transacciones</div>
+  <div class="stats-row">
+    <div class="stat-card green">
+      <div class="stat-label">Ventas del día</div>
+      <div class="stat-val">{{ ventas|length }}</div>
+      <div class="stat-sub">transacciones válidas</div>
     </div>
-    <div class="emp-stat">
-      <div class="emp-stat-icon"><i class="bi bi-cash-coin"></i></div>
-      <div class="emp-stat-label">Total recaudado</div>
-      <div class="emp-stat-val" style="font-size:1.4rem;">${{ total_dia|floatformat:0 }}</div>
-      <div class="emp-stat-sub">ventas válidas</div>
+    <div class="stat-card green">
+      <div class="stat-label">Total recaudado</div>
+      <div class="stat-val">${{ total_dia|miles }}</div>
+      <div class="stat-sub">ventas válidas</div>
     </div>
-    <div class="emp-stat">
-      <div class="emp-stat-icon"><i class="bi bi-cash"></i></div>
-      <div class="emp-stat-label">En efectivo</div>
-      <div class="emp-stat-val" style="font-size:1.4rem;">${{ total_efectivo|floatformat:0 }}</div>
-      <div class="emp-stat-sub">cobrado en caja</div>
+    <div class="stat-card green">
+      <div class="stat-label">En efectivo</div>
+      <div class="stat-val">${{ total_efectivo|miles }}</div>
+      <div class="stat-sub">cobrado en caja</div>
     </div>
     {% if num_anuladas %}
-    <div class="emp-stat">
-      <div class="emp-stat-icon" style="background:var(--red-pale);color:var(--red-dark);"><i class="bi bi-x-circle"></i></div>
-      <div class="emp-stat-label">Anuladas</div>
-      <div class="emp-stat-val" style="color:var(--red);">{{ num_anuladas }}</div>
-      <div class="emp-stat-sub">en esta fecha</div>
+    <div class="stat-card red">
+      <div class="stat-label">Anuladas</div>
+      <div class="stat-val">{{ num_anuladas }}</div>
+      <div class="stat-sub">en esta fecha</div>
     </div>
     {% endif %}
   </div>
 
-  <!-- Tabla -->
-  <div class="card anim-3">
-    <div class="card-head" style="display:flex;align-items:center;justify-content:space-between;">
-      <span>Ventas — {{ fecha }}</span>
-      {% if sede %}<span class="sede-badge"><i class="bi bi-geo-alt"></i> {{ sede.nombre }}</span>{% endif %}
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Ventas — {{ fecha }}</span>
     </div>
     {% if ventas %}
     <div class="table-wrap">
-      <table class="table ventas-table">
+      <table class="tbl ventas-table">
         <thead>
           <tr>
             <th>Ticket</th>
@@ -70,34 +76,28 @@
         </thead>
         <tbody>
           {% for v in ventas %}
-          <tr {% if v.anulada %}class="fila-anulada"{% endif %}>
-            <td style="font-family:var(--serif);font-weight:600;color:var(--emp-dark);white-space:nowrap;">
-              {{ v.ticket }}
-              {% if v.anulada %}
-                <span class="badge" style="background:var(--red-pale);color:var(--red-dark);border:1px solid var(--red-tint);font-size:.6rem;vertical-align:middle;margin-left:.25rem;">ANULADA</span>
-              {% endif %}
-            </td>
-            <td style="font-size:var(--text-xs);color:var(--ash);white-space:nowrap;">{{ v.fecha|time:"H:i" }}</td>
+          <tr {% if v.anulada %}style="opacity:.45;text-decoration:line-through;"{% endif %}>
             <td>
-              {% if v.tipo_pago == 'efectivo' %}
-                <span class="badge badge-efectivo">Efectivo</span>
-              {% elif v.tipo_pago == 'cuenta_estudiante' %}
-                <span class="badge badge-est">Estudiante</span>
-              {% else %}
-                <span class="badge badge-doc">Docente</span>
-              {% endif %}
+              <span style="font-family:var(--serif);font-weight:600;color:var(--leaf-dark);white-space:nowrap;">{{ v.ticket }}</span>
+              {% if v.anulada %}<span class="badge badge-anulada">ANULADA</span>{% endif %}
             </td>
-            <td style="font-size:var(--text-sm);">
+            <td style="color:var(--ash);font-size:var(--text-xs);">{{ v.fecha|time:"H:i" }}</td>
+            <td>
+              {% if v.tipo_pago == 'efectivo' %}<span class="badge badge-efectivo">Efectivo</span>
+              {% elif v.tipo_pago == 'cuenta_estudiante' %}<span class="badge badge-est">Estudiante</span>
+              {% else %}<span class="badge badge-doc">Docente</span>{% endif %}
+            </td>
+            <td style="color:var(--stone);font-size:var(--text-sm);">
               {% if v.estudiante %}{{ v.estudiante.perfil.user.get_full_name }}
               {% elif v.docente %}{{ v.docente.perfil.user.get_full_name }}
               {% else %}<span style="color:var(--ash);">—</span>{% endif %}
             </td>
-            <td style="font-size:var(--text-xs);color:var(--stone);max-width:180px;">
+            <td style="color:var(--stone);font-size:var(--text-sm);max-width:180px;">
               {% for d in v.detalles.all %}
                 {{ d.cantidad }}× {{ d.producto.nombre }}{% if not forloop.last %}, {% endif %}
               {% endfor %}
             </td>
-            <td style="text-align:right;font-weight:700;color:var(--emp-dark);">${{ v.total|floatformat:0 }}</td>
+            <td style="text-align:right;font-weight:700;color:var(--leaf-dark);">${{ v.total|miles }}</td>
             <td>
               {% if not v.anulada %}
               <button class="btn btn-xs btn-ghost"
@@ -116,27 +116,28 @@
         </tbody>
         <tfoot>
           <tr>
-            <td colspan="5" style="font-weight:600;text-align:right;padding-right:1rem;color:var(--stone);">Total del día</td>
-            <td style="text-align:right;font-family:var(--serif);font-size:1.1rem;color:var(--emp);font-weight:700;">${{ total_dia|floatformat:0 }}</td>
+            <td colspan="5" style="text-align:right;padding-right:1rem;font-weight:600;color:var(--stone);font-size:var(--text-sm);">Total del día</td>
+            <td style="text-align:right;font-family:var(--serif);font-size:1.1rem;color:var(--leaf);font-weight:700;">${{ total_dia|miles }}</td>
             <td></td>
           </tr>
         </tfoot>
       </table>
     </div>
     {% else %}
-    <div style="padding:2.5rem;text-align:center;color:var(--ash);">
-      <i class="bi bi-receipt" style="font-size:2.5rem;display:block;margin-bottom:.5rem;color:var(--fog);"></i>
-      No hay ventas registradas para esta fecha.
+    <div class="empty-state">
+      <i class="bi bi-receipt es-icon"></i>
+      <h3>Sin ventas en esta fecha</h3>
+      <p>No hay transacciones registradas para {{ fecha }}.</p>
     </div>
     {% endif %}
   </div>
 
 </div>
 
-<!-- ══ MODAL ANULACIÓN ══ -->
+<!-- MODAL ANULACIÓN -->
 <div class="recibo-overlay" id="anularOverlay">
   <div class="recibo-box" style="width:360px;">
-    <div class="recibo-head" style="background:var(--ink);">
+    <div class="recibo-head">
       <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
         <span class="recibo-head-title" style="font-size:1rem;">Anular venta</span>
         <button onclick="cerrarAnular()" style="background:none;border:none;color:var(--ash);cursor:pointer;font-size:1.1rem;display:flex;">
@@ -145,7 +146,7 @@
       </div>
       <div id="anularTicketLabel" style="font-family:monospace;font-size:var(--text-xs);color:var(--ash);margin-top:.35rem;letter-spacing:.05em;"></div>
     </div>
-    <div style="padding:1.25rem;display:flex;flex-direction:column;gap:.75rem;">
+    <div style="display:flex;flex-direction:column;gap:.75rem;padding:1.25rem;">
       <div class="field">
         <label class="field-label" style="color:var(--red-dark);">
           <i class="bi bi-exclamation-triangle-fill"></i>
@@ -156,20 +157,20 @@
         <label class="field-label">Motivo de anulación <span style="color:var(--red);">*</span></label>
         <input type="text" id="anularMotivo" class="form-input" placeholder="Ej: Error en cobro, producto no entregado...">
       </div>
-      <div style="border-top:1px solid var(--mist);padding-top:.75rem;">
-        <div style="font-size:var(--text-xs);font-weight:600;color:var(--stone);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem;">
+      <div style="border-top:1px solid var(--mist);padding-top:.75rem;display:flex;flex-direction:column;gap:.65rem;">
+        <div style="font-size:var(--text-xs);font-weight:600;color:var(--stone);text-transform:uppercase;letter-spacing:.05em;">
           <i class="bi bi-shield-lock"></i> Autorización de supervisor
         </div>
         <div class="field">
           <label class="field-label">Usuario del supervisor</label>
           <input type="text" id="anularSupUser" class="form-input" placeholder="usuario_supervisor" autocomplete="off">
         </div>
-        <div class="field" style="margin-top:.5rem;">
+        <div class="field">
           <label class="field-label">Contraseña del supervisor</label>
           <input type="password" id="anularSupPass" class="form-input" placeholder="••••••••" autocomplete="off">
         </div>
       </div>
-      <div id="anularError" style="display:none;" class="msg msg-error" style="margin:0;"></div>
+      <div id="anularError" style="display:none;" class="msg msg-error"></div>
       <button class="btn-cobrar" id="anularBtn" onclick="confirmarAnular()" style="background:var(--red);">
         <i class="bi bi-x-circle"></i> Confirmar anulación
       </button>

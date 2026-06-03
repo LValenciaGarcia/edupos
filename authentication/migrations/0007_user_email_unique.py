@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunSQL(
-            sql="CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS auth_user_email_unique ON auth_user (email) WHERE email != '';",
-            reverse_sql="DROP INDEX IF EXISTS auth_user_email_unique;",
+            sql="CREATE UNIQUE INDEX auth_user_email_unique ON auth_user (email) WHERE email != '';",
+            reverse_sql="DROP INDEX auth_user_email_unique;",
         ),
     ]

@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
 from django.contrib import messages
 from django.http import JsonResponse
 from django.db import transaction, models as dm
@@ -9,6 +10,7 @@ import json
 
 from authentication.models import Perfil, Estudiante, Docente, Sede
 from app_admin.models import Producto, Categoria
+from app_padre.models import AlergiaEstudiante, RestriccionAlimento
 from .models import VentaEmpleado, DetalleVenta, TurnoCaja, AnulacionVenta
 
 
@@ -115,17 +117,27 @@ def turno(request):
                 if not sede_usar:
                     messages.error(request, 'No tienes sede asignada activa.')
                 else:
+                    try:
+                        efectivo_inicial = max(0, float(request.POST.get('efectivo_inicial') or 0))
+                    except (ValueError, TypeError):
+                        messages.error(request, 'El monto de efectivo inicial es inválido.')
+                        return redirect('app_empleado:turno')
                     TurnoCaja.objects.create(
                         empleado=emp,
                         sede=sede_usar,
-                        efectivo_inicial=request.POST.get('efectivo_inicial') or 0,
+                        efectivo_inicial=efectivo_inicial,
                         nota=request.POST.get('nota', ''),
                     )
                     messages.success(request, 'Turno abierto. ¡Buen turno!')
                     return redirect('app_empleado:turno')
 
         elif accion == 'cerrar' and turno_activo:
-            turno_activo.efectivo_final = request.POST.get('efectivo_final') or 0
+            try:
+                efectivo_final = max(0, float(request.POST.get('efectivo_final') or 0))
+            except (ValueError, TypeError):
+                messages.error(request, 'El monto de efectivo al cierre es inválido.')
+                return redirect('app_empleado:turno')
+            turno_activo.efectivo_final = efectivo_final
             turno_activo.estado  = 'cerrado'
             turno_activo.cierre  = timezone.now()
             turno_activo.nota    = request.POST.get('nota_cierre', '')
@@ -153,21 +165,36 @@ def caja(request):
     emp  = _empleado(request)
     sede = _sede_activa(request)
 
-    productos  = (
+    productos  = list(
         Producto.objects
         .filter(disponible=True)
         .select_related('categoria')
+        .prefetch_related('receta__ingrediente__alergenos')
         .order_by('categoria__nombre', 'nombre')
     )
     categorias = Categoria.objects.filter(activa=True)
     turno      = _turno_activo(request)
 
+    # Mapa alérgeno por producto (códigos) — evita N+1 gracias al prefetch
+    alergenos_map = {}
+    for p in productos:
+        if p.tipo == 'elaborado':
+            codigos = list({
+                al.codigo
+                for ri in p.receta.all()
+                for al in ri.ingrediente.alergenos.all()
+            })
+        else:
+            codigos = []
+        alergenos_map[p.pk] = codigos
+
     return render(request, 'app_empleado/caja.html', {
-        'empleado':   emp,
-        'sede':       sede,
-        'productos':  productos,
-        'categorias': categorias,
-        'turno':      turno,
+        'empleado':     emp,
+        'sede':         sede,
+        'productos':    productos,
+        'categorias':   categorias,
+        'turno':        turno,
+        'alergenos_map': json.dumps(alergenos_map),
     })
 
 
@@ -186,6 +213,9 @@ def procesar_venta(request):
 
         if not items:
             return JsonResponse({'ok': False, 'error': 'El carrito está vacío'})
+
+        if tipo_pago in ('cuenta_estudiante', 'cuenta_docente') and not cliente_id:
+            return JsonResponse({'ok': False, 'error': 'Selecciona un cliente para este tipo de pago.'})
 
         emp  = _empleado(request)
         sede = _sede_activa(request)
@@ -206,7 +236,7 @@ def procesar_venta(request):
                 cantidad = int(item['cantidad'])
                 if not p.disponible:
                     return JsonResponse({'ok': False, 'error': f'"{p.nombre}" ya no está disponible.'})
-                if p.tipo == 'simple' and p.stock < cantidad:
+                if p.stock < cantidad:
                     return JsonResponse({'ok': False, 'error': f'Stock insuficiente para "{p.nombre}" (disponible: {p.stock}).'})
                 validados.append((p, cantidad))
 
@@ -220,8 +250,6 @@ def procesar_venta(request):
                 nota=nota,
             )
 
-            fiado_usado = 0
-
             if tipo_pago == 'cuenta_estudiante' and cliente_id:
                 est = Estudiante.objects.select_for_update().get(pk=cliente_id)
                 if float(est.saldo) < total_calculado:
@@ -230,13 +258,9 @@ def procesar_venta(request):
 
             elif tipo_pago == 'cuenta_docente' and cliente_id:
                 doc = Docente.objects.select_for_update().get(pk=cliente_id)
-                if doc.saldo_total_disponible < total_calculado:
-                    return JsonResponse({'ok': False, 'error': f'Saldo/crédito insuficiente. Disponible: ${doc.saldo_total_disponible:,.0f}'})
-                # Calculate fiado used
-                if total_calculado > float(doc.saldo):
-                    fiado_usado = total_calculado - float(doc.saldo)
-                venta.docente     = doc
-                venta.fiado_usado = fiado_usado
+                if float(doc.saldo) < total_calculado:
+                    return JsonResponse({'ok': False, 'error': f'Saldo insuficiente. Disponible: ${doc.saldo:,.0f}'})
+                venta.docente = doc
 
             venta.save()
 
@@ -247,9 +271,8 @@ def procesar_venta(request):
                     cantidad=cantidad,
                     precio_unit=producto.precio_venta,
                 )
-                if producto.tipo == 'simple':
-                    producto.stock -= cantidad
-                    producto.save(update_fields=['stock'])
+                producto.stock -= cantidad
+                producto.save(update_fields=['stock'])
 
             venta.recalcular_total()
 
@@ -260,13 +283,8 @@ def procesar_venta(request):
 
             elif tipo_pago == 'cuenta_docente' and venta.docente:
                 doc = venta.docente
-                if float(venta.total) <= float(doc.saldo):
-                    doc.saldo = float(doc.saldo) - float(venta.total)
-                else:
-                    exceso          = float(venta.total) - float(doc.saldo)
-                    doc.saldo       = 0
-                    doc.deuda_fiado = float(doc.deuda_fiado) + exceso
-                doc.save(update_fields=['saldo', 'deuda_fiado'])
+                doc.saldo = float(doc.saldo) - float(venta.total)
+                doc.save(update_fields=['saldo'])
 
         detalles = [
             {'nombre': d.producto.nombre, 'cantidad': d.cantidad, 'subtotal': float(d.subtotal)}
@@ -280,8 +298,8 @@ def procesar_venta(request):
         return JsonResponse({'ok': False, 'error': 'Estudiante no encontrado.'})
     except Docente.DoesNotExist:
         return JsonResponse({'ok': False, 'error': 'Docente no encontrado.'})
-    except Exception as e:
-        return JsonResponse({'ok': False, 'error': str(e)}, status=500)
+    except Exception:
+        return JsonResponse({'ok': False, 'error': 'Error interno al procesar la venta.'}, status=500)
 
 
 @empleado_required
@@ -308,7 +326,7 @@ def buscar_cliente(request):
                 dm.Q(documento__icontains=q)
             ).select_related('perfil__user')[:10]
             results = [
-                {'id': d.pk, 'nombre': d.perfil.user.get_full_name(), 'saldo': float(d.saldo), 'credito': float(d.credito_disponible)}
+                {'id': d.pk, 'nombre': d.perfil.user.get_full_name(), 'saldo': float(d.saldo)}
                 for d in qs
             ]
 
@@ -383,15 +401,16 @@ def anular_venta(request):
             return JsonResponse({'ok': False, 'error': 'Usuario sin perfil válido.'})
 
         emp = _empleado(request)
-        try:
-            venta = VentaEmpleado.objects.get(ticket=ticket, empleado=emp)
-        except VentaEmpleado.DoesNotExist:
-            return JsonResponse({'ok': False, 'error': 'Ticket no encontrado en tus ventas.'})
-
-        if venta.anulada:
-            return JsonResponse({'ok': False, 'error': 'Esta venta ya fue anulada.'})
 
         with transaction.atomic():
+            try:
+                venta = VentaEmpleado.objects.select_for_update().get(ticket=ticket, empleado=emp)
+            except VentaEmpleado.DoesNotExist:
+                return JsonResponse({'ok': False, 'error': 'Ticket no encontrado en tus ventas.'})
+
+            if venta.anulada:
+                return JsonResponse({'ok': False, 'error': 'Esta venta ya fue anulada.'})
+
             # Revertir saldo
             if venta.tipo_pago == 'cuenta_estudiante' and venta.estudiante:
                 venta.estudiante.saldo = float(venta.estudiante.saldo) + float(venta.total)
@@ -399,18 +418,13 @@ def anular_venta(request):
 
             elif venta.tipo_pago == 'cuenta_docente' and venta.docente:
                 doc = venta.docente
-                # Usar fiado_usado guardado en la venta para revertir exactamente
-                fiado_rev  = float(venta.fiado_usado)
-                saldo_rev  = float(venta.total) - fiado_rev
-                doc.deuda_fiado = max(0, float(doc.deuda_fiado) - fiado_rev)
-                doc.saldo       = float(doc.saldo) + saldo_rev
-                doc.save(update_fields=['saldo', 'deuda_fiado'])
+                doc.saldo = float(doc.saldo) + float(venta.total)
+                doc.save(update_fields=['saldo'])
 
             # Restaurar stock
             for detalle in venta.detalles.select_related('producto').all():
-                if detalle.producto.tipo == 'simple':
-                    detalle.producto.stock += detalle.cantidad
-                    detalle.producto.save(update_fields=['stock'])
+                detalle.producto.stock += detalle.cantidad
+                detalle.producto.save(update_fields=['stock'])
 
             venta.anulada = True
             venta.save(update_fields=['anulada'])
@@ -423,8 +437,8 @@ def anular_venta(request):
 
         return JsonResponse({'ok': True, 'mensaje': f'Venta {ticket} anulada. Saldo/stock restaurados.'})
 
-    except Exception as e:
-        return JsonResponse({'ok': False, 'error': str(e)}, status=500)
+    except Exception:
+        return JsonResponse({'ok': False, 'error': 'Error interno al procesar la anulación.'}, status=500)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -447,9 +461,9 @@ def inventario_empleado(request):
     if cat_id:
         productos = productos.filter(categoria__nombre=cat_id)
 
-    total_productos = productos.filter(disponible=True).count()
-    sin_stock_count = sum(1 for p in productos if p.sin_stock)
-    stock_bajo_count = sum(1 for p in productos if p.stock_bajo and not p.sin_stock)
+    total_productos  = productos.filter(disponible=True).count()
+    sin_stock_count  = sum(1 for p in productos if p.disponible and p.sin_stock)
+    stock_bajo_count = sum(1 for p in productos if p.disponible and p.stock_bajo and not p.sin_stock)
 
     return render(request, 'app_empleado/inventario.html', {
         'empleado':        emp,
@@ -538,6 +552,9 @@ def perfil(request):
         user.perfil.save(update_fields=['telefono'])
 
         if email and email != user.email:
+            if User.objects.filter(email=email).exclude(pk=user.pk).exists():
+                messages.error(request, 'Ese correo ya está en uso por otra cuenta.')
+                return redirect('app_empleado:perfil')
             user.email = email
             user.save(update_fields=['email'])
 
@@ -548,3 +565,106 @@ def perfil(request):
         'empleado': emp,
         'sede':     _sede_activa(request),
     })
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HELPERS DE RESTRICCIONES
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _restricciones_estudiante(e):
+    """Devuelve dict con alergias y restricciones activas de un Estudiante."""
+    alergias_qs = (
+        AlergiaEstudiante.objects
+        .filter(estudiante=e, activo=True)
+        .select_related('alergeno')
+    )
+    alergias = [
+        {
+            'nombre':         a.nombre,
+            'tipo':           a.tipo,
+            'gravedad':       a.gravedad,
+            'alergeno_codigo': a.alergeno.codigo if a.alergeno_id else None,
+        }
+        for a in alergias_qs
+    ]
+    restricciones = (
+        RestriccionAlimento.objects
+        .filter(estudiante=e, activo=True)
+        .select_related('categoria')
+    )
+    return {
+        'alergias':                alergias,
+        'restricciones_productos': [r.producto_id for r in restricciones if r.producto_id],
+        'restricciones_categorias': [r.categoria.nombre for r in restricciones if r.categoria_id],
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# IDENTIFICACIÓN POR QR (carnet del estudiante o docente)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@empleado_required
+def cliente_por_codigo(request):
+    """
+    Lookup exacto por contenido del QR.
+    Formatos soportados:
+      - "DOC-<pk>"  → docente
+      - cualquier otra cosa → se trata como `Estudiante.codigo`
+    Devuelve `tipo` en la respuesta para que la caja seleccione la pestaña correcta.
+    """
+    codigo = (request.GET.get('codigo') or '').strip()
+    if not codigo:
+        return JsonResponse({'ok': False, 'error': 'Falta código.'}, status=400)
+    try:
+        if codigo.upper().startswith('DOC-'):
+            try:
+                pk = int(codigo.split('-', 1)[1])
+            except (ValueError, IndexError):
+                return JsonResponse({'ok': False, 'error': 'Código de docente inválido.'})
+            d = Docente.objects.select_related('perfil__user').filter(
+                perfil__activo=True, pk=pk
+            ).first()
+            if not d:
+                return JsonResponse({'ok': False, 'error': 'Docente no encontrado.'})
+            return JsonResponse({'ok': True, 'tipo': 'docente', 'cliente': {
+                'id':     d.pk,
+                'nombre': d.perfil.user.get_full_name(),
+                'saldo':  float(d.saldo),
+            }})
+
+        e = Estudiante.objects.select_related('perfil__user').filter(
+            perfil__activo=True, codigo=codigo
+        ).first()
+        if not e:
+            return JsonResponse({'ok': False, 'error': f'Sin usuario con código "{codigo}".'})
+        return JsonResponse({'ok': True, 'tipo': 'estudiante', 'cliente': {
+            'id':     e.pk,
+            'nombre': e.perfil.user.get_full_name(),
+            'codigo': e.codigo,
+            'saldo':  float(e.saldo),
+            **_restricciones_estudiante(e),
+        }})
+    except Exception as ex:
+        return JsonResponse({'ok': False, 'error': str(ex)}, status=500)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# RESTRICCIONES DE CLIENTE (para búsqueda manual — QR ya las incluye inline)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@empleado_required
+def cliente_restricciones(request):
+    tipo = request.GET.get('tipo', '')
+    pk   = request.GET.get('id', '')
+
+    vacio = {'ok': True, 'alergias': [], 'restricciones_productos': [], 'restricciones_categorias': []}
+
+    if tipo != 'estudiante' or not pk:
+        return JsonResponse(vacio)
+
+    try:
+        e = Estudiante.objects.get(pk=int(pk), perfil__activo=True)
+    except (ValueError, Estudiante.DoesNotExist):
+        return JsonResponse({'ok': False, 'error': 'Estudiante no encontrado.'})
+
+    return JsonResponse({'ok': True, **_restricciones_estudiante(e)})

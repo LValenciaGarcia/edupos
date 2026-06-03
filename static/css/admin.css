@@ -4,6 +4,28 @@
    Requiere base.css cargado antes.
    ══════════════════════════════════════════════════════════════════════════════ */
 
+/* ── Franja decorativa superior del sidebar ── */
+.sidebar::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--leaf-dark), var(--leaf-bright), var(--leaf-dark));
+  z-index: 1;
+}
+
+/* ── Gradiente sutil en brand bar ── */
+.sb-brand {
+  background: linear-gradient(90deg, rgba(22,163,74,0.08) 0%, transparent 70%);
+}
+
+/* ── Active link con box-shadow verde en admin ── */
+.sb-link.active {
+  background: rgba(22,163,74,0.14);
+  box-shadow: inset 0 0 0 1px rgba(34,197,94,0.18);
+}
+.sb-link.active i { color: var(--leaf-bright); }
+.sb-link.active::before { width: 2.5px; }
+.sb-link:hover i { color: var(--leaf-bright); }
+
 /* ══ PRODUCT GRID ════════════════════════════════════════════════════════════ */
 .product-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
 @media (max-width: 1200px) { .product-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -99,101 +121,24 @@
   font-size: var(--text-sm); text-decoration: none; color: var(--ink);
   transition: background 0.1s;
 }
-.alert-item:hover { background: var(--cream); }
 .alert-item:last-child { border-bottom: none; }
-.alert-dot { width: 0.48rem; height: 0.48rem; border-radius: 50%; flex-shrink: 0; margin-top: 0.3rem; }
-.dot-red   { background: var(--red); }
-.dot-amber { background: var(--amber); }
-.alert-empty { padding: 1.5rem 1rem; text-align: center; color: var(--ash); font-size: var(--text-sm); }
-
-/* ══ MODAL INFO PRODUCTO ═════════════════════════════════════════════════════ */
-.modal-overlay {
-  display: none; position: fixed; inset: 0;
-  background: rgba(15,15,14,0.5); backdrop-filter: blur(3px);
-  z-index: 500; align-items: center; justify-content: center;
+.alert-item:hover { background: var(--cream); }
+.alert-dot {
+  width: 0.5rem; height: 0.5rem; border-radius: 50%; flex-shrink: 0;
+  margin-top: 0.25rem;
 }
-.modal-overlay.open { display: flex; }
-
-.modal-box {
-  background: var(--ivory); border-radius: var(--radius-lg);
-  width: 100%; max-width: 380px;
-  box-shadow: 0 24px 64px rgba(0,0,0,0.2);
-  overflow: hidden; border: 1px solid var(--mist);
-}
-.modal-head {
-  background: var(--ink); padding: 1rem 1.2rem;
-  display: flex; align-items: center; justify-content: space-between;
-}
-.modal-head-title {
-  font-family: var(--serif); font-size: 1.05rem; font-weight: 500;
-  color: rgba(255,255,255,0.86); letter-spacing: 0.01em;
-}
-.modal-close-btn {
-  background: none; border: none; color: rgba(255,255,255,0.38); cursor: pointer;
-  font-size: 0.95rem;
-  display: flex; align-items: center; justify-content: center;
-  width: 1.7rem; height: 1.7rem; border-radius: 5px;
-  transition: background 0.14s, color 0.14s;
-}
-.modal-close-btn:hover { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7); }
-
-.modal-body {
-  padding: 1.2rem; display: flex; flex-direction: column;
-  gap: 0.28rem; max-height: 70vh; overflow-y: auto;
-}
-.modal-row { display: flex; justify-content: space-between; gap: 1rem; font-size: var(--text-sm); }
-.modal-row-label { color: var(--stone); }
-.modal-row-val   { font-weight: 600; }
-.modal-divider   { height: 1px; background: var(--mist); margin: 0.3rem 0; }
-
-/* ══ RECETA ROW ══════════════════════════════════════════════════════════════ */
-.receta-row {
-  display: grid; grid-template-columns: 1fr 8rem 2rem;
-  gap: 0.5rem; align-items: center; margin-bottom: 0.5rem;
-}
-.receta-row input, .receta-row select {
-  font-family: var(--sans); font-size: var(--text-sm);
-  padding: 0.41rem 0.7rem; border: 1px solid var(--fog); border-radius: 7px; width: 100%;
-}
-.receta-row input:focus, .receta-row select:focus { outline: none; border-color: var(--leaf); }
-
-.btn-rm-row {
-  background: var(--red-pale); color: var(--red); border: none;
-  border-radius: 5px; width: 1.72rem; height: 1.72rem;
-  cursor: pointer; font-size: var(--text-sm);
-  display: flex; align-items: center; justify-content: center;
+.alert-dot.dot-green  { background: var(--leaf); }
+.alert-dot.dot-red    { background: var(--red); }
+.alert-dot.dot-amber  { background: var(--amber); }
+.alert-dot.dot-sky    { background: var(--sky); }
+.alert-empty {
+  padding: 1.5rem 1rem; text-align: center;
+  font-size: var(--text-sm); color: var(--ash);
 }
 
-/* Image preview en formularios */
-#img-preview {
-  max-width: 8rem; max-height: 8rem; border-radius: 7px;
-  border: 1px solid var(--mist); margin-top: 0.5rem;
-  display: none; object-fit: cover;
-}
-
-/* ══ MOBILE RESPONSIVE (≤ 640px) ═══════════════════════════════════════════ */
+/* ══ MOBILE (≤ 640px) ════════════════════════════════════════════════════════ */
 @media (max-width: 640px) {
-  /* Kanban: columna única */
-  .kanban { grid-template-columns: 1fr; }
-
-  /* Product grid: 2 columnas en móvil (era 3) */
-  .product-grid { grid-template-columns: 1fr 1fr; }
-
-  /* Alert panel */
-  .alert-panel {
-    position: fixed;
-    top: 3.5rem; left: 0.75rem; right: 0.75rem;
-    width: auto;
-  }
-
-  /* Modal full-width en móvil */
-  .modal-box {
-    max-width: calc(100vw - 1.5rem);
-    margin: 0.75rem;
-    max-height: calc(100dvh - 1.5rem);
-  }
-  .modal-body { max-height: 60dvh; }
-
-  /* Receta row: 2 columnas */
-  .receta-row { grid-template-columns: 1fr 6rem 2rem; }
+  .product-grid { grid-template-columns: 1fr; }
+  .kanban { grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+  .kanban-col { padding: 0.5rem; }
 }

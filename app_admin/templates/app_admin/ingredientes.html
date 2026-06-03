@@ -429,13 +429,13 @@
         <td>
           <div class="action-group">
             <a href="{% url 'app_admin:lotes_ingrediente' ing.pk %}" class="action-btn" title="Ver/añadir lotes" style="color:var(--sky);border-color:var(--sky);">
-              <i class="bi bi-layers"></i> Lotes
+              <i class="bi bi-layers"></i>
             </a>
             <a href="{% url 'app_admin:entrada_stock' %}?ing={{ ing.pk }}" class="action-btn entrada" title="Registrar entrada">
-              <i class="bi bi-box-arrow-in-down"></i> Entrada
+              <i class="bi bi-box-arrow-in-down"></i>
             </a>
             <a href="{% url 'app_admin:salida_stock' %}?tipo=ingrediente&item={{ ing.pk }}" class="action-btn salida" title="Registrar salida">
-              <i class="bi bi-box-arrow-up"></i> Salida
+              <i class="bi bi-box-arrow-up"></i>
             </a>
             <a href="{% url 'app_admin:ingrediente_editar' ing.pk %}" class="action-btn editar" title="Editar ingrediente">
               <i class="bi bi-pencil"></i>
@@ -737,16 +737,20 @@ function limpiarSeleccionIng() {
 function ingBulkAccion(accion) {
   const checks = document.querySelectorAll('.ing-check:checked');
   if (!checks.length) return;
-  if (accion === 'eliminar' && !confirm('¿Desactivar ' + checks.length + ' ingrediente(s)?')) return;
-  document.getElementById('ing-bulk-accion').value = accion;
-  const container = document.getElementById('ing-bulk-pks');
-  container.innerHTML = '';
-  checks.forEach(c => {
-    const inp = document.createElement('input');
-    inp.type = 'hidden'; inp.name = 'pks'; inp.value = c.value;
-    container.appendChild(inp);
-  });
-  document.getElementById('form-ing-bulk').submit();
+  const ejecutar = function() {
+    document.getElementById('ing-bulk-accion').value = accion;
+    const container = document.getElementById('ing-bulk-pks');
+    container.innerHTML = '';
+    checks.forEach(c => {
+      const inp = document.createElement('input');
+      inp.type = 'hidden'; inp.name = 'pks'; inp.value = c.value;
+      container.appendChild(inp);
+    });
+    document.getElementById('form-ing-bulk').submit();
+  };
+  if (accion === 'eliminar') {
+    paShowConfirm('¿Desactivar ' + checks.length + ' ingrediente(s)?', ejecutar, { type: 'warn', okText: 'Desactivar' });
+  } else { ejecutar(); }
 }
 </script>
 {% endblock %}

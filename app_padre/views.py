@@ -1,6 +1,7 @@
 import json
 import csv
 import io
+import unicodedata
 from decimal import Decimal
 from collections import defaultdict
 
@@ -15,7 +16,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST, require_GET
 
 from authentication.models import Perfil, Padre, Estudiante
-from authentication.utils import generar_username as _generar_username
+from authentication.utils import generar_username as _generar_username, generar_username_estudiante as _gen_username_est
 from app_admin.models import Producto, Categoria, Pedido, DetallePedido, Alergeno
 from .models import (
     RecargaSaldo, RecargaPadre, LimiteGasto, RestriccionAlimento,
@@ -45,6 +46,30 @@ def padre_required(view_func):
 
 def _get_padre(request):
     return get_object_or_404(Padre, perfil=request.user.perfil)
+
+
+def _norm(s):
+    """Lowercase + strip accents — for tolerant matching ('Lácteos' → 'lacteos')."""
+    s = (s or '').strip().lower()
+    return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
+
+
+def _alergia_conflicto(prod, alergias_nombres):
+    """True if any of the parent-registered allergy names matches one of the product's allergens
+    (accent-insensitive, substring in either direction)."""
+    if not alergias_nombres:
+        return False
+    codes = [_norm(ae.codigo) for ae in prod.alergenos]
+    if not codes:
+        return False
+    for nombre in alergias_nombres:
+        n = _norm(nombre)
+        if not n:
+            continue
+        for c in codes:
+            if c and (c in n or n in c):
+                return True
+    return False
 
 
 
@@ -176,13 +201,14 @@ def crear_estudiante(request):
     if request.method == 'POST':
         first_name = request.POST.get('first_name', '').strip()
         last_name  = request.POST.get('last_name',  '').strip()
+        email      = request.POST.get('email',      '').strip().lower()
         password1  = request.POST.get('password1',  '')
         password2  = request.POST.get('password2',  '')
         grado      = request.POST.get('grado',      '').strip()
         codigo     = request.POST.get('codigo',     '').strip()
 
         errores = []
-        if not all([first_name, last_name, password1, grado, codigo]):
+        if not all([first_name, last_name, email, password1, grado, codigo]):
             errores.append('Todos los campos son obligatorios.')
         if password1 != password2:
             errores.append('Las contraseñas no coinciden.')
@@ -190,6 +216,8 @@ def crear_estudiante(request):
             errores.append('La contraseña debe tener al menos 8 caracteres.')
         if Estudiante.objects.filter(codigo=codigo).exists():
             errores.append('Ya existe un estudiante con ese código.')
+        if email and User.objects.filter(email=email).exists():
+            errores.append('Ya existe una cuenta con ese correo electrónico.')
 
         if errores:
             for e in errores:
@@ -198,10 +226,11 @@ def crear_estudiante(request):
                 'padre': padre, 'form_data': request.POST,
             }))
 
-        username = _generar_username(first_name, last_name)
+        username = _gen_username_est(codigo)
         user = User.objects.create_user(
             username=username, password=password1,
             first_name=first_name, last_name=last_name,
+            email=email,
         )
         perfil = Perfil.objects.create(user=user, rol='estudiante')
         Estudiante.objects.create(perfil=perfil, padre=padre, grado=grado, codigo=codigo, saldo=0)
@@ -230,36 +259,43 @@ def recargar_saldo(request, pk):
             messages.error(request, 'Monto inválido.')
             return redirect('app_padre:recargar_saldo', pk=pk)
 
-        comprobante = request.FILES.get('comprobante')
-
-        if monto <= 0:
-            messages.error(request, 'El monto debe ser mayor a cero.')
+        if monto < 1000:
+            messages.error(request, 'El monto mínimo es $1.000.')
         elif monto > 2_000_000:
             messages.error(request, 'El monto máximo por recarga es $2.000.000.')
-        elif not comprobante:
-            messages.error(request, 'Debes adjuntar el comprobante de pago para enviar la solicitud.')
         else:
+            # Cancelar recargas MP iniciadas pero abandonadas (sin pago real)
+            RecargaSaldo.objects.filter(
+                estudiante=estudiante, estado='pendiente',
+                mp_preference_id__gt='', mp_payment_id='',
+            ).update(estado='rechazada', nota_admin='Cancelada al iniciar nueva recarga', fecha_resolucion=timezone.now())
+
             recarga = RecargaSaldo.objects.create(
                 estudiante=estudiante, padre=padre,
-                monto=monto, nota=nota, comprobante=comprobante,
-                estado='pendiente',
+                monto=monto, nota=nota, estado='pendiente',
             )
-            Notificacion.objects.create(
-                padre=padre,
-                tipo='recarga_pendiente',
-                titulo='Recarga en revisión',
-                mensaje=f'Tu solicitud de recarga de ${monto:,.0f} para {estudiante.perfil.user.get_full_name()} está siendo revisada.',
-                url_accion='/padre/hijos/',
-            )
-            nombre = estudiante.perfil.user.first_name or estudiante.perfil.user.email
-            messages.success(request, f'Solicitud de recarga de ${monto:,.0f} enviada. El saldo se actualizará cuando sea aprobada.')
-            return redirect('app_padre:hijos')
+            try:
+                from pagos.utils import crear_preferencia_mp
+                nombre_est = estudiante.perfil.user.get_full_name() or estudiante.codigo
+                pref = crear_preferencia_mp(
+                    titulo=f'Recarga Punto Asis — {nombre_est}',
+                    monto=monto,
+                    external_reference=f'saldo-{recarga.pk}',
+                )
+                recarga.mp_preference_id = pref['id']
+                recarga.save(update_fields=['mp_preference_id'])
+                return redirect(pref['init_point'])
+            except Exception as e:
+                recarga.delete()
+                messages.error(request, 'No se pudo conectar con MercadoPago. Intenta de nuevo.')
+                return redirect('app_padre:recargar_saldo', pk=pk)
 
     historial = RecargaSaldo.objects.filter(estudiante=estudiante).order_by('-fecha')[:15]
     return render(request, 'app_padre/recargar_saldo.html', _ctx_padre(padre, {
         'padre': padre,
         'estudiante': estudiante,
         'historial': historial,
+        'todos_hijos': padre.hijos.order_by('perfil__user__first_name').all(),
     }))
 
 
@@ -269,55 +305,186 @@ def recargar_saldo(request, pk):
 
 @padre_required
 def menu(request):
-    padre    = _get_padre(request)
-    cat_slug = request.GET.get('cat', '')
-    q        = request.GET.get('q', '').strip()
-    hijo_pk  = request.GET.get('hijo', '')
+    padre = _get_padre(request)
 
-    productos = Producto.objects.filter(disponible=True, stock__gt=0).select_related('categoria').order_by('categoria', 'nombre')
+    if request.method == 'POST':
+        hijo_pk_str = request.POST.get('hijo_pk', '').strip()
+        fuente      = request.POST.get('fuente', 'saldo_hijo')
+        nota_ped    = request.POST.get('nota', '').strip()
 
+        if not hijo_pk_str:
+            messages.error(request, 'Debes seleccionar un estudiante.')
+            return redirect('app_padre:menu')
+
+        try:
+            estudiante = padre.hijos.get(pk=int(hijo_pk_str))
+        except (Estudiante.DoesNotExist, ValueError):
+            messages.error(request, 'Estudiante no válido.')
+            return redirect('app_padre:menu')
+
+        restricciones_prod_ids = set(
+            RestriccionAlimento.objects.filter(
+                Q(estudiante=estudiante) | Q(estudiante__isnull=True, padre=padre),
+                activo=True, producto__isnull=False,
+            ).values_list('producto_id', flat=True)
+        )
+        restricciones_cat_ids = set(
+            RestriccionAlimento.objects.filter(
+                Q(estudiante=estudiante) | Q(estudiante__isnull=True, padre=padre),
+                activo=True, categoria__isnull=False,
+            ).values_list('categoria_id', flat=True)
+        )
+
+        carrito = {}
+        for key, val in request.POST.items():
+            if key.startswith('qty_'):
+                try:
+                    prod_id = int(key[4:])
+                    qty     = int(val)
+                    if qty > 0:
+                        carrito[prod_id] = qty
+                except (ValueError, TypeError):
+                    pass
+
+        if not carrito:
+            messages.error(request, 'El carrito está vacío.')
+            return redirect('app_padre:menu')
+
+        horarios_activos = HorarioCompra.objects.filter(estudiante=estudiante, activo=True)
+        if horarios_activos.exists():
+            ahora_hora = timezone.localtime().time()
+            en_horario = any(h.hora_inicio <= ahora_hora <= h.hora_fin for h in horarios_activos)
+            if not en_horario:
+                messages.error(request, 'No es un horario permitido para realizar pedidos para este estudiante.')
+                return redirect('app_padre:menu')
+
+        alergias_nombres = set(
+            AlergiaEstudiante.objects.filter(estudiante=estudiante, activo=True)
+            .values_list('nombre', flat=True)
+        )
+
+        total  = Decimal('0')
+        lineas = []
+        for prod_id, qty in carrito.items():
+            try:
+                prod = Producto.objects.get(pk=prod_id, disponible=True)
+            except Producto.DoesNotExist:
+                messages.error(request, 'Uno de los productos no está disponible.')
+                return redirect('app_padre:menu')
+            if prod.id in restricciones_prod_ids or prod.categoria_id in restricciones_cat_ids:
+                messages.error(request, f'"{prod.nombre}" está restringido para este estudiante.')
+                return redirect('app_padre:menu')
+            if _alergia_conflicto(prod, alergias_nombres):
+                messages.error(request, f'"{prod.nombre}" puede contener alérgenos registrados para este estudiante.')
+                return redirect('app_padre:menu')
+            subtotal = Decimal(str(prod.precio_venta)) * qty
+            total   += subtotal
+            lineas.append((prod, qty, subtotal))
+
+        if fuente not in ('saldo_hijo', 'saldo_padre'):
+            fuente = 'saldo_hijo'
+
+        try:
+            with transaction.atomic():
+                if fuente == 'saldo_hijo':
+                    est_locked   = Estudiante.objects.select_for_update().get(pk=estudiante.pk)
+                    padre_locked = None
+                    if est_locked.saldo < total:
+                        messages.error(request, f'El estudiante no tiene saldo suficiente (disponible: ${est_locked.saldo:,.0f}).')
+                        return redirect('app_padre:menu')
+                else:
+                    padre_locked = Padre.objects.select_for_update().get(pk=padre.pk)
+                    est_locked   = estudiante
+                    if padre_locked.saldo < total:
+                        messages.error(request, f'Tu saldo no es suficiente (disponible: ${padre_locked.saldo:,.0f}).')
+                        return redirect('app_padre:menu')
+
+                pedido = Pedido.objects.create(
+                    estudiante=est_locked, total=0, costo_total=0, nota=nota_ped
+                )
+                for prod, qty, _ in lineas:
+                    DetallePedido.objects.create(
+                        pedido=pedido, producto=prod,
+                        cantidad=qty, precio_unitario=prod.precio_venta,
+                        costo_unitario=prod.costo_calculado,
+                    )
+                pedido.recalcular_totales()
+                PedidoPadre.objects.create(pedido=pedido, padre=padre, fuente=fuente, nota=nota_ped)
+
+                if fuente == 'saldo_hijo':
+                    est_locked.saldo -= total
+                    est_locked.save(update_fields=['saldo'])
+                else:
+                    padre_locked.saldo -= total
+                    padre_locked.save(update_fields=['saldo'])
+        except Exception:
+            messages.error(request, 'Error al procesar el pedido. Intenta de nuevo.')
+            return redirect('app_padre:menu')
+
+        Notificacion.objects.create(
+            padre=padre,
+            tipo='pedido_padre',
+            titulo='Pedido realizado',
+            mensaje=f'Realizaste un pedido de ${total:,.0f} para {estudiante.perfil.user.get_full_name()}. Ticket: {pedido.ticket}',
+            url_accion='/padre/historial/',
+        )
+        messages.success(request, f'Pedido {pedido.ticket} creado exitosamente por ${total:,.0f}.')
+        return redirect('app_padre:historial')
+
+    # GET ─────────────────────────────────────────────────────────────────────
+    cat_slug   = request.GET.get('cat', '')
+    q          = request.GET.get('q', '').strip()
+    categorias = Categoria.objects.filter(activa=True)
+    hijos      = padre.hijos.select_related('perfil__user').order_by('perfil__user__first_name')
+
+    productos = (
+        Producto.objects
+        .filter(disponible=True, stock__gt=0)
+        .select_related('categoria')
+        .order_by('categoria', 'nombre')
+    )
     if cat_slug:
         productos = productos.filter(categoria__nombre=cat_slug)
     if q:
         productos = productos.filter(nombre__icontains=q)
 
-    categorias = Categoria.objects.filter(activa=True)
-    hijos      = padre.hijos.select_related('perfil__user')
+    # Per-hijo restriction + allergy data serialised for JS
+    hijos_data = []
+    for hijo in hijos:
+        qs_r  = RestriccionAlimento.objects.filter(
+            Q(estudiante=hijo) | Q(estudiante__isnull=True, padre=padre),
+            activo=True,
+        )
+        r_prod = list(qs_r.filter(producto__isnull=False).values_list('producto_id', flat=True))
+        r_cat  = list(qs_r.filter(categoria__isnull=False).values_list('categoria_id', flat=True))
+        alergias = list(
+            AlergiaEstudiante.objects.filter(estudiante=hijo, activo=True).values_list('nombre', flat=True)
+        )
+        hijos_data.append({
+            'pk':               hijo.pk,
+            'nombre':           hijo.perfil.user.first_name,
+            'nombre_completo':  hijo.perfil.user.get_full_name(),
+            'grado':            hijo.grado,
+            'saldo':            float(hijo.saldo),
+            'restricciones_prod': r_prod,
+            'restricciones_cat':  r_cat,
+            'alergias':           alergias,
+        })
 
-    # Restricciones del hijo seleccionado
-    restricciones_ids_prod = set()
-    restricciones_ids_cat  = set()
-    hijo_sel = None
-    if hijo_pk:
-        try:
-            hijo_sel = padre.hijos.get(pk=hijo_pk)
-            qs_r = RestriccionAlimento.objects.filter(
-                Q(estudiante=hijo_sel) | Q(estudiante__isnull=True, padre=padre),
-                activo=True,
-            )
-            restricciones_ids_prod = set(qs_r.filter(producto__isnull=False).values_list('producto_id', flat=True))
-            restricciones_ids_cat  = set(qs_r.filter(categoria__isnull=False).values_list('categoria_id', flat=True))
-        except Estudiante.DoesNotExist:
-            pass
-
-    # Anotar cada producto con su estado de restricción
-    productos_list = []
+    # Products with allergen codes for JS data attributes
+    prods_data = []
     for p in productos:
-        restringido = p.id in restricciones_ids_prod or p.categoria_id in restricciones_ids_cat
-        productos_list.append((p, restringido))
+        alergenos_codigos = [ae.codigo for ae in p.alergenos]
+        prods_data.append((p, alergenos_codigos))
 
     return render(request, 'app_padre/menu.html', _ctx_padre(padre, {
-        'padre': padre,
-        'productos': [p for p, _ in productos_list],
-        'productos_list': productos_list,
-        'restricciones_prod': restricciones_ids_prod,
-        'restricciones_cat': restricciones_ids_cat,
+        'padre':      padre,
+        'hijos':      hijos,
+        'hijos_json': json.dumps(hijos_data),
+        'prods_data': prods_data,
         'categorias': categorias,
         'cat_activa': cat_slug,
-        'q': q,
-        'hijos': hijos,
-        'hijo_sel': hijo_sel,
-        'hijo_pk': hijo_pk,
+        'q':          q,
     }))
 
 
@@ -632,6 +799,18 @@ def restricciones(request, pk):
 
         est_fk = estudiante if aplica_a == 'hijo' else None
 
+        # Evitar duplicados exactos
+        if prod_id and RestriccionAlimento.objects.filter(
+            padre=padre, estudiante=est_fk, producto_id=prod_id,
+        ).exists():
+            messages.error(request, 'Ese producto ya está restringido para ese alcance.')
+            return redirect('app_padre:restricciones', pk=pk)
+        if cat_id and RestriccionAlimento.objects.filter(
+            padre=padre, estudiante=est_fk, categoria_id=cat_id,
+        ).exists():
+            messages.error(request, 'Esa categoría ya está restringida para ese alcance.')
+            return redirect('app_padre:restricciones', pk=pk)
+
         RestriccionAlimento.objects.create(
             padre=padre, estudiante=est_fk,
             producto_id=prod_id, categoria_id=cat_id,
@@ -644,8 +823,12 @@ def restricciones(request, pk):
         Q(estudiante=estudiante) | Q(estudiante__isnull=True, padre=padre),
     ).select_related('producto', 'categoria', 'estudiante__perfil__user')
 
-    productos   = Producto.objects.filter(disponible=True).select_related('categoria').order_by('nombre')
-    categorias  = Categoria.objects.filter(activa=True)
+    # Excluir productos y categorías que ya tienen restricción activa para este alcance
+    ya_prod_ids = set(restricciones_qs.filter(producto__isnull=False).values_list('producto_id', flat=True))
+    ya_cat_ids  = set(restricciones_qs.filter(categoria__isnull=False).values_list('categoria_id', flat=True))
+
+    productos  = Producto.objects.filter(disponible=True).exclude(pk__in=ya_prod_ids).select_related('categoria').order_by('categoria__nombre', 'nombre')
+    categorias = Categoria.objects.filter(activa=True).exclude(pk__in=ya_cat_ids)
 
     return render(request, 'app_padre/restricciones.html', _ctx_padre(padre, {
         'padre': padre,
@@ -777,16 +960,9 @@ def pedido_padre(request, pk):
                 messages.error(request, f'"{prod.nombre}" está restringido para este estudiante.')
                 return redirect('app_padre:pedido_padre', pk=pk)
             # Bloquear si el producto contiene un alérgeno registrado del estudiante
-            if alergias_nombres:
-                alergenos_prod = set(prod.alergenos.values_list('codigo', flat=True))
-                # También verificar por nombre libre (texto) contra código de alérgeno
-                conflicto = any(
-                    a.lower() in ' '.join(alergenos_prod).lower()
-                    for a in alergias_nombres
-                )
-                if conflicto:
-                    messages.error(request, f'"{prod.nombre}" puede contener alérgenos registrados para este estudiante.')
-                    return redirect('app_padre:pedido_padre', pk=pk)
+            if _alergia_conflicto(prod, alergias_nombres):
+                messages.error(request, f'"{prod.nombre}" puede contener alérgenos registrados para este estudiante.')
+                return redirect('app_padre:pedido_padre', pk=pk)
             subtotal = Decimal(str(prod.precio_venta)) * qty
             total   += subtotal
             lineas.append((prod, qty, subtotal))
@@ -863,10 +1039,7 @@ def pedido_padre(request, pk):
     for p in productos:
         restringido = p.id in restricciones_prod_ids or p.categoria_id in restricciones_cat_ids
         alergenos_prod = list(p.alergenos)
-        tiene_alergia = bool(alergias_estudiante) and any(
-            a.lower() in ' '.join(ae.codigo for ae in alergenos_prod).lower()
-            for a in alergias_estudiante
-        )
+        tiene_alergia = _alergia_conflicto(p, alergias_estudiante)
         prods_lista.append((p, restringido, alergenos_prod, tiene_alergia))
 
     return render(request, 'app_padre/pedido_padre.html', _ctx_padre(padre, {
@@ -875,6 +1048,7 @@ def pedido_padre(request, pk):
         'prods_lista': prods_lista,
         'categorias': categorias,
         'alergias_estudiante': alergias_estudiante,
+        'todos_hijos': padre.hijos.order_by('perfil__user__first_name').all(),
     }))
 
 
@@ -1025,28 +1199,34 @@ def saldo_padre(request):
             messages.error(request, 'Monto inválido.')
             return redirect('app_padre:saldo_padre')
 
-        comprobante = request.FILES.get('comprobante')
-
-        if monto <= 0:
-            messages.error(request, 'El monto debe ser mayor a cero.')
+        if monto < 1000:
+            messages.error(request, 'El monto mínimo es $1.000.')
         elif monto > 2_000_000:
             messages.error(request, 'El monto máximo por recarga es $2.000.000.')
         else:
-            RecargaPadre.objects.create(
-                padre=padre,
-                monto=monto,
-                nota=nota,
-                comprobante=comprobante,
+            # Cancelar recargas MP iniciadas pero abandonadas (sin pago real)
+            RecargaPadre.objects.filter(
+                padre=padre, estado='pendiente',
+                mp_preference_id__gt='', mp_payment_id='',
+            ).update(estado='rechazada', nota_admin='Cancelada al iniciar nueva recarga', fecha_resolucion=timezone.now())
+
+            recarga = RecargaPadre.objects.create(
+                padre=padre, monto=monto, nota=nota, estado='pendiente',
             )
-            Notificacion.objects.create(
-                padre=padre,
-                tipo='recarga_pendiente',
-                titulo='Recarga de saldo propio en revisión',
-                mensaje=f'Tu solicitud de recarga de ${monto:,.0f} para tu saldo personal está siendo revisada.',
-                url_accion='/padre/saldo/',
-            )
-            messages.success(request, f'Solicitud de recarga de ${monto:,.0f} enviada. Tu saldo se actualizará cuando sea aprobada.')
-            return redirect('app_padre:saldo_padre')
+            try:
+                from pagos.utils import crear_preferencia_mp
+                pref = crear_preferencia_mp(
+                    titulo='Recarga Saldo Propio — Punto Asis',
+                    monto=monto,
+                    external_reference=f'padre-{recarga.pk}',
+                )
+                recarga.mp_preference_id = pref['id']
+                recarga.save(update_fields=['mp_preference_id'])
+                return redirect(pref['init_point'])
+            except Exception:
+                recarga.delete()
+                messages.error(request, 'No se pudo conectar con MercadoPago. Intenta de nuevo.')
+                return redirect('app_padre:saldo_padre')
 
     # Historial de pedidos realizados por el padre con su propio saldo
     pedidos_propios = PedidoPadre.objects.filter(
@@ -1194,10 +1374,11 @@ def alergias(request, pk):
         accion = request.POST.get('accion', '')
 
         if accion == 'crear':
-            nombre   = request.POST.get('nombre', '').strip()
-            tipo     = request.POST.get('tipo', 'alergia')
-            gravedad = request.POST.get('gravedad', 'leve')
-            notas    = request.POST.get('notas', '').strip()
+            nombre          = request.POST.get('nombre', '').strip()
+            tipo            = request.POST.get('tipo', 'alergia')
+            gravedad        = request.POST.get('gravedad', 'leve')
+            notas           = request.POST.get('notas', '').strip()
+            alergeno_codigo = request.POST.get('alergeno_codigo', '').strip()
 
             if not nombre:
                 messages.error(request, 'El nombre de la alergia es obligatorio.')
@@ -1208,9 +1389,21 @@ def alergias(request, pk):
             if gravedad not in dict(AlergiaEstudiante.GRAVEDAD_CHOICES):
                 gravedad = 'leve'
 
+            # Vincular al alérgeno estándar del catálogo para restricción automática
+            alergeno = None
+            if alergeno_codigo:
+                alergeno = Alergeno.objects.filter(codigo=alergeno_codigo).first()
+            if alergeno is None:
+                nombre_lower = nombre.lower()
+                for a in Alergeno.objects.all():
+                    if a.get_codigo_display().lower() == nombre_lower or a.codigo == nombre_lower:
+                        alergeno = a
+                        break
+
             AlergiaEstudiante.objects.create(
                 padre=padre, estudiante=estudiante,
                 nombre=nombre, tipo=tipo, gravedad=gravedad, notas=notas,
+                alergeno=alergeno,
             )
             messages.success(request, f'Alergia "{nombre}" registrada.')
 
@@ -1236,3 +1429,25 @@ def alergias(request, pk):
         'GRAVEDAD_CHOICES': AlergiaEstudiante.GRAVEDAD_CHOICES,
         'alergenos_catalogo': Alergeno.objects.all(),
     }))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TOGGLE RECARGA AUTÓNOMA
+# ══════════════════════════════════════════════════════════════════════════════
+
+@padre_required
+@require_POST
+def toggle_recarga_autonoma(request, pk):
+    padre      = _get_padre(request)
+    estudiante = get_object_or_404(Estudiante, pk=pk, padre=padre)
+    estudiante.puede_recargar_autonomo = not estudiante.puede_recargar_autonomo
+    estudiante.save(update_fields=['puede_recargar_autonomo'])
+    nombre = estudiante.perfil.user.get_full_name() or estudiante.codigo
+    if estudiante.puede_recargar_autonomo:
+        messages.success(request, f'Recarga autónoma habilitada para {nombre}.')
+    else:
+        messages.success(request, f'Recarga autónoma deshabilitada para {nombre}.')
+    next_url = request.POST.get('next', '').strip()
+    if next_url and next_url.startswith('/'):
+        return redirect(next_url)
+    return redirect('app_padre:hijos')

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pago pendiente — Punto Asis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: #f3f2ee; font-family: 'Inter', sans-serif; padding: 1.5rem;
+    }
+
+    .card {
+      background: #fff; border-radius: 20px; padding: 2.8rem 2.2rem 2.4rem;
+      text-align: center; max-width: 420px; width: 100%;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.10);
+    }
+
+    .clock-wrap {
+      width: 72px; height: 72px; border-radius: 50%;
+      background: linear-gradient(135deg, #d97706, #f59e0b);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 1.4rem;
+      box-shadow: 0 4px 20px rgba(217,119,6,0.30);
+      animation: pop .4s cubic-bezier(.34,1.56,.64,1) both;
+    }
+    @keyframes pop {
+      from { transform: scale(0); opacity: 0; }
+      to   { transform: scale(1); opacity: 1; }
+    }
+    .clock-wrap svg { width: 36px; height: 36px; }
+
+    /* Pulso animado */
+    .pulse-ring {
+      position: absolute;
+      width: 72px; height: 72px; border-radius: 50%;
+      border: 2px solid #f59e0b; opacity: 0;
+      animation: pulse 2s ease-out infinite;
+    }
+    .clock-container { position: relative; display: flex; justify-content: center; margin-bottom: 1.4rem; }
+    @keyframes pulse {
+      0%   { transform: scale(1);   opacity: .6; }
+      100% { transform: scale(1.7); opacity: 0; }
+    }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: .35rem;
+      background: #fef3c7; color: #92400e;
+      border-radius: 999px; padding: .28rem .95rem;
+      font-size: .72rem; font-weight: 700; letter-spacing: .07em;
+      text-transform: uppercase; margin-bottom: 1.1rem;
+    }
+    .badge-dot {
+      width: 6px; height: 6px; border-radius: 50%; background: #d97706;
+      animation: blink 1.2s ease-in-out infinite;
+    }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: .2; } }
+
+    h1 {
+      font-family: 'DM Serif Display', serif; font-size: 1.75rem;
+      color: #0f172a; margin-bottom: .5rem; line-height: 1.2;
+    }
+    p { color: #64748b; font-size: .88rem; line-height: 1.6; margin-bottom: 1.6rem; }
+
+    .info-box {
+      background: #fffbeb; border: 1px solid #fde68a;
+      border-radius: 10px; padding: .9rem 1rem; margin-bottom: 1.6rem;
+      font-size: .82rem; color: #92400e; line-height: 1.5;
+    }
+
+    .divider { border: none; border-top: 1px solid #f1f5f9; margin: 0 0 1.4rem; }
+
+    .mp-brand {
+      display: flex; align-items: center; justify-content: center; gap: .5rem;
+      font-size: .72rem; color: #94a3b8; margin-bottom: 1.6rem;
+    }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: .45rem;
+      background: #0f172a; color: #fff;
+      padding: .72rem 1.8rem; border-radius: 10px; text-decoration: none;
+      font-weight: 600; font-size: .88rem; transition: background .15s;
+    }
+    .btn:hover { background: #1e293b; }
+    .btn svg { width: 16px; height: 16px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="clock-container">
+      <div class="pulse-ring"></div>
+      <div class="clock-wrap">
+        <svg viewBox="0 0 36 36" fill="none">
+          <circle cx="18" cy="18" r="11" stroke="#fff" stroke-width="2.5"/>
+          <path d="M18 11v7l4 3" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </div>
+
+    <span class="badge"><span class="badge-dot"></span>En proceso</span>
+
+    <h1>Pago en revisión</h1>
+    <p>MercadoPago está procesando tu pago.<br>
+       Esto puede tomar unos minutos.</p>
+
+    <div class="info-box">
+      El saldo se acreditará <strong>automáticamente</strong> en cuanto MercadoPago confirme el pago. No necesitas hacer nada más.
+    </div>
+
+    <hr class="divider">
+
+    <div class="mp-brand">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <rect width="18" height="18" rx="4" fill="#009ee3"/>
+        <path d="M4 9.5c0-2.485 2.015-4.5 4.5-4.5S13 7.015 13 9.5 10.985 14 8.5 14 4 11.985 4 9.5z" fill="#fff"/>
+        <path d="M7 8.25l2.5 1.25L7 10.75V8.25z" fill="#009ee3"/>
+      </svg>
+      Procesado con MercadoPago
+    </div>
+
+    <a href="/" class="btn">
+      <svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M8 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Ir al inicio
+    </a>
+  </div>
+</body>
+</html>

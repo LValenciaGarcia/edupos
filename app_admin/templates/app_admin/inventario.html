@@ -439,10 +439,10 @@
           <div class="action-group" style="justify-content:center;">
             {% if p.tipo == 'simple' %}
             <a href="{% url 'app_admin:entrada_stock_producto' p.pk %}" class="action-btn entrada" title="Registrar entrada">
-              <i class="bi bi-box-arrow-in-down"></i> Entrada
+              <i class="bi bi-box-arrow-in-down"></i>
             </a>
             <a href="{% url 'app_admin:salida_stock' %}?tipo=producto&item={{ p.pk }}" class="action-btn salida" title="Registrar salida">
-              <i class="bi bi-box-arrow-up"></i> Salida
+              <i class="bi bi-box-arrow-up"></i>
             </a>
             {% endif %}
             <a href="{% url 'app_admin:producto_editar' p.pk %}" class="action-btn editar" title="Editar producto">
@@ -541,13 +541,14 @@
               <i class="bi bi-basket" style="font-size:0.68rem;color:var(--fog);"></i>
             </div>
             {% endif %}
-            <div>
-              <div style="font-weight:600;font-size:0.85rem;">{{ ing.nombre }}</div>
-              <div style="font-size:0.71rem;color:var(--ash);margin-top:0.1rem;">
-                {{ ing.unidad_compra }} · {{ ing.get_unidad_base_display }}
-              </div>
-            </div>
+            <div style="font-weight:600;font-size:0.85rem;">{{ ing.nombre }}</div>
           </div>
+        </td>
+        <td style="font-size:0.82rem;color:var(--stone);">
+          {{ ing.get_unidad_base_display }}
+          {% if ing.unidad_compra %}
+          <div style="font-size:0.7rem;color:var(--ash);">compra: {{ ing.unidad_compra }}</div>
+          {% endif %}
         </td>
         <td>
           {% if ing.sin_stock %}
@@ -580,10 +581,10 @@
         <td>
           <div class="action-group" style="justify-content:center;">
             <a href="{% url 'app_admin:entrada_stock' %}?ing={{ ing.pk }}" class="action-btn entrada" title="Registrar entrada">
-              <i class="bi bi-box-arrow-in-down"></i> Entrada
+              <i class="bi bi-box-arrow-in-down"></i>
             </a>
             <a href="{% url 'app_admin:salida_stock' %}?tipo=ingrediente&item={{ ing.pk }}" class="action-btn salida" title="Registrar salida">
-              <i class="bi bi-box-arrow-up"></i> Salida
+              <i class="bi bi-box-arrow-up"></i>
             </a>
             <a href="{% url 'app_admin:ingrediente_editar' ing.pk %}" class="action-btn editar" title="Editar ingrediente">
               <i class="bi bi-pencil"></i>
@@ -719,10 +720,10 @@
         <td>
           <div class="action-group" style="justify-content:center;">
             <a href="{% url 'app_admin:insumo_ajuste' ins.pk %}?tipo=entrada" class="action-btn entrada" title="Registrar entrada">
-              <i class="bi bi-box-arrow-in-down"></i> Entrada
+              <i class="bi bi-box-arrow-in-down"></i>
             </a>
             <a href="{% url 'app_admin:insumo_ajuste' ins.pk %}?tipo=salida" class="action-btn salida" title="Registrar salida">
-              <i class="bi bi-box-arrow-up"></i> Salida
+              <i class="bi bi-box-arrow-up"></i>
             </a>
             <a href="{% url 'app_admin:insumo_editar' ins.pk %}" class="action-btn editar" title="Editar insumo">
               <i class="bi bi-pencil"></i>
@@ -938,16 +939,17 @@ function invProdBulkAccion(accion) {
   const checks = document.querySelectorAll('.inv-prod-check:checked');
   if (!checks.length) return;
   let msg = accion === 'eliminar' ? '¿Eliminar ' + checks.length + ' producto(s)?' : '¿' + accion.charAt(0).toUpperCase() + accion.slice(1) + ' ' + checks.length + ' producto(s)?';
-  if (!confirm(msg)) return;
-  document.getElementById('inv-prod-bulk-accion').value = accion;
-  const container = document.getElementById('inv-prod-bulk-pks');
-  container.innerHTML = '';
-  checks.forEach(c => {
-    const inp = document.createElement('input');
-    inp.type = 'hidden'; inp.name = 'pks'; inp.value = c.value;
-    container.appendChild(inp);
-  });
-  document.getElementById('form-inv-prod-bulk').submit();
+  paShowConfirm(msg, function() {
+    document.getElementById('inv-prod-bulk-accion').value = accion;
+    const container = document.getElementById('inv-prod-bulk-pks');
+    container.innerHTML = '';
+    checks.forEach(c => {
+      const inp = document.createElement('input');
+      inp.type = 'hidden'; inp.name = 'pks'; inp.value = c.value;
+      container.appendChild(inp);
+    });
+    document.getElementById('form-inv-prod-bulk').submit();
+  }, { type: accion === 'eliminar' ? 'danger' : 'warn', okText: accion.charAt(0).toUpperCase() + accion.slice(1) });
 }
 
 // ── Selección múltiple ingredientes (inventario) ──────────────────────────
@@ -985,16 +987,17 @@ function limpiarInvIng() {
 function invIngBulkAccion(accion) {
   const checks = document.querySelectorAll('.inv-ing-check:checked');
   if (!checks.length) return;
-  if (!confirm('¿Desactivar ' + checks.length + ' ingrediente(s)?')) return;
-  document.getElementById('inv-ing-bulk-accion').value = accion;
-  const container = document.getElementById('inv-ing-bulk-pks');
-  container.innerHTML = '';
-  checks.forEach(c => {
-    const inp = document.createElement('input');
-    inp.type = 'hidden'; inp.name = 'pks'; inp.value = c.value;
-    container.appendChild(inp);
-  });
-  document.getElementById('form-inv-ing-bulk').submit();
+  paShowConfirm('¿Desactivar ' + checks.length + ' ingrediente(s)?', function() {
+    document.getElementById('inv-ing-bulk-accion').value = accion;
+    const container = document.getElementById('inv-ing-bulk-pks');
+    container.innerHTML = '';
+    checks.forEach(c => {
+      const inp = document.createElement('input');
+      inp.type = 'hidden'; inp.name = 'pks'; inp.value = c.value;
+      container.appendChild(inp);
+    });
+    document.getElementById('form-inv-ing-bulk').submit();
+  }, { type: 'warn', okText: 'Desactivar' });
 }
 
 // ── Confirm eliminar insumo ───────────────────────────────────────────────
@@ -1040,16 +1043,17 @@ function limpiarInvIns() {
 function invInsBulkAccion(accion) {
   const checks = document.querySelectorAll('.inv-ins-check:checked');
   if (!checks.length) return;
-  if (!confirm('¿Eliminar ' + checks.length + ' insumo(s)?')) return;
-  document.getElementById('inv-ins-bulk-accion').value = accion;
-  const container = document.getElementById('inv-ins-bulk-pks');
-  container.innerHTML = '';
-  checks.forEach(c => {
-    const inp = document.createElement('input');
-    inp.type = 'hidden'; inp.name = 'pks'; inp.value = c.value;
-    container.appendChild(inp);
-  });
-  document.getElementById('form-inv-ins-bulk').submit();
+  paShowConfirm('¿Eliminar ' + checks.length + ' insumo(s)?', function() {
+    document.getElementById('inv-ins-bulk-accion').value = accion;
+    const container = document.getElementById('inv-ins-bulk-pks');
+    container.innerHTML = '';
+    checks.forEach(c => {
+      const inp = document.createElement('input');
+      inp.type = 'hidden'; inp.name = 'pks'; inp.value = c.value;
+      container.appendChild(inp);
+    });
+    document.getElementById('form-inv-ins-bulk').submit();
+  }, { okText: 'Eliminar' });
 }
 
 // ── Búsqueda en tabla (client-side) ──────────────────────────────────────

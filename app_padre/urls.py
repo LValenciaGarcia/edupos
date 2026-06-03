@@ -19,6 +19,7 @@ urlpatterns = [
     path('hijos/<int:pk>/pedir/',                   views.pedido_padre,         name='pedido_padre'),
     path('hijos/<int:pk>/programados/',             views.pedidos_programados,  name='pedidos_programados'),
     path('hijos/<int:pk>/alergias/',                views.alergias,             name='alergias'),
+    path('hijos/<int:pk>/toggle-recarga/',          views.toggle_recarga_autonoma, name='toggle_recarga_autonoma'),
 
     # ── Cafetería ──────────────────────────────────────────────────────────
     path('menu/',                                   views.menu,                 name='menu'),

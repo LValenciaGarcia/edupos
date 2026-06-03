@@ -2,9 +2,9 @@
 {% load filtros %}
 {% block title %}{{ pedido.ticket }}{% endblock %}
 {% block page_title %}{{ pedido.ticket }}{% endblock %}
-{% block nav_pedidos_docentes %}active{% endblock %}
+{% block nav_pedidos %}active{% endblock %}
 {% block topbar_actions %}
-  <a href="{% url 'app_admin:pedidos_docentes' %}" class="btn btn-ghost btn-sm"><i class="bi bi-arrow-left"></i> Volver a pedidos</a>
+  <a href="{% url 'app_admin:pedidos' %}" class="btn btn-ghost btn-sm"><i class="bi bi-arrow-left"></i> Volver a pedidos</a>
 {% endblock %}
 
 {% block content %}
@@ -22,7 +22,7 @@
         <div class="grid-2" style="gap:1rem;margin-bottom:1rem;">
           <div>
             <div style="font-size:0.7rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.2rem;">Docente</div>
-            <div style="font-weight:600;">{{ pedido.docente.perfil.user.get_full_name|default:get_full_name|default:pedido.docente.perfil.user.email }}</div>
+            <div style="font-weight:600;">{{ pedido.docente.perfil.user.get_full_name|default:pedido.docente.perfil.user.email }}</div>
             <div style="font-size:0.82rem;color:var(--gray-500);">{{ pedido.docente.materia }}</div>
           </div>
           <div>
@@ -108,7 +108,7 @@
               {% csrf_token %}
               <input type="hidden" name="estado" value="cancelado">
               <input type="hidden" name="next" value="{% url 'app_admin:pedido_docente_detalle' pedido.pk %}">
-              <button type="submit" class="btn btn-danger btn-full" onclick="return confirm('¿Cancelar este pedido?')"><i class="bi bi-x"></i> Cancelar pedido</button>
+              <button type="submit" class="btn btn-danger btn-full" data-pa-confirm="¿Cancelar este pedido?" data-pa-ok="Cancelar"><i class="bi bi-x"></i> Cancelar pedido</button>
             </form>
           {% elif pedido.estado == 'preparando' %}
             <form method="post" action="{% url 'app_admin:pedido_docente_estado' pedido.pk %}">
@@ -127,14 +127,14 @@
               {% csrf_token %}
               <input type="hidden" name="estado" value="cancelado">
               <input type="hidden" name="next" value="{% url 'app_admin:pedido_docente_detalle' pedido.pk %}">
-              <button type="submit" class="btn btn-danger btn-full" onclick="return confirm('¿Cancelar este pedido?')"><i class="bi bi-x"></i> Cancelar pedido</button>
+              <button type="submit" class="btn btn-danger btn-full" data-pa-confirm="¿Cancelar este pedido?" data-pa-ok="Cancelar"><i class="bi bi-x"></i> Cancelar pedido</button>
             </form>
           {% elif pedido.estado == 'listo' %}
             <form method="post" action="{% url 'app_admin:pedido_docente_estado' pedido.pk %}">
               {% csrf_token %}
               <input type="hidden" name="estado" value="entregado">
               <input type="hidden" name="next" value="{% url 'app_admin:pedido_docente_detalle' pedido.pk %}">
-              <button type="submit" class="btn btn-primary btn-full" onclick="return confirm('¿Marcar como entregado?')"><i class="bi bi-check-lg"></i> Entregar</button>
+              <button type="submit" class="btn btn-primary btn-full" data-pa-confirm="¿Marcar como entregado?" data-pa-type="leaf" data-pa-ok="Entregar"><i class="bi bi-check-lg"></i> Entregar</button>
             </form>
             <form method="post" action="{% url 'app_admin:pedido_docente_estado' pedido.pk %}">
               {% csrf_token %}

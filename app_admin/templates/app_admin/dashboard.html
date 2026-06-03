@@ -93,7 +93,7 @@
           {% if i.sin_stock %}<span class="stock-out">Sin stock</span>
           {% else %}<span class="stock-low">{{ i.stock_real|floatformat:"-2" }} {{ i.get_unidad_base_display }}</span>{% endif %}
         </td>
-        <td style="font-size:.78rem;color:var(--gray-500);">{{ i.unidad_compra }}</td>
+        <td style="font-size:.78rem;color:var(--gray-500);">—</td>
         <td>
           <a href="{% url 'app_admin:entrada_stock' %}"
              class="btn btn-ghost btn-xs" title="Registrar entrada">

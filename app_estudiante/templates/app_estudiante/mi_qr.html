@@ -1,0 +1,155 @@
+{% extends 'app_estudiante/base_estudiante.html' %}
+{% load static %}
+
+{% block title %}Mi carnet QR{% endblock %}
+{% block page_title %}Mi carnet QR{% endblock %}
+
+{% block extra_css %}
+<style>
+  .qr-page-wrap {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 1rem; padding: 1rem 0 2rem;
+  }
+  .qr-page-card {
+    background: var(--ivory, #fff);
+    border: 1px solid var(--mist);
+    border-radius: 14px;
+    padding: 1.5rem 1.5rem 1.25rem;
+    max-width: 420px; width: 100%;
+    text-align: center;
+  }
+  .qr-page-card .qr-canvas-wrap {
+    background: #fff;
+    border-radius: 10px;
+    padding: 1rem;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto;
+  }
+  .qr-page-card img.qr-img { display: block; max-width: 100%; height: auto; border-radius: 8px; }
+  .qr-page-name { font-family: var(--serif, serif); font-size: 1.3rem; margin-top: .85rem; color: var(--ink); }
+  .qr-page-meta { font-size: .78rem; color: var(--ash); margin-top: .2rem; }
+  .qr-page-hint { font-size: .82rem; color: var(--stone); margin: .5rem 0 1rem; }
+  .qr-page-actions { display: flex; gap: .5rem; justify-content: center; flex-wrap: wrap; }
+
+  /* ── Modo presentación ── */
+  body.qr-presentando {
+    background: #ffffff !important;
+    overflow: hidden;
+  }
+  body.qr-presentando .sidebar,
+  body.qr-presentando .topbar,
+  body.qr-presentando .sb-overlay,
+  body.qr-presentando .msg-list { display: none !important; }
+  body.qr-presentando .main { margin-left: 0 !important; }
+  body.qr-presentando .page-body { padding: 0 !important; }
+
+  .qr-fullscreen {
+    position: fixed; inset: 0;
+    background: #ffffff;
+    display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    z-index: 9999;
+    padding: 2vh 4vw;
+    color: #0f0f0e;
+  }
+  body.qr-presentando .qr-fullscreen { display: flex; }
+  .qr-fs-img-wrap {
+    background: #fff;
+    border-radius: 12px;
+    padding: 1rem;
+    width: min(82vh, 82vw);
+    aspect-ratio: 1 / 1;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .qr-fs-img-wrap img { width: 100%; height: 100%; object-fit: contain; }
+  .qr-fs-name {
+    font-family: var(--serif, serif);
+    font-size: clamp(1.4rem, 3.5vh, 2.4rem);
+    margin-top: 1.2rem; color: #0f0f0e; text-align: center;
+  }
+  .qr-fs-meta { font-size: clamp(.85rem, 2vh, 1.1rem); color: #555; margin-top: .3rem; }
+  .qr-fs-hint { font-size: clamp(.7rem, 1.6vh, .9rem); color: #999; margin-top: 1rem; }
+  .qr-fs-close {
+    position: absolute; top: 1rem; right: 1rem;
+    background: #f3f2ee; border: 1px solid #e6e4dd;
+    border-radius: 999px; width: 2.6rem; height: 2.6rem;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: #0f0f0e; font-size: 1.2rem;
+  }
+  .qr-fs-close:hover { background: #e6e4dd; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="qr-page-wrap">
+  <div class="qr-page-card">
+    <div class="qr-canvas-wrap">
+      <img class="qr-img"
+           src="data:image/png;base64,{{ qr_img_b64 }}"
+           alt="Código QR de {{ request.user.get_full_name|default:request.user.username }}">
+    </div>
+    <div class="qr-page-name">{{ request.user.get_full_name|default:request.user.username }}</div>
+    <div class="qr-page-meta">Código: {{ estudiante.codigo }} · Grado {{ estudiante.grado }}</div>
+    <p class="qr-page-hint">Muestra este QR al cajero para identificarte y pagar con tu saldo.</p>
+    <div class="qr-page-actions">
+      <button type="button" class="btn btn-primary" onclick="qrPresentar()">
+        <i class="bi bi-fullscreen"></i> Mostrar en pantalla completa
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modo presentación -->
+<div class="qr-fullscreen" id="qrFullscreen">
+  <button type="button" class="qr-fs-close" onclick="qrCerrarPresentacion()" title="Cerrar">
+    <i class="bi bi-x-lg"></i>
+  </button>
+  <div class="qr-fs-img-wrap">
+    <img src="data:image/png;base64,{{ qr_img_b64 }}"
+         alt="QR {{ estudiante.codigo }}">
+  </div>
+  <div class="qr-fs-name">{{ request.user.get_full_name|default:request.user.username }}</div>
+  <div class="qr-fs-meta">Código {{ estudiante.codigo }} · Grado {{ estudiante.grado }}</div>
+  <div class="qr-fs-hint">Toca <i class="bi bi-x-lg"></i> o presiona ESC para salir</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  let _wakeLock = null;
+
+  async function qrPresentar() {
+    document.body.classList.add('qr-presentando');
+    const root = document.documentElement;
+    try {
+      if (root.requestFullscreen) await root.requestFullscreen();
+      else if (root.webkitRequestFullscreen) await root.webkitRequestFullscreen();
+    } catch (e) {}
+    if ('wakeLock' in navigator) {
+      try { _wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+    }
+  }
+
+  async function qrCerrarPresentacion() {
+    document.body.classList.remove('qr-presentando');
+    if (document.fullscreenElement) {
+      try { await document.exitFullscreen(); } catch (e) {}
+    } else if (document.webkitFullscreenElement) {
+      try { await document.webkitExitFullscreen(); } catch (e) {}
+    }
+    if (_wakeLock) { try { _wakeLock.release(); } catch (e) {} _wakeLock = null; }
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.body.classList.contains('qr-presentando'))
+      qrCerrarPresentacion();
+  });
+
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement && document.body.classList.contains('qr-presentando')) {
+      document.body.classList.remove('qr-presentando');
+      if (_wakeLock) { try { _wakeLock.release(); } catch (e) {} _wakeLock = null; }
+    }
+  });
+</script>
+{% endblock %}

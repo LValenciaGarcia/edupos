@@ -2,138 +2,19 @@
 {% load filtros %}
 {% block title %}Inicio{% endblock %}
 {% block page_title %}Inicio{% endblock %}
-{% block nav_dashboard %}active{% endblock %}
-
-{% block extra_css %}
-<style>
-  .welcome-bar {
-    background: var(--ink);
-    border-radius: 12px;
-    padding: 1.6rem 2rem;
-    margin-bottom: 1.25rem;
-    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-    position: relative; overflow: hidden;
-  }
-  .welcome-bar::before {
-    content: ''; position: absolute; right: -3rem; top: -3rem;
-    width: 14rem; height: 14rem; border-radius: 50%;
-    background: radial-gradient(circle, rgba(34,197,94,0.12) 0%, transparent 70%);
-    pointer-events: none;
-  }
-  .welcome-greeting { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--leaf-bright); margin-bottom: 0.35rem; }
-  .welcome-name { font-family: var(--serif); font-size: 1.7rem; font-weight: 500; color: #fff; line-height: 1.15; }
-  .welcome-sub { font-size: 0.78rem; color: rgba(255,255,255,0.4); margin-top: 0.3rem; }
-  .welcome-actions { display: flex; gap: 0.6rem; flex-shrink: 0; flex-wrap: wrap; }
-  .btn-white { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.12); }
-  .btn-white:hover { background: rgba(255,255,255,0.16); }
-
-  /* KPI strip */
-  .kpi-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0.85rem; margin-bottom: 1.25rem; }
-  .kpi-card {
-    background: var(--ivory); border: 1px solid var(--mist); border-radius: 10px;
-    padding: 1.1rem 1.3rem; display: flex; flex-direction: column; gap: 0.3rem;
-    position: relative; overflow: hidden; transition: box-shadow 0.18s, border-color 0.18s;
-  }
-  .kpi-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.06); border-color: var(--fog); }
-  .kpi-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; border-radius: 99px 0 0 99px; }
-  .kpi-card.green::before { background: var(--leaf); }
-  .kpi-card.amber::before { background: var(--amber); }
-  .kpi-card.sky::before   { background: var(--sky); }
-  .kpi-card.violet::before{ background: var(--violet); }
-  .kpi-card.red::before   { background: var(--red); }
-  .kpi-label { font-size: 0.59rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ash); }
-  .kpi-val   { font-family: var(--serif); font-size: 1.9rem; line-height: 1; }
-  .kpi-card.green .kpi-val  { color: var(--leaf); }
-  .kpi-card.amber .kpi-val  { color: var(--amber); }
-  .kpi-card.sky   .kpi-val  { color: var(--sky); }
-  .kpi-card.violet .kpi-val { color: var(--violet); }
-  .kpi-card.red   .kpi-val  { color: var(--red); }
-  .kpi-sub { font-size: 0.68rem; color: var(--ash); }
-
-  /* Alertas */
-  .alerta-bar {
-    display: flex; align-items: flex-start; gap: 0.75rem;
-    padding: 0.85rem 1.1rem; border-radius: 9px; margin-bottom: 0.5rem;
-    font-size: 0.82rem; font-weight: 500;
-  }
-  .alerta-bar.amber { background: var(--amber-pale); color: var(--amber); border: 1px solid var(--amber-tint); }
-  .alerta-bar.red   { background: var(--red-pale);   color: var(--red);   border: 1px solid var(--red-tint); }
-  .alerta-bar i { font-size: 1rem; flex-shrink: 0; margin-top: 0.05rem; }
-
-  /* Grid */
-  .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
-  .dash-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.2rem; }
-  @media (max-width: 1100px) { .dash-grid-3 { grid-template-columns: 1fr 1fr; } }
-  @media (max-width: 900px) { .dash-grid, .dash-grid-3 { grid-template-columns: 1fr; } }
-
-  /* Hijo row */
-  .hijo-row {
-    display: flex; align-items: center; gap: 1rem;
-    padding: 0.9rem 1.5rem; border-bottom: 1px solid var(--mist); transition: background 0.12s;
-  }
-  .hijo-row:last-child { border-bottom: none; }
-  .hijo-row:hover { background: var(--cream); }
-  .hijo-avatar {
-    width: 2.4rem; height: 2.4rem; border-radius: 50%; flex-shrink: 0;
-    background: var(--leaf-tint); border: 1px solid var(--leaf-pale);
-    display: flex; align-items: center; justify-content: center;
-    font-family: var(--serif); font-size: 1rem; color: var(--leaf-dark);
-  }
-  .hijo-info { flex: 1; min-width: 0; }
-  .hijo-nombre { font-size: 0.86rem; font-weight: 600; }
-  .hijo-meta { font-size: 0.71rem; color: var(--ash); margin-top: 0.08rem; }
-  .hijo-saldo { text-align: right; flex-shrink: 0; }
-  .hijo-saldo-val { font-family: var(--serif); font-size: 1.1rem; font-weight: 500; }
-  .hijo-saldo-val.low { color: var(--red); }
-  .hijo-saldo-val.ok  { color: var(--leaf); }
-  .hijo-saldo-lbl { font-size: 0.6rem; color: var(--ash); letter-spacing: 0.06em; text-transform: uppercase; }
-  .hijo-actions { display: flex; gap: 0.35rem; flex-shrink: 0; }
-
-  /* Pedido row */
-  .pedido-row {
-    display: flex; align-items: center; gap: 0.85rem;
-    padding: 0.85rem 1.5rem; border-bottom: 1px solid var(--mist); transition: background 0.12s;
-  }
-  .pedido-row:last-child { border-bottom: none; }
-  .pedido-row:hover { background: var(--cream); }
-  .pedido-ticket { font-size: 0.68rem; font-weight: 700; color: var(--leaf); letter-spacing: 0.05em; font-family: monospace; }
-  .pedido-info { flex: 1; min-width: 0; }
-  .pedido-estudiante { font-size: 0.82rem; font-weight: 600; }
-  .pedido-fecha { font-size: 0.69rem; color: var(--ash); margin-top: 0.07rem; }
-  .pedido-total { font-size: 0.86rem; font-weight: 700; text-align: right; flex-shrink: 0; }
-
-  /* Notif row */
-  .notif-row {
-    display: flex; align-items: flex-start; gap: 0.7rem;
-    padding: 0.8rem 1.4rem; border-bottom: 1px solid var(--mist);
-  }
-  .notif-row:last-child { border-bottom: none; }
-  .notif-icon { width: 1.8rem; height: 1.8rem; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; margin-top: 0.1rem; }
-  .notif-icon.verde   { background: var(--leaf-tint); color: var(--leaf-dark); }
-  .notif-icon.rojo    { background: var(--red-tint);  color: var(--red); }
-  .notif-icon.amarillo{ background: var(--amber-tint);color: var(--amber); }
-  .notif-icon.azul    { background: var(--sky-tint);  color: var(--sky); }
-  .notif-icon.violeta { background: var(--violet-tint);color: var(--violet); }
-  .notif-titulo { font-size: 0.8rem; font-weight: 600; }
-  .notif-msg    { font-size: 0.74rem; color: var(--stone); margin-top: 0.1rem; }
-  .notif-fecha  { font-size: 0.65rem; color: var(--ash); margin-top: 0.15rem; }
-  .notif-row.no-leida { background: rgba(22,163,74,0.03); }
-</style>
-{% endblock %}
 
 {% block content %}
 
-<!-- Bienvenida -->
-<div class="welcome-bar">
-  <div>
-    <div class="welcome-greeting">Bienvenido de nuevo</div>
-    <div class="welcome-name">{{ request.user.get_full_name|default:request.user.email }}</div>
-    <div class="welcome-sub">Panel de padre — Punto Asis · {{ hijos.count }} hijo{{ hijos.count|pluralize:"s" }} vinculado{{ hijos.count|pluralize:"s" }}</div>
-  </div>
-  <div class="welcome-actions">
-    <a href="{% url 'app_padre:menu' %}" class="btn btn-white btn-sm"><i class="bi bi-shop"></i> Menú</a>
-    <a href="{% url 'app_padre:estadisticas' %}" class="btn btn-white btn-sm"><i class="bi bi-bar-chart-line"></i> Estadísticas</a>
-    <a href="{% url 'app_padre:crear_estudiante' %}" class="btn btn-primary btn-sm"><i class="bi bi-person-plus"></i> Registrar hijo</a>
+<!-- Hero -->
+<div class="page-hero">
+  <div class="page-hero-inner">
+    <div class="page-hero-eyebrow">Panel de Padre</div>
+    <div class="page-hero-name">Hola, {{ request.user.first_name|default:request.user.email }}</div>
+    <div class="page-hero-chips">
+      <span class="page-hero-chip"><i class="bi bi-people"></i> {{ n_hijos }} hijo{{ n_hijos|pluralize:"s" }} vinculado{{ n_hijos|pluralize:"s" }}</span>
+      <span class="page-hero-chip"><i class="bi bi-wallet2"></i> Mi saldo: ${{ padre.saldo|miles }}</span>
+      {% if n_notif %}<span class="page-hero-chip"><i class="bi bi-bell"></i> {{ n_notif }} nueva{{ n_notif|pluralize:"s" }}</span>{% endif %}
+    </div>
   </div>
 </div>
 
@@ -150,7 +31,7 @@
 {% for item in alertas_limites %}
 <div class="alerta-bar amber">
   <i class="bi bi-speedometer2"></i>
-  <span>Límite {{ item.limite.get_tipo_display|lower }} de <strong>{{ item.limite.estudiante.perfil.user.get_full_name }}</strong> al <strong>{{ item.pct }}%</strong> — disponible: ${{ item.limite.disponible|floatformat:0 }}</span>
+  <span>Límite {{ item.limite.get_tipo_display|lower }} de <strong>{{ item.limite.estudiante.perfil.user.get_full_name }}</strong> al <strong>{{ item.pct }}%</strong> — disponible: ${{ item.limite.disponible|miles }}</span>
 </div>
 {% endfor %}
 
@@ -162,31 +43,36 @@
 {% endif %}
 
 <!-- KPIs -->
-<div class="kpi-strip">
-  <div class="kpi-card green">
+<div class="kpi-grid" style="margin-bottom:1.5rem;">
+  <div class="kpi kpi-green">
+    <div class="kpi-icon"><i class="bi bi-piggy-bank"></i></div>
     <div class="kpi-label">Saldo total hijos</div>
-    <div class="kpi-val">${{ saldo_total|miles }}</div>
+    <div class="kpi-value">${{ saldo_total|miles }}</div>
     <div class="kpi-sub">{{ n_hijos }} hijo{{ n_hijos|pluralize:"s" }}</div>
   </div>
-  <div class="kpi-card amber">
+  <div class="kpi kpi-amber">
+    <div class="kpi-icon"><i class="bi bi-bar-chart-line"></i></div>
     <div class="kpi-label">Gasto del mes</div>
-    <div class="kpi-val">${{ gasto_mes|miles }}</div>
+    <div class="kpi-value">${{ gasto_mes|miles }}</div>
     <div class="kpi-sub">Pedidos entregados</div>
   </div>
-  <div class="kpi-card sky">
+  <div class="kpi kpi-sky">
+    <div class="kpi-icon"><i class="bi bi-calendar-week"></i></div>
     <div class="kpi-label">Gasto esta semana</div>
-    <div class="kpi-val">${{ gasto_semana|miles }}</div>
+    <div class="kpi-value">${{ gasto_semana|miles }}</div>
     <div class="kpi-sub">Últimos 7 días</div>
   </div>
-  <div class="kpi-card violet">
+  <div class="kpi kpi-violet">
+    <div class="kpi-icon"><i class="bi bi-wallet2"></i></div>
     <div class="kpi-label">Mi saldo</div>
-    <div class="kpi-val">${{ padre.saldo|miles }}</div>
+    <div class="kpi-value">${{ padre.saldo|miles }}</div>
     <div class="kpi-sub">Saldo propio</div>
   </div>
   {% if n_notif %}
-  <div class="kpi-card red">
+  <div class="kpi kpi-red">
+    <div class="kpi-icon"><i class="bi bi-bell"></i></div>
     <div class="kpi-label">Sin leer</div>
-    <div class="kpi-val">{{ n_notif }}</div>
+    <div class="kpi-value">{{ n_notif }}</div>
     <div class="kpi-sub">Notificaciones</div>
   </div>
   {% endif %}
@@ -206,7 +92,7 @@
       <div class="hijo-row">
         <div class="hijo-avatar">{{ hijo.perfil.user.first_name|slice:":1"|upper }}</div>
         <div class="hijo-info">
-          <div class="hijo-nombre">{{ hijo.perfil.user.get_full_name|default:get_full_name|default:hijo.perfil.user.email }}</div>
+          <div class="hijo-nombre">{{ hijo.perfil.user.get_full_name|default:hijo.perfil.user.email }}</div>
           <div class="hijo-meta">Grado {{ hijo.grado }} · {{ hijo.codigo }}</div>
         </div>
         <div class="hijo-saldo">
@@ -215,7 +101,7 @@
         </div>
         <div class="hijo-actions">
           <a href="{% url 'app_padre:recargar_saldo' hijo.pk %}" class="btn btn-primary btn-xs" title="Recargar"><i class="bi bi-plus-lg"></i></a>
-          <a href="{% url 'app_padre:pedido_padre' hijo.pk %}" class="btn btn-sky btn-xs" title="Pedir para hijo"><i class="bi bi-cart-plus"></i></a>
+          <a href="{% url 'app_padre:menu' %}" class="btn btn-sky btn-xs" title="Ir al menú"><i class="bi bi-shop"></i></a>
         </div>
       </div>
       {% endfor %}
@@ -245,7 +131,7 @@
           {% if pedido.pedido_padre %}<span class="badge badge-padre" style="margin-left:2px;">Padre</span>{% endif %}
         </div>
         <div class="pedido-info">
-          <div class="pedido-estudiante">{{ pedido.estudiante.perfil.user.get_full_name|default:get_full_name|default:pedido.estudiante.perfil.user.email }}</div>
+          <div class="pedido-estudiante">{{ pedido.estudiante.perfil.user.get_full_name|default:pedido.estudiante.perfil.user.email }}</div>
           <div class="pedido-fecha">{{ pedido.fecha_pedido|date:"d M, H:i" }}</div>
         </div>
         <div class="pedido-total">${{ pedido.total|miles }}</div>
@@ -283,7 +169,7 @@
 </div>
 {% endif %}
 
-<!-- Accesos rápidos por hijo -->
+<!-- Controles rápidos por hijo -->
 {% if hijos %}
 <div class="card">
   <div class="card-head">
@@ -302,7 +188,7 @@
         </div>
         <div class="grid-2" style="gap:0.4rem;">
           <a href="{% url 'app_padre:recargar_saldo' hijo.pk %}" class="btn btn-primary btn-xs btn-full"><i class="bi bi-plus-circle"></i> Recargar</a>
-          <a href="{% url 'app_padre:pedido_padre' hijo.pk %}" class="btn btn-sky btn-xs btn-full"><i class="bi bi-cart-plus"></i> Pedir</a>
+          <a href="{% url 'app_padre:menu' %}" class="btn btn-sky btn-xs btn-full"><i class="bi bi-shop"></i> Menú</a>
           <a href="{% url 'app_padre:limites' hijo.pk %}" class="btn btn-amber btn-xs btn-full"><i class="bi bi-speedometer2"></i> Límites</a>
           <a href="{% url 'app_padre:restricciones' hijo.pk %}" class="btn btn-danger btn-xs btn-full"><i class="bi bi-shield-x"></i> Restricciones</a>
           <a href="{% url 'app_padre:horarios' hijo.pk %}" class="btn btn-ghost btn-xs btn-full"><i class="bi bi-clock"></i> Horarios</a>

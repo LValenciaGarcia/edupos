@@ -2,101 +2,183 @@
 {% load filtros %}
 {% block title %}Restricciones Alimenticias{% endblock %}
 {% block page_title %}Restricciones Alimenticias{% endblock %}
-{% block nav_hijos %}active{% endblock %}
+{% block nav_restricciones %}active{% endblock %}
 
 {% block extra_css %}
 <style>
-  .page-layout { display: grid; grid-template-columns: 1fr 380px; gap: 1.4rem; align-items: start; }
+  .page-layout { display: grid; grid-template-columns: 1fr 400px; gap: 1.4rem; align-items: start; }
   @media (max-width: 980px) { .page-layout { grid-template-columns: 1fr; } }
 
-  .hijo-chip {
+  /* Banner hijo */
+  .hijo-banner {
     display: flex; align-items: center; gap: 0.85rem;
-    background: var(--ink); border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.4rem; color: #fff;
+    background: var(--ink); border-radius: 10px; padding: 0.9rem 1.2rem; margin-bottom: 1.2rem;
   }
-  .hijo-chip-ava {
-    width: 2.5rem; height: 2.5rem; border-radius: 50%;
+  .hijo-banner-ava {
+    width: 2.4rem; height: 2.4rem; border-radius: 50%;
     background: rgba(220,38,38,0.2); border: 1px solid rgba(220,38,38,0.3);
     display: flex; align-items: center; justify-content: center;
-    font-family: var(--serif); font-size: 1rem; color: #f87171; flex-shrink: 0;
+    font-size: 1rem; color: #f87171; flex-shrink: 0;
   }
-  .hijo-chip-name { font-family: var(--serif); font-size: 1.1rem; }
-  .hijo-chip-meta { font-size: 0.71rem; color: rgba(255,255,255,0.45); margin-top: 0.07rem; }
+  .hijo-banner-name { font-family: var(--serif); font-size: 1rem; color: #fff; }
+  .hijo-banner-meta { font-size: 0.68rem; color: rgba(255,255,255,0.4); margin-top: 0.07rem; }
 
+  /* Lista de restricciones activas */
   .restriccion-card {
     background: var(--ivory); border: 1px solid var(--mist); border-radius: 10px;
-    padding: 1rem 1.25rem; margin-bottom: 0.75rem;
+    padding: 0.85rem 1.1rem; margin-bottom: 0.65rem;
     display: flex; align-items: flex-start; gap: 0.85rem;
   }
   .restriccion-card.inactiva { opacity: 0.5; }
-  .restriccion-icon {
-    width: 2.2rem; height: 2.2rem; border-radius: 8px; flex-shrink: 0;
-    background: var(--red-tint); color: var(--red);
-    display: flex; align-items: center; justify-content: center; font-size: 0.95rem;
+  .restriccion-thumb {
+    width: 2.6rem; height: 2.6rem; border-radius: 8px; flex-shrink: 0; overflow: hidden;
+    background: var(--red-tint); display: flex; align-items: center; justify-content: center;
   }
+  .restriccion-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .restriccion-thumb-icon { font-size: 1.1rem; color: var(--red); }
   .restriccion-info { flex: 1; min-width: 0; }
-  .restriccion-nombre { font-size: 0.87rem; font-weight: 600; }
-  .restriccion-tipo { font-size: 0.7rem; color: var(--ash); margin-top: 0.07rem; }
-  .restriccion-motivo { font-size: 0.74rem; color: var(--stone); margin-top: 0.2rem; font-style: italic; }
-  .restriccion-aplica { font-size: 0.68rem; margin-top: 0.15rem; }
-  .restriccion-actions { display: flex; gap: 0.35rem; align-items: flex-start; flex-shrink: 0; }
+  .restriccion-nombre { font-size: 0.86rem; font-weight: 600; }
+  .restriccion-tipo { font-size: 0.69rem; color: var(--ash); margin-top: 0.04rem; }
+  .restriccion-motivo { font-size: 0.73rem; color: var(--stone); margin-top: 0.18rem; font-style: italic; }
+  .restriccion-aplica { font-size: 0.68rem; margin-top: 0.14rem; display: flex; gap: 4px; flex-wrap: wrap; }
+  .restriccion-actions { display: flex; gap: 0.3rem; align-items: flex-start; flex-shrink: 0; }
 
+  /* Panel "Nueva restricción" */
   .seg-control {
-    display: flex; background: var(--mist); border-radius: 8px; padding: 2px; gap: 2px; margin-bottom: 0.85rem;
+    display: flex; background: var(--mist); border-radius: 8px; padding: 2px; gap: 2px; margin-bottom: 1rem;
   }
   .seg-btn {
     flex: 1; padding: 0.5rem; border: none; border-radius: 6px; font-family: var(--sans);
     font-size: 0.77rem; font-weight: 600; cursor: pointer; background: none; color: var(--stone);
     transition: background 0.14s, color 0.14s;
   }
-  .seg-btn.active { background: var(--ivory); color: var(--leaf-dark); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .seg-btn.active { background: var(--ivory); color: var(--red); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
 
-  .product-search { position: relative; margin-bottom: 0.65rem; }
-  .product-search input { width: 100%; padding-left: 2rem; }
-  .product-search i { position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%); color: var(--ash); font-size: 0.85rem; }
-  .product-list { max-height: 200px; overflow-y: auto; border: 1px solid var(--fog); border-radius: 7px; }
-  .product-opt {
-    display: flex; align-items: center; gap: 0.5rem;
-    padding: 0.55rem 0.85rem; font-size: 0.8rem; cursor: pointer;
-    border-bottom: 1px solid var(--mist); transition: background 0.1s;
+  /* Búsqueda */
+  .prod-search-wrap { position: relative; margin-bottom: 0.7rem; }
+  .prod-search-wrap i {
+    position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%);
+    color: var(--ash); font-size: 0.85rem; pointer-events: none; z-index: 1;
   }
-  .product-opt:last-child { border-bottom: none; }
-  .product-opt:hover { background: var(--cream); }
-  .product-opt input { accent-color: var(--leaf); flex-shrink: 0; }
-  .product-opt-cat { font-size: 0.65rem; color: var(--ash); }
+  .prod-search-wrap input {
+    width: 100%; padding: 0.52rem 0.85rem 0.52rem 2.2rem;
+    border: 1.5px solid var(--fog); border-radius: 8px;
+    background: var(--ivory); color: var(--ink);
+    font-family: var(--sans); font-size: 0.8rem;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    box-sizing: border-box;
+  }
+  .prod-search-wrap input::placeholder { color: var(--ash); }
+  .prod-search-wrap input:focus {
+    outline: none; border-color: var(--red);
+    box-shadow: 0 0 0 3px rgba(220,38,38,0.1);
+  }
+
+  /* Grid de productos */
+  .prod-grid-restr {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.55rem;
+    max-height: 300px; overflow-y: auto; padding: 2px;
+  }
+  .prod-card-restr {
+    border: 1.5px solid var(--fog); border-radius: 9px; overflow: hidden;
+    cursor: pointer; transition: border-color 0.14s, box-shadow 0.14s;
+    background: var(--ivory); position: relative;
+  }
+  .prod-card-restr:hover { border-color: var(--red-tint); }
+  .prod-card-restr.selected {
+    border-color: var(--red); background: var(--red-pale);
+    box-shadow: 0 0 0 2px rgba(220,38,38,0.15);
+  }
+  .prod-card-restr.selected::after {
+    content: '\F26B'; font-family: 'bootstrap-icons'; position: absolute;
+    top: 4px; right: 5px; font-size: 0.75rem; color: var(--red);
+  }
+  .prod-card-img {
+    height: 58px; background: var(--cream);
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+  }
+  .prod-card-img img { width: 100%; height: 100%; object-fit: cover; }
+  .prod-card-img .prod-no-img { font-size: 1.3rem; color: var(--fog); }
+  .prod-card-body { padding: 0.35rem 0.45rem 0.45rem; }
+  .prod-card-name { font-size: 0.68rem; font-weight: 600; line-height: 1.3; }
+  .prod-card-cat  { font-size: 0.58rem; color: var(--ash); margin-top: 0.08rem; }
+
+  /* Grid de categorías */
+  .cat-grid-restr { display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem; }
+  .cat-card-restr {
+    border: 1.5px solid var(--fog); border-radius: 10px; padding: 0.75rem 0.9rem;
+    cursor: pointer; transition: border-color 0.14s, background 0.14s; background: var(--ivory);
+    display: flex; align-items: center; gap: 0.7rem; position: relative;
+  }
+  .cat-card-restr:hover { border-color: var(--red-tint); }
+  .cat-card-restr.selected { border-color: var(--red); background: var(--red-pale); }
+  .cat-card-restr.selected::after {
+    content: '\F26B'; font-family: 'bootstrap-icons'; position: absolute;
+    top: 5px; right: 7px; font-size: 0.75rem; color: var(--red);
+  }
+  .cat-card-icon {
+    width: 2.1rem; height: 2.1rem; border-radius: 8px; flex-shrink: 0;
+    background: var(--red-tint); display: flex; align-items: center; justify-content: center;
+    font-size: 1rem; color: var(--red);
+  }
+  .cat-card-name { font-size: 0.8rem; font-weight: 600; line-height: 1.25; }
+
+  /* Preview seleccionado */
+  .selected-preview {
+    display: flex; align-items: center; gap: 0.75rem;
+    background: var(--red-pale); border: 1px solid var(--red-tint);
+    border-radius: 9px; padding: 0.65rem 0.85rem; margin-bottom: 0.9rem;
+  }
+  .selected-preview-img {
+    width: 2.4rem; height: 2.4rem; border-radius: 7px; flex-shrink: 0; overflow: hidden;
+    background: var(--red-tint); display: flex; align-items: center; justify-content: center;
+  }
+  .selected-preview-img img { width: 100%; height: 100%; object-fit: cover; }
+  .selected-preview-icon { font-size: 1.1rem; color: var(--red); }
+  .selected-preview-name { font-size: 0.82rem; font-weight: 700; color: var(--red); }
+  .selected-preview-sub  { font-size: 0.67rem; color: var(--stone); margin-top: 0.05rem; }
 </style>
 {% endblock %}
 
 {% block content %}
 
-<!-- Chip del hijo -->
-<div class="hijo-chip">
-  <div class="hijo-chip-ava"><i class="bi bi-shield-x"></i></div>
+<!-- Banner hijo -->
+<div class="hijo-banner">
+  <div class="hijo-banner-ava"><i class="bi bi-shield-x"></i></div>
   <div>
-    <div class="hijo-chip-name">Restricciones de {{ estudiante.perfil.user.get_full_name }}</div>
-    <div class="hijo-chip-meta">Grado {{ estudiante.grado }} · Los productos restringidos quedarán bloqueados</div>
+    <div class="hijo-banner-name">Restricciones de {{ estudiante.perfil.user.get_full_name }}</div>
+    <div class="hijo-banner-meta">Grado {{ estudiante.grado }} · Los productos restringidos quedan bloqueados al hacer pedidos</div>
   </div>
 </div>
 
 <div class="page-layout">
 
-  <!-- Lista de restricciones -->
+  <!-- ══ LISTA DE RESTRICCIONES ══ -->
   <div>
-    <h2 style="font-family:var(--serif);font-size:1.25rem;font-weight:500;margin-bottom:1rem;">
-      Restricciones activas ({{ restricciones.count }})
+    <h2 style="font-family:var(--serif);font-size:1.2rem;font-weight:500;margin-bottom:1rem;">
+      Activas ({{ restricciones.count }})
     </h2>
 
     {% if restricciones %}
       {% for r in restricciones %}
       <div class="restriccion-card {% if not r.activo %}inactiva{% endif %}">
-        <div class="restriccion-icon">
-          <i class="bi bi-{% if r.producto %}box-seam{% else %}tag{% endif %}"></i>
+        <div class="restriccion-thumb">
+          {% if r.producto and r.producto.imagen %}
+            <img src="{{ r.producto.imagen.url }}" alt="{{ r.producto.nombre }}">
+          {% elif r.producto %}
+            <i class="bi bi-box-seam restriccion-thumb-icon"></i>
+          {% else %}
+            <i class="bi bi-tag restriccion-thumb-icon"></i>
+          {% endif %}
         </div>
         <div class="restriccion-info">
           <div class="restriccion-nombre">
-            {% if r.producto %}{{ r.producto.nombre }}{% elif r.categoria %}{{ r.categoria.get_nombre_display }} (categoría completa){% endif %}
+            {% if r.producto %}{{ r.producto.nombre }}
+            {% elif r.categoria %}{{ r.categoria.get_nombre_display }}
+            {% endif %}
           </div>
           <div class="restriccion-tipo">
-            {% if r.producto %}Producto específico · {{ r.producto.categoria.get_nombre_display }}
+            {% if r.producto %}Producto · {{ r.producto.categoria.get_nombre_display }}
             {% else %}Categoría completa{% endif %}
           </div>
           {% if r.motivo %}<div class="restriccion-motivo">{{ r.motivo }}</div>{% endif %}
@@ -104,7 +186,7 @@
             <span class="badge {% if r.estudiante %}badge-pendiente{% else %}badge-rechazada{% endif %}">
               {% if r.estudiante %}Solo {{ r.estudiante.perfil.user.first_name }}{% else %}Todos mis hijos{% endif %}
             </span>
-            <span class="badge {% if r.activo %}badge-activo{% else %}badge-inactivo{% endif %}" style="margin-left:4px;">
+            <span class="badge {% if r.activo %}badge-activo{% else %}badge-inactivo{% endif %}">
               {% if r.activo %}Activa{% else %}Inactiva{% endif %}
             </span>
           </div>
@@ -118,7 +200,7 @@
               <i class="bi bi-{% if r.activo %}pause-circle{% else %}play-circle{% endif %}"></i>
             </button>
           </form>
-          <form method="post" style="display:inline;" onsubmit="return confirm('¿Eliminar esta restricción?')">
+          <form method="post" style="display:inline;" data-pa-confirm="¿Eliminar esta restricción?" data-pa-ok="Eliminar">
             {% csrf_token %}
             <input type="hidden" name="action" value="delete">
             <input type="hidden" name="restriccion_id" value="{{ r.pk }}">
@@ -131,7 +213,7 @@
       <div class="card">
         <div class="empty-state">
           <i class="bi bi-shield-check es-icon"></i>
-          <p>No hay restricciones configuradas.</p>
+          <p>Sin restricciones configuradas.</p>
           <p style="margin-top:0.4rem;font-size:0.78rem;color:var(--stone);">Todos los productos están disponibles para este estudiante.</p>
         </div>
       </div>
@@ -142,18 +224,18 @@
     </a>
   </div>
 
-  <!-- Formulario nueva restricción -->
-  <div class="card">
+  <!-- ══ FORMULARIO NUEVA RESTRICCIÓN ══ -->
+  <div class="card" style="position:sticky;top:calc(var(--topbar-h) + 1rem);">
     <div class="card-head"><span class="card-title">Nueva restricción</span></div>
     <div class="card-body">
       <form method="post" id="formRestr" novalidate>
         {% csrf_token %}
-        <input type="hidden" name="action" value="save">
-        <input type="hidden" name="tipo_obj" id="tipo_obj_input" value="producto">
-        <input type="hidden" name="obj_id"   id="obj_id_input"   value="">
+        <input type="hidden" name="action"    value="save">
+        <input type="hidden" name="tipo_obj"  id="tipo_obj_input" value="producto">
+        <input type="hidden" name="obj_id"    id="obj_id_input"   value="">
 
-        <!-- Segmentado: Producto / Categoría -->
-        <div class="seg-control" style="margin-bottom:0.9rem;">
+        <!-- Segmentado -->
+        <div class="seg-control">
           <button type="button" class="seg-btn active" id="btnProd" onclick="switchTab('producto')">
             <i class="bi bi-box-seam"></i> Producto
           </button>
@@ -162,36 +244,81 @@
           </button>
         </div>
 
-        <!-- Panel productos -->
+        <!-- ── Panel productos ── -->
         <div id="panelProducto">
-          <div class="product-search">
+          {% if productos %}
+          <div class="prod-search-wrap">
             <i class="bi bi-search"></i>
-            <input type="text" id="searchProd" placeholder="Buscar producto…" oninput="filterProducts(this.value)">
+            <input type="text" id="searchProd" placeholder="Buscar producto…" oninput="filterProducts(this.value)" autocomplete="off">
           </div>
-          <div class="product-list" id="productList">
+          <div class="prod-grid-restr" id="productGrid">
             {% for p in productos %}
-            <label class="product-opt" data-name="{{ p.nombre|lower }}" data-id="{{ p.pk }}">
-              <input type="radio" name="_prod_radio" value="{{ p.pk }}" onchange="selectItem('producto', {{ p.pk }})">
-              <div>
-                <div>{{ p.nombre }}</div>
-                <div class="product-opt-cat">{{ p.categoria.get_nombre_display }}</div>
+            <div class="prod-card-restr"
+                 data-name="{{ p.nombre|lower }}" data-id="{{ p.pk }}"
+                 data-img="{% if p.imagen %}{{ p.imagen.url }}{% endif %}"
+                 data-cat="{{ p.categoria.get_nombre_display }}"
+                 onclick="selectProd({{ p.pk }}, '{{ p.nombre|escapejs }}', '{% if p.imagen %}{{ p.imagen.url }}{% endif %}', '{{ p.categoria.get_nombre_display|escapejs }}')">
+              <div class="prod-card-img">
+                {% if p.imagen %}
+                  <img src="{{ p.imagen.url }}" alt="{{ p.nombre }}" loading="lazy">
+                {% else %}
+                  <i class="bi bi-box-seam prod-no-img"></i>
+                {% endif %}
               </div>
-            </label>
+              <div class="prod-card-body">
+                <div class="prod-card-name">{{ p.nombre }}</div>
+                <div class="prod-card-cat">{{ p.categoria.get_nombre_display }}</div>
+              </div>
+            </div>
             {% endfor %}
           </div>
+          {% else %}
+          <div style="text-align:center;padding:1.8rem 1rem;color:var(--ash);">
+            <i class="bi bi-check-circle-fill" style="font-size:1.8rem;display:block;margin-bottom:0.5rem;color:var(--leaf);"></i>
+            <span style="font-size:0.8rem;">Todos los productos ya están restringidos</span>
+          </div>
+          {% endif %}
         </div>
 
-        <!-- Panel categorías -->
+        <!-- ── Panel categorías ── -->
         <div id="panelCategoria" style="display:none;">
-          <div style="display:flex;flex-direction:column;gap:0.5rem;">
+          {% if categorias %}
+          <div class="cat-grid-restr">
             {% for cat in categorias %}
-            <label class="tipo-opt" style="display:flex;align-items:center;gap:0.65rem;padding:0.7rem 0.9rem;border:1px solid var(--fog);border-radius:8px;cursor:pointer;">
-              <input type="radio" name="_cat_radio" value="{{ cat.pk }}" onchange="selectItem('categoria', {{ cat.pk }})">
-              <div>
-                <div style="font-size:0.83rem;font-weight:600;">{{ cat.get_nombre_display }}</div>
+            {% with cat_icon=cat.nombre %}
+            <div class="cat-card-restr" data-id="{{ cat.pk }}"
+                 onclick="selectCat({{ cat.pk }}, '{{ cat.get_nombre_display|escapejs }}')">
+              <div class="cat-card-icon">
+                {% if cat.nombre == 'desayuno' %}<i class="bi bi-cup-hot"></i>
+                {% elif cat.nombre == 'almuerzo' %}<i class="bi bi-egg-fried"></i>
+                {% elif cat.nombre == 'snacks' %}<i class="bi bi-bag"></i>
+                {% elif cat.nombre == 'bebidas' %}<i class="bi bi-cup-straw"></i>
+                {% else %}<i class="bi bi-grid"></i>{% endif %}
               </div>
-            </label>
+              <div class="cat-card-name">{{ cat.get_nombre_display }}</div>
+            </div>
+            {% endwith %}
             {% endfor %}
+          </div>
+          {% else %}
+          <div style="text-align:center;padding:1.8rem 1rem;color:var(--ash);">
+            <i class="bi bi-check-circle-fill" style="font-size:1.8rem;display:block;margin-bottom:0.5rem;color:var(--leaf);"></i>
+            <span style="font-size:0.8rem;">Todas las categorías ya están restringidas</span>
+          </div>
+          {% endif %}
+        </div>
+
+        <!-- Preview seleccionado -->
+        <div id="selectedPreview" style="display:none;margin-top:1rem;">
+          <div class="selected-preview">
+            <div class="selected-preview-img" id="previewImgWrap">
+              <i class="bi bi-shield-x selected-preview-icon" id="previewIcon"></i>
+              <img id="previewImg" src="" alt="" style="display:none;width:100%;height:100%;object-fit:cover;">
+            </div>
+            <div>
+              <div class="selected-preview-name" id="previewNombre">–</div>
+              <div class="selected-preview-sub" id="previewSub"></div>
+            </div>
           </div>
         </div>
 
@@ -206,10 +333,6 @@
         <div class="field" style="margin-bottom:1.1rem;">
           <label for="motivo">Motivo (opcional)</label>
           <input type="text" id="motivo" name="motivo" placeholder="Ej: Alergia, dieta, preferencia…" maxlength="200">
-        </div>
-
-        <div id="seleccionado" style="display:none;background:var(--red-pale);border:1px solid var(--red-tint);border-radius:7px;padding:0.6rem 0.85rem;font-size:0.79rem;color:var(--red);margin-bottom:0.9rem;">
-          <i class="bi bi-shield-x"></i> <span id="seleccionado-texto">–</span>
         </div>
 
         <button type="submit" class="btn btn-danger btn-full" id="btnSubmit" disabled>
@@ -227,44 +350,74 @@
   function switchTab(tab) {
     document.getElementById('tipo_obj_input').value = tab;
     document.getElementById('obj_id_input').value = '';
-    document.getElementById('seleccionado').style.display = 'none';
+    document.getElementById('selectedPreview').style.display = 'none';
     document.getElementById('btnSubmit').disabled = true;
+    document.querySelectorAll('.prod-card-restr, .cat-card-restr').forEach(c => c.classList.remove('selected'));
 
-    if (tab === 'producto') {
-      document.getElementById('panelProducto').style.display = 'block';
-      document.getElementById('panelCategoria').style.display = 'none';
-      document.getElementById('btnProd').classList.add('active');
-      document.getElementById('btnCat').classList.remove('active');
-    } else {
-      document.getElementById('panelProducto').style.display = 'none';
-      document.getElementById('panelCategoria').style.display = 'block';
-      document.getElementById('btnProd').classList.remove('active');
-      document.getElementById('btnCat').classList.add('active');
-    }
+    const isProd = tab === 'producto';
+    document.getElementById('panelProducto').style.display = isProd ? 'block' : 'none';
+    document.getElementById('panelCategoria').style.display = isProd ? 'none' : 'block';
+    document.getElementById('btnProd').classList.toggle('active', isProd);
+    document.getElementById('btnCat').classList.toggle('active', !isProd);
   }
 
-  function selectItem(tipo, id) {
-    document.getElementById('tipo_obj_input').value = tipo;
+  function selectProd(id, nombre, imgUrl, cat) {
+    document.querySelectorAll('.prod-card-restr').forEach(c => c.classList.remove('selected'));
+    document.querySelector(`.prod-card-restr[data-id="${id}"]`)?.classList.add('selected');
+
+    document.getElementById('tipo_obj_input').value = 'producto';
     document.getElementById('obj_id_input').value = id;
-    const label = tipo === 'producto'
-      ? document.querySelector(`.product-opt[data-id="${id}"]`)?.querySelector('div div:first-child')?.textContent
-      : document.querySelector(`input[name="_cat_radio"][value="${id}"]`)?.closest('label')?.querySelector('div div')?.textContent;
-    document.getElementById('seleccionado-texto').textContent = label || id;
-    document.getElementById('seleccionado').style.display = 'block';
+
+    document.getElementById('previewNombre').textContent = nombre;
+    document.getElementById('previewSub').textContent = cat;
+
+    const img = document.getElementById('previewImg');
+    const icon = document.getElementById('previewIcon');
+    if (imgUrl) {
+      img.src = imgUrl;
+      img.style.display = 'block';
+      icon.style.display = 'none';
+    } else {
+      img.style.display = 'none';
+      icon.className = 'bi bi-box-seam selected-preview-icon';
+      icon.style.display = 'block';
+    }
+
+    document.getElementById('selectedPreview').style.display = 'block';
+    document.getElementById('btnSubmit').disabled = false;
+  }
+
+  function selectCat(id, nombre) {
+    document.querySelectorAll('.cat-card-restr').forEach(c => c.classList.remove('selected'));
+    document.querySelector(`.cat-card-restr[data-id="${id}"]`)?.classList.add('selected');
+
+    document.getElementById('tipo_obj_input').value = 'categoria';
+    document.getElementById('obj_id_input').value = id;
+
+    document.getElementById('previewNombre').textContent = nombre;
+    document.getElementById('previewSub').textContent = 'Categoría completa';
+
+    const img = document.getElementById('previewImg');
+    const icon = document.getElementById('previewIcon');
+    img.style.display = 'none';
+    icon.className = 'bi bi-tag selected-preview-icon';
+    icon.style.display = 'block';
+
+    document.getElementById('selectedPreview').style.display = 'block';
     document.getElementById('btnSubmit').disabled = false;
   }
 
   function filterProducts(q) {
-    const opts = document.querySelectorAll('.product-opt');
-    opts.forEach(opt => {
-      opt.style.display = opt.dataset.name.includes(q.toLowerCase()) ? '' : 'none';
+    const lower = q.toLowerCase();
+    document.querySelectorAll('.prod-card-restr').forEach(card => {
+      card.style.display = card.dataset.name.includes(lower) ? '' : 'none';
     });
   }
 
   document.getElementById('formRestr').addEventListener('submit', function(e) {
     if (!document.getElementById('obj_id_input').value) {
       e.preventDefault();
-      alert('Selecciona un producto o categoría.');
+      paShowToast('Selecciona un producto o categoría.', 'warn');
     }
   });
 </script>

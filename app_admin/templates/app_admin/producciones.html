@@ -2,7 +2,7 @@
 {% load filtros %}
 {% block title %}Producciones{% endblock %}
 {% block page_title %}Producciones{% endblock %}
-{% block nav_inventario %}active{% endblock %}
+{% block nav_producciones %}active{% endblock %}
 
 {% block topbar_actions %}
   <a href="{% url 'app_admin:produccion_nueva' %}" class="btn btn-primary btn-sm">
@@ -12,19 +12,201 @@
 
 {% block content %}
 <style>
-  .prod-row { display:grid;grid-template-columns:140px 1fr 90px 130px 110px;gap:.7rem;align-items:center;
-              padding:.7rem .9rem;border:1px solid var(--mist);border-radius:10px;
-              background:var(--ivory);margin-bottom:.5rem; }
-  .cell-label { font-size:.63rem;font-weight:700;color:var(--stone);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.15rem; }
-  .cell-val   { font-size:.87rem;font-weight:600;color:var(--ink); }
-  .cell-sub   { font-size:.74rem;color:var(--ash); }
+  :root {
+    --modal-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.02);
+    --modal-hover: 0 25px 40px -12px rgba(0, 0, 0, 0.15);
+    --price-color: #059669;
+  }
+  html[data-theme="dark"] {
+    --modal-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255,255,255,0.04);
+    --modal-hover: 0 25px 40px -12px rgba(0, 0, 0, 0.6);
+    --price-color: #34d399;
+  }
+
+  /* Grid de 3 columnas estilo modal */
+  .producciones-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+  }
+
+  /* Tarjeta modal */
+  .modal-card {
+    background: var(--ivory);
+    border-radius: 20px;
+    box-shadow: var(--modal-shadow);
+    transition: all 0.25s ease;
+    overflow: hidden;
+    border: 1px solid var(--mist);
+  }
+
+  .modal-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--modal-hover);
+  }
+
+  /* Cabecera de la tarjeta con fecha */
+  .modal-card-header {
+    padding: 1.2rem 1.2rem 0.8rem 1.2rem;
+    border-bottom: 2px solid var(--mist);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .fecha-principal {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.2px;
+  }
+
+  .hora-produccion {
+    font-size: 0.7rem;
+    color: var(--ash);
+    font-weight: 500;
+  }
+
+  .badge-order {
+    background: var(--cream);
+    padding: 0.2rem 0.65rem;
+    border-radius: 30px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--stone);
+  }
+
+  /* Cuerpo de la tarjeta */
+  .modal-card-body {
+    padding: 1rem 1.2rem;
+  }
+
+  .producto-titulo {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .producto-nombre {
+    background: var(--cream);
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+  }
+
+  .nota-produccion {
+    font-size: 0.75rem;
+    color: var(--stone);
+    background: var(--cream);
+    padding: 0.4rem 0.7rem;
+    border-radius: 12px;
+    margin: 0.6rem 0;
+    border-left: 3px solid #10b981;
+  }
+
+  .cantidad-producida {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin: 0.8rem 0;
+    padding: 0.5rem 0;
+    border-bottom: 1px dashed var(--mist);
+  }
+
+  .cantidad-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--stone);
+    letter-spacing: 0.5px;
+  }
+
+  .cantidad-valor {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--ink);
+  }
+
+  .cantidad-unidad {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--stone);
+  }
+
+  /* Costos */
+  .costos-container {
+    background: var(--cream);
+    border-radius: 16px;
+    padding: 0.7rem 0.9rem;
+    margin: 0.8rem 0;
+    border: 1px solid var(--mist);
+  }
+
+  .costo-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-weight: 600;
+  }
+
+  .costo-total span:first-child {
+    font-size: 0.7rem;
+    color: var(--stone);
+    text-transform: uppercase;
+  }
+
+  .costo-total span:last-child {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: var(--price-color);
+  }
+
+  .costo-unitario {
+    font-size: 0.7rem;
+    color: var(--stone);
+    text-align: right;
+    margin-top: 0.3rem;
+    border-top: 1px solid var(--mist);
+    padding-top: 0.3rem;
+  }
+
+  /* Responsable */
+  .responsable-area {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.8rem;
+    padding-top: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--stone);
+    border-top: 1px solid var(--mist);
+  }
+
+  .responsable-area i {
+    color: #10b981;
+    font-size: 0.9rem;
+  }
+
+  /* Empty state */
+  .empty-state-cards {
+    text-align: center;
+    padding: 3rem;
+    background: var(--cream);
+    border: 1px solid var(--mist);
+    border-radius: 24px;
+    margin-top: 2rem;
+  }
 </style>
 
-<div style="max-width:860px;margin:0 auto;">
-
+<div style="max-width: 1280px; margin: 0 auto; padding: 0 0.5rem;">
   {% if messages %}
     {% for msg in messages %}
-    <div style="display:flex;align-items:center;gap:.6rem;padding:.75rem 1rem;margin-bottom:.75rem;border-radius:9px;
+    <div style="display:flex;align-items:center;gap:.6rem;padding:.75rem 1rem;margin-bottom:1rem;border-radius:14px;
                 background:{% if msg.tags == 'error' %}#fee2e2{% else %}#dcfce7{% endif %};
                 color:{% if msg.tags == 'error' %}#991b1b{% else %}#166534{% endif %};
                 border:1px solid {% if msg.tags == 'error' %}#fca5a5{% else %}#86efac{% endif %};">
@@ -34,52 +216,80 @@
     {% endfor %}
   {% endif %}
 
-  <div class="card">
-    <div class="card-head" style="display:flex;align-items:center;justify-content:space-between;">
-      <span class="card-title">Historial de producciones</span>
-      <a href="{% url 'app_admin:produccion_nueva' %}" class="btn btn-primary btn-sm">
-        <i class="bi bi-plus-lg"></i> Nueva
+  <div class="card" style="border-radius: 24px; overflow: visible;">
+    <div class="card-head" style="display:flex;align-items:center;justify-content:space-between; flex-wrap:wrap; gap:1rem;">
+      <span class="card-title" style="font-size: 1.3rem;">
+        <i class="bi bi-grid-3x3-gap-fill" style="margin-right: 0.5rem; color: #059669;"></i> 
+        Producciones · Últimos registros
+      </span>
+      <a href="{% url 'app_admin:produccion_nueva' %}" class="btn btn-primary btn-sm" style="border-radius: 40px; padding: 0.45rem 1.2rem;">
+        <i class="bi bi-plus-lg"></i> Nueva producción
       </a>
     </div>
-    <div style="padding:1rem 1.2rem;">
-
-      <!-- Header -->
-      <div style="display:grid;grid-template-columns:140px 1fr 90px 130px 110px;gap:.7rem;padding:0 .9rem .4rem;
-                  font-size:.63rem;font-weight:700;color:var(--stone);text-transform:uppercase;letter-spacing:.04em;">
-        <span>Fecha</span><span>Producto</span><span>Cantidad</span><span>Costo total</span><span>Responsable</span>
+    
+    <div style="padding: 1rem 0 1.5rem 0;">
+      <!-- Grid 3 columnas horizontales -->
+      <div class="producciones-grid">
+        {% for p in producciones %}
+        <div class="modal-card">
+          <div class="modal-card-header">
+            <div>
+              <div class="fecha-principal">{{ p.fecha|date:"d/m/Y" }}</div>
+              <div class="hora-produccion">{{ p.fecha|time:"H:i" }} hrs</div>
+            </div>
+            <div class="badge-order">
+              <i class="bi bi-calendar-check" style="font-size: 0.65rem;"></i> #{{ forloop.counter }}
+            </div>
+          </div>
+          
+          <div class="modal-card-body">
+            <div class="producto-titulo">
+              <i class="bi bi-box-seam" style="color: #10b981;"></i>
+              <span class="producto-nombre">{{ p.producto.nombre }}</span>
+            </div>
+            
+            {% if p.nota %}
+            <div class="nota-produccion">
+              <i class="bi bi-pencil-square" style="font-size: 0.7rem; margin-right: 4px;"></i> {{ p.nota|truncatechars:60 }}
+            </div>
+            {% endif %}
+            
+            <div class="cantidad-producida">
+              <span class="cantidad-label">Cantidad producida</span>
+              <span>
+                <span class="cantidad-valor">{{ p.cantidad_producida|default:"0" }}</span>
+                <span class="cantidad-unidad">und</span>
+              </span>
+            </div>
+            
+            <div class="costos-container">
+              <div class="costo-total">
+                <span><i class="bi bi-cash-stack"></i> Costo total</span>
+                <span>${{ p.costo_total|miles|default:"0" }}</span>
+              </div>
+              {% if p.cantidad_producida and p.cantidad_producida > 0 %}
+              <div class="costo-unitario">
+                ≈ ${{ p.costo_total|miles }} / unidad
+              </div>
+              {% endif %}
+            </div>
+            
+            <div class="responsable-area">
+              <i class="bi bi-person-circle"></i>
+              <span>{{ p.responsable.get_full_name|default:p.responsable.email|truncatechars:30 }}</span>
+            </div>
+          </div>
+        </div>
+        {% empty %}
+        <div class="empty-state-cards" style="grid-column: 1 / -1;">
+          <i class="bi bi-hammer" style="font-size: 3rem; display: block; margin-bottom: 0.8rem; opacity: 0.4;"></i>
+          <p style="color: var(--stone);">Sin producciones registradas.</p>
+          <a href="{% url 'app_admin:produccion_nueva' %}" style="color: #059669; font-weight: 600; text-decoration: none; border-bottom: 1px solid #05966950;">
+            + Registrar primera producción
+          </a>
+        </div>
+        {% endfor %}
       </div>
-
-      {% for p in producciones %}
-      <div class="prod-row">
-        <div>
-          <div class="cell-val">{{ p.fecha|date:"d/m/Y" }}</div>
-          <div class="cell-sub">{{ p.fecha|time:"H:i" }}</div>
-        </div>
-        <div>
-          <div class="cell-val">{{ p.producto.nombre }}</div>
-          {% if p.nota %}<div class="cell-sub">{{ p.nota }}</div>{% endif %}
-        </div>
-        <div>
-          <div class="cell-val">{{ p.cantidad_producida }} und</div>
-        </div>
-        <div>
-          <div class="cell-val">${{ p.costo_total|miles }}</div>
-          {% if p.cantidad_producida %}
-          <div class="cell-sub">≈ ${{ p.costo_total|floatformat:0 }}  / und</div>
-          {% endif %}
-        </div>
-        <div>
-          <div class="cell-val">{{ p.responsable.get_full_name|default:get_full_name|default:p.responsable.email }}</div>
-        </div>
-      </div>
-      {% empty %}
-      <div style="text-align:center;padding:3rem;color:var(--ash);">
-        <i class="bi bi-hammer" style="font-size:2.5rem;display:block;margin-bottom:.6rem;opacity:.4;"></i>
-        Sin producciones registradas.
-        <a href="{% url 'app_admin:produccion_nueva' %}" style="color:var(--leaf);font-weight:600;">Registrar primera producción</a>
-      </div>
-      {% endfor %}
-
     </div>
   </div>
 </div>

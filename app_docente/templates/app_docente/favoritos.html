@@ -1,4 +1,5 @@
 {% extends 'app_docente/base_docente.html' %}
+{% load filtros %}
 {% block title %}Mis Favoritos{% endblock %}
 {% block topbar_title %}Mis Favoritos{% endblock %}
 
@@ -41,7 +42,7 @@
     </div>
 
     <div class="prod-footer">
-      <span class="prod-price">${{ fav.producto.precio_venta|floatformat:0 }}</span>
+      <span class="prod-price">${{ fav.producto.precio_venta|miles }}</span>
       <button class="btn btn-primary btn-sm fav-add"
               data-pk="{{ fav.producto.pk }}"
               data-name="{{ fav.producto.nombre }}"
@@ -98,7 +99,22 @@
 
 {% block extra_js %}
 <script>
+const CARRITO_KEY = 'carrito_doc_{{ docente.pk }}';
 let cart = {};
+
+// ── Restore from localStorage ──
+(function() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(CARRITO_KEY) || '{}');
+    for (const [pk, item] of Object.entries(saved)) {
+      if (item && item.qty > 0) cart[pk] = item;
+    }
+  } catch(e) {}
+})();
+
+function saveCart() {
+  localStorage.setItem(CARRITO_KEY, JSON.stringify(cart));
+}
 
 function updateUI() {
   const count = Object.values(cart).reduce((a,i) => a + i.qty, 0);
@@ -131,6 +147,7 @@ function changeQty(pk, delta) {
   if (!cart[pk]) return;
   cart[pk].qty += delta;
   if (cart[pk].qty <= 0) delete cart[pk];
+  saveCart();
   updateUI();
 }
 
@@ -139,6 +156,7 @@ document.querySelectorAll('.fav-add').forEach(btn => {
     const pk = btn.dataset.pk;
     if (cart[pk]) cart[pk].qty++;
     else cart[pk] = { pk, name: btn.dataset.name, price: parseFloat(btn.dataset.price), qty: 1 };
+    saveCart();
     updateUI();
     btn.innerHTML = '<i class="bi bi-check-lg"></i> Listo';
     btn.style.background = 'var(--leaf-dark)';
@@ -147,16 +165,18 @@ document.querySelectorAll('.fav-add').forEach(btn => {
 });
 
 document.querySelectorAll('.fav-remove').forEach(btn => {
-  btn.addEventListener('click', async () => {
-    if (!confirm('¿Quitar de favoritos?')) return;
-    await fetch(`/docente/favoritos/toggle/${btn.dataset.pk}/`, {
-      method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' },
-    });
-    const card = btn.closest('.prod-card');
-    card.style.transition = 'all .25s';
-    card.style.opacity = '0';
-    card.style.transform = 'scale(0.9)';
-    setTimeout(() => card.remove(), 250);
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    paShowConfirm('¿Quitar de favoritos?', async function() {
+      await fetch(`/docente/favoritos/toggle/${btn.dataset.pk}/`, {
+        method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+      });
+      const card = btn.closest('.prod-card');
+      card.style.transition = 'all .25s';
+      card.style.opacity = '0';
+      card.style.transform = 'scale(0.9)';
+      setTimeout(() => card.remove(), 250);
+    }, { type: 'warn', okText: 'Quitar' });
   });
 });
 
@@ -164,10 +184,14 @@ function openCart()  { updateUI(); document.getElementById('cart-modal').style.d
 function closeCart() { document.getElementById('cart-modal').style.display = 'none'; }
 
 document.getElementById('cart-form')?.addEventListener('submit', e => {
-  if (Object.keys(cart).length === 0) { e.preventDefault(); alert('El carrito está vacío.'); return; }
+  if (Object.keys(cart).length === 0) { e.preventDefault(); paShowToast('El carrito está vacío.', 'warn'); return; }
   document.getElementById('cart-json').value = JSON.stringify(
     Object.values(cart).map(i => ({ id: i.pk, cantidad: i.qty }))
   );
+  localStorage.removeItem(CARRITO_KEY);
 });
+
+// Init UI with restored cart
+updateUI();
 </script>
 {% endblock %}

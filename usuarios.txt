@@ -1,13 +1,16 @@
 USUARIOS EDUPOS
 - ADMIN:
-  - USER: admin
+  - USER: alejoluna1509@gmail.com
   - PASS: admin1234
 - Padre:
-  - USER: angel.ariza
+  - USER:	angelmanuelarizaferreira@gmail.com
   - PASS: Salchipapa
 - Estudiante:
-  - USER: leonardo.valencia
+  - USER: leonardovalenciagarcia42@gmail.com
   - PASS: Salchipapa
 - Docente:
-  - USER: juan.jaramillo1
+  - USER: jjaramillo@gmail.com
+  - PASS: Salchipapa
+- Empleado:
+  - USER: juandavidq@gmail.com
   - PASS: Salchipapa

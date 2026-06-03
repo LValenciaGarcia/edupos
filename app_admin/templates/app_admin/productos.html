@@ -830,8 +830,7 @@ function prodBulkAccion(accion) {
   if (accion === 'mostrar')   msg = '¿Mostrar ' + checks.length + ' producto(s) en el menú?';
   if (accion === 'ocultar')   msg = '¿Ocultar ' + checks.length + ' producto(s) del menú?';
   if (accion === 'eliminar')  msg = '¿Eliminar permanentemente ' + checks.length + ' producto(s)?';
-  if (!confirm(msg)) return;
-  ejecutarBulkProd();
+  paShowConfirm(msg, ejecutarBulkProd, { type: accion === 'eliminar' ? 'danger' : 'warn', okText: accion.charAt(0).toUpperCase() + accion.slice(1) });
 }
 
 function ejecutarBulkProd() {

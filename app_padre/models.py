@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from authentication.models import Estudiante, Padre
 from authentication.validators import validate_image
-from app_admin.models import Producto, Categoria
+from app_admin.models import Producto, Categoria, Alergeno
 from simple_history.models import HistoricalRecords
 
 
@@ -26,6 +26,8 @@ class RecargaPadre(models.Model):
     comprobante      = models.ImageField(upload_to='recargas/padres/', blank=True, null=True, validators=[validate_image])
     nota             = models.CharField(max_length=300, blank=True)
     estado           = models.CharField(max_length=15, choices=ESTADO_RECARGA_CHOICES, default='pendiente')
+    mp_preference_id = models.CharField(max_length=200, blank=True)
+    mp_payment_id    = models.CharField(max_length=100, blank=True)
     nota_admin       = models.CharField(max_length=300, blank=True, verbose_name='Nota del administrador')
     fecha            = models.DateTimeField(auto_now_add=True)
     fecha_resolucion = models.DateTimeField(null=True, blank=True)
@@ -89,6 +91,8 @@ class RecargaSaldo(models.Model):
     comprobante      = models.ImageField(upload_to='recargas/comprobantes/', blank=True, null=True, validators=[validate_image])
     nota             = models.CharField(max_length=300, blank=True)
     estado           = models.CharField(max_length=15, choices=ESTADO_CHOICES, default='pendiente')
+    mp_preference_id = models.CharField(max_length=200, blank=True)
+    mp_payment_id    = models.CharField(max_length=100, blank=True)
     nota_admin       = models.CharField(max_length=300, blank=True, verbose_name='Nota del administrador')
     fecha            = models.DateTimeField(auto_now_add=True)
     fecha_resolucion = models.DateTimeField(null=True, blank=True)
@@ -102,6 +106,13 @@ class RecargaSaldo(models.Model):
         if recarga.estado != 'pendiente':
             return  # Ya fue procesada, no hacer nada
         estudiante = Estudiante.objects.select_for_update().get(pk=recarga.estudiante.pk)
+
+        # Validar vinculación padre↔hijo: el padre que originó la recarga
+        # debe seguir siendo el padre actual del estudiante.
+        if recarga.padre_id and estudiante.padre_id != recarga.padre_id:
+            raise ValidationError(
+                'No se puede aprobar: el estudiante ya no está vinculado a este padre.'
+            )
 
         recarga.estado = 'aprobada'
         recarga.fecha_resolucion = timezone.now()
@@ -226,6 +237,7 @@ class AlergiaEstudiante(models.Model):
     padre      = models.ForeignKey(Padre, on_delete=models.CASCADE, related_name='alergias')
     estudiante = models.ForeignKey(Estudiante, on_delete=models.CASCADE, related_name='alergias')
     nombre     = models.CharField(max_length=100, help_text='Ej: Maní, Lactosa, Gluten, Mariscos…')
+    alergeno   = models.ForeignKey(Alergeno, on_delete=models.SET_NULL, null=True, blank=True, related_name='alergias_estudiante')
     tipo       = models.CharField(max_length=15, choices=TIPO_CHOICES, default='alergia')
     gravedad   = models.CharField(max_length=12, choices=GRAVEDAD_CHOICES, default='leve')
     notas      = models.TextField(blank=True, help_text='Síntomas, medicación, instrucciones de emergencia…')

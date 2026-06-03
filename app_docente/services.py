@@ -1,6 +1,6 @@
 """
-Capa de servicios para operaciones financieras del docente.
-Encapsula la lógica de negocio de pedidos y fiado, manteniendo las vistas limpias.
+Capa de servicios para operaciones de pedidos del docente.
+Encapsula validaciones de saldo y stock manteniendo las vistas limpias.
 """
 from decimal import Decimal
 import json
@@ -14,21 +14,22 @@ class PedidoDocenteService:
 
     @staticmethod
     @transaction.atomic
-    def confirmar_desde_carrito(docente, carrito_raw: str, nota: str, tipo_pago: str):
+    def confirmar_desde_carrito(docente, carrito_raw: str, nota: str, pedido_grupal=None):
         """
-        Procesa un carrito JSON, valida balance/fiado y crea el PedidoDocente.
+        Procesa un carrito JSON, valida saldo y stock, y crea el PedidoDocente.
 
         Args:
-            docente: instancia Docente (con select_for_update aplicado en la vista).
+            docente: instancia Docente.
             carrito_raw: string JSON '[{"id": 1, "cantidad": 2}, ...]'
-            nota: texto opcional del pedido
-            tipo_pago: 'saldo' | 'fiado'
+            nota: texto opcional del pedido.
+            pedido_grupal: PedidoGrupal opcional (si el pedido se une a uno grupal).
 
         Returns:
             PedidoDocente creado.
 
         Raises:
-            ValueError: si el carrito está vacío, el saldo es insuficiente o el fiado excede el límite.
+            ValueError: si el carrito está vacío, no hay productos válidos,
+                        falta stock o el saldo es insuficiente.
         """
         from .models import PedidoDocente, DetallePedidoDocente
         from authentication.models import Docente as DocenteModel
@@ -38,11 +39,10 @@ class PedidoDocenteService:
         except (json.JSONDecodeError, TypeError):
             raise ValueError('Carrito inválido.')
 
-        # Construir ítems validados
         items = []
         for item in carrito:
             try:
-                producto = Producto.objects.get(pk=item['id'], disponible=True)
+                producto = Producto.objects.select_for_update().get(pk=item['id'], disponible=True)
                 cantidad = max(int(item.get('cantidad', 1)), 1)
                 items.append((producto, cantidad))
             except (Producto.DoesNotExist, KeyError, ValueError):
@@ -51,26 +51,28 @@ class PedidoDocenteService:
         if not items:
             raise ValueError('No hay productos válidos en el carrito.')
 
-        total = sum(p.precio_venta * cant for p, cant in items)
+        for producto, cantidad in items:
+            if producto.tipo == 'simple' and producto.stock < cantidad:
+                raise ValueError(
+                    f'Stock insuficiente para "{producto.nombre}" '
+                    f'(disponible: {producto.stock}, solicitado: {cantidad}).'
+                )
 
-        # Re-bloquear el docente dentro de la transacción para evitar race conditions
+        total = sum(Decimal(str(p.precio_venta)) * cant for p, cant in items)
+
         docente_locked = DocenteModel.objects.select_for_update().get(pk=docente.pk)
 
-        if tipo_pago == 'saldo':
-            if docente_locked.saldo < total:
-                raise ValueError(f'Saldo insuficiente. Disponible: ${docente_locked.saldo:,.0f}, requerido: ${total:,.0f}.')
-        else:
-            if docente_locked.credito_disponible < total:
-                raise ValueError(
-                    f'Límite de fiado excedido. Crédito disponible: ${docente_locked.credito_disponible:,.0f}, '
-                    f'requerido: ${total:,.0f}.'
-                )
+        if docente_locked.saldo < total:
+            raise ValueError(
+                f'Saldo insuficiente. Disponible: ${docente_locked.saldo:,.0f}, '
+                f'requerido: ${total:,.0f}.'
+            )
 
         pedido = PedidoDocente.objects.create(
             docente=docente_locked,
             nota=nota,
-            tipo_pago=tipo_pago,
             total=total,
+            pedido_grupal=pedido_grupal,
         )
         DetallePedidoDocente.objects.bulk_create([
             DetallePedidoDocente(
@@ -82,47 +84,7 @@ class PedidoDocenteService:
             for producto, cantidad in items
         ])
 
-        if tipo_pago == 'saldo':
-            docente_locked.saldo = Decimal(str(docente_locked.saldo)) - total
-        else:
-            docente_locked.deuda_fiado = Decimal(str(docente_locked.deuda_fiado)) + total
-        docente_locked.save(update_fields=['saldo', 'deuda_fiado'])
-
-        # Registrar movimiento de fiado
-        if tipo_pago == 'fiado':
-            from .models import MovimientoFiado
-            MovimientoFiado.objects.create(
-                docente=docente_locked,
-                tipo='cargo',
-                monto=total,
-                saldo_post=docente_locked.deuda_fiado,
-                referencia=pedido,
-                nota=f'Pedido {pedido.ticket}',
-            )
+        docente_locked.saldo = Decimal(str(docente_locked.saldo)) - total
+        docente_locked.save(update_fields=['saldo'])
 
         return pedido
-
-    @staticmethod
-    @transaction.atomic
-    def abonar_fiado(docente, monto: Decimal, nota: str = ''):
-        """Registra un abono al fiado del docente."""
-        from .models import MovimientoFiado
-        from authentication.models import Docente as DocenteModel
-
-        docente_locked = DocenteModel.objects.select_for_update().get(pk=docente.pk)
-        if monto <= 0:
-            raise ValueError('El monto del abono debe ser mayor a cero.')
-        if monto > docente_locked.deuda_fiado:
-            raise ValueError('El abono supera la deuda actual.')
-
-        docente_locked.deuda_fiado = Decimal(str(docente_locked.deuda_fiado)) - monto
-        docente_locked.save(update_fields=['deuda_fiado'])
-
-        MovimientoFiado.objects.create(
-            docente=docente_locked,
-            tipo='abono',
-            monto=monto,
-            saldo_post=docente_locked.deuda_fiado,
-            nota=nota or 'Abono manual',
-        )
-        return docente_locked

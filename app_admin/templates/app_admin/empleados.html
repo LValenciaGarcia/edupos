@@ -7,110 +7,160 @@
 
 {% block extra_css %}
 <style>
-/* ── Empleados page ──────────────────────────────────────────────────────── */
-.emp-stats {
+/* ── KPI strip ─────────────────────────────────────────────────────────── */
+.emp-kpi {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 1rem;
+  gap: .75rem;
+  margin-bottom: 1.5rem;
 }
-@media (max-width: 800px) { .emp-stats { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 480px) { .emp-stats { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 800px) { .emp-kpi { grid-template-columns: repeat(2, 1fr); } }
 
-.emp-stat {
+.emp-kpi-card {
   background: var(--ivory);
   border: 1px solid var(--mist);
-  border-radius: var(--radius);
-  padding: 1.1rem 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: .15rem;
+  border-radius: 10px;
+  padding: .95rem 1.1rem;
+  display: flex; flex-direction: column; gap: .2rem;
+  position: relative; overflow: hidden;
+  transition: box-shadow .18s, border-color .18s;
 }
-.emp-stat-icon {
-  width: 2.1rem; height: 2.1rem;
-  border-radius: 7px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: .95rem;
-  margin-bottom: .55rem;
+.emp-kpi-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.06); border-color: var(--fog); }
+.emp-kpi-card::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  border-radius: 99px 0 0 99px;
 }
-.emp-stat-num { font-family: var(--serif); font-size: 1.9rem; line-height: 1; }
-.emp-stat-lbl { font-size: var(--text-xs); color: var(--ash); }
+.emp-kpi-card.total::before  { background: var(--ash); }
+.emp-kpi-card.green::before  { background: var(--leaf); }
+.emp-kpi-card.red::before    { background: var(--red); }
+.emp-kpi-card.sky::before    { background: var(--sky); }
+.emp-kpi-label { font-size: .59rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ash); }
+.emp-kpi-val   { font-family: var(--serif); font-size: 1.7rem; line-height: 1; }
+.emp-kpi-card.total .emp-kpi-val { color: var(--ink); }
+.emp-kpi-card.green .emp-kpi-val { color: var(--leaf); }
+.emp-kpi-card.red   .emp-kpi-val { color: var(--red); }
+.emp-kpi-card.sky   .emp-kpi-val { color: var(--sky); }
+.emp-kpi-sub { font-size: .66rem; color: var(--ash); }
 
-/* ── Filter bar ──────────────────────────────────────────────────────────── */
-.emp-filter {
+/* ── Filter bar ─────────────────────────────────────────────────────────── */
+.emp-filterbar {
+  display: flex; align-items: center; gap: .5rem;
+  margin-bottom: 1.1rem; flex-wrap: wrap;
+}
+.emp-search {
+  position: relative; flex: 1; min-width: 200px; max-width: 320px;
+}
+.emp-search i {
+  position: absolute; left: .65rem; top: 50%;
+  transform: translateY(-50%);
+  color: var(--ash); font-size: .8rem; pointer-events: none;
+}
+.emp-search input {
+  width: 100%;
+  padding: .42rem .8rem .42rem 2rem;
+  border: 1px solid var(--fog); border-radius: 7px;
+  background: var(--ivory); font-family: var(--sans);
+  font-size: .81rem; color: var(--ink); outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.emp-search input:focus { border-color: var(--leaf); box-shadow: 0 0 0 3px var(--leaf-pale); }
+.emp-select {
+  height: 2.1rem; padding: 0 1.8rem 0 .75rem;
+  border: 1px solid var(--fog); border-radius: 7px;
   background: var(--ivory);
-  border: 1px solid var(--mist);
-  border-radius: var(--radius);
-  padding: .85rem 1.15rem;
-  display: flex; gap: .65rem; flex-wrap: wrap; align-items: center;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23a4a39b'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right .55rem center;
+  font-family: var(--sans); font-size: .78rem; color: var(--ink);
+  appearance: none; cursor: pointer; outline: none;
+  transition: border-color .14s;
 }
-.emp-filter .form-input { background: var(--cream); }
-.emp-filter .form-input:focus { border-color: var(--leaf); background: var(--ivory); }
+.emp-select:focus { border-color: var(--leaf); }
+.emp-count { margin-left: auto; font-size: .75rem; color: var(--ash); font-weight: 500; }
 
-/* ── Employee card list ──────────────────────────────────────────────────── */
-.emp-list { display: flex; flex-direction: column; gap: .45rem; }
-
-.emp-card {
-  background: var(--ivory);
-  border: 1px solid var(--mist);
-  border-radius: var(--radius);
-  padding: .85rem 1.15rem;
-  display: flex; align-items: center; gap: 1rem;
-  transition: border-color .14s, box-shadow .14s, transform .14s;
+/* ── Card / Table ───────────────────────────────────────────────────────── */
+.card { background: var(--ivory); border: 1px solid var(--mist); border-radius: 12px; overflow: hidden; }
+.tbl { width: 100%; border-collapse: collapse; }
+.tbl thead { border-bottom: 1px solid var(--mist); }
+.tbl thead th {
+  padding: .6rem .9rem;
+  text-align: left; font-size: .67rem; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ash); background: var(--cream); white-space: nowrap;
 }
-.emp-card:hover {
-  border-color: var(--fog);
-  box-shadow: 0 2px 14px rgba(0,0,0,.06);
-  transform: translateX(3px);
-}
+.tbl tbody tr { border-bottom: 1px solid var(--mist); transition: background .1s; }
+.tbl tbody tr:last-child { border-bottom: none; }
+.tbl tbody tr:hover { background: var(--cream); }
+.tbl td { padding: .68rem .9rem; vertical-align: middle; font-size: .82rem; }
 
 /* Avatar */
-.emp-av {
-  width: 2.6rem; height: 2.6rem; border-radius: 50%;
+.e-avatar {
+  width: 2.15rem; height: 2.15rem; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-family: var(--serif); font-size: 1rem; font-weight: 700;
-  flex-shrink: 0; user-select: none;
+  font-family: var(--serif); font-size: .75rem; font-weight: 700;
+  letter-spacing: .02em; flex-shrink: 0;
 }
-.av-cajero    { background: var(--amber-tint); color: var(--amber-dark); }
-.av-atencion  { background: var(--sky-tint);   color: var(--sky-dark); }
-.av-supervisor{ background: var(--violet-tint); color: var(--violet-dark); }
-.av-default   { background: var(--leaf-tint);  color: var(--leaf-dark); }
+.e-avatar.av-cajero    { background: var(--amber-tint); color: var(--amber-dark); }
+.e-avatar.av-atencion  { background: var(--sky-tint);   color: var(--sky-dark); }
+.e-avatar.av-supervisor{ background: var(--violet-tint); color: var(--violet-dark); }
+.e-avatar.av-default   { background: var(--leaf-tint);  color: var(--leaf-dark); }
+.e-cell { display: flex; align-items: center; gap: .6rem; }
+.e-name { font-weight: 600; color: var(--ink); font-size: .83rem; }
+.e-email { font-size: .69rem; color: var(--ash); margin-top: 1px; }
 
-/* Info */
-.emp-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 18ch; }
-.emp-sub  { font-size: var(--text-xs); color: var(--ash); margin-top: .08rem; }
-
-/* Cargo pill */
-.cargo-pill {
-  display: inline-flex; align-items: center;
-  padding: .22rem .65rem; border-radius: 99px;
-  font-size: var(--text-2xs); font-weight: 700;
-  letter-spacing: .07em; text-transform: uppercase; flex-shrink: 0;
+/* Cargo badge */
+.cargo-badge {
+  display: inline-flex; align-items: center; gap: .28rem;
+  padding: .2rem .58rem; border-radius: 99px;
+  font-size: .67rem; font-weight: 600; letter-spacing: .04em; white-space: nowrap;
 }
-.cp-cajero    { background: var(--amber-tint); color: var(--amber-dark); }
-.cp-atencion  { background: var(--sky-tint);   color: var(--sky-dark); }
-.cp-supervisor{ background: var(--violet-tint); color: var(--violet-dark); }
-.cp-default   { background: var(--leaf-tint);  color: var(--leaf-dark); }
+.cb-cajero    { background: var(--amber-tint); color: var(--amber-dark); }
+.cb-atencion  { background: var(--sky-tint);   color: var(--sky-dark); }
+.cb-supervisor{ background: var(--violet-tint); color: var(--violet-dark); }
+.cb-default   { background: var(--leaf-tint);  color: var(--leaf-dark); }
+
+/* Status badge */
+.status-badge {
+  display: inline-flex; align-items: center; gap: .3rem;
+  padding: .2rem .58rem; border-radius: 99px;
+  font-size: .67rem; font-weight: 600; letter-spacing: .04em;
+}
+.status-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+.sb-active   { background: var(--leaf-tint); color: var(--leaf-dark); }
+.sb-active   .status-dot { background: var(--leaf); }
+.sb-inactive { background: var(--red-tint);  color: #991b1b; }
+.sb-inactive .status-dot { background: var(--red); }
 
 /* Sede pills */
-.sede-pills    { display: flex; flex-wrap: wrap; gap: .3rem; max-width: 180px; }
-.sede-pill     { font-size: var(--text-2xs); padding: .17rem .5rem; background: var(--cream); border: 1px solid var(--mist); border-radius: 99px; color: var(--stone); white-space: nowrap; }
-.global-pill   { font-size: var(--text-2xs); padding: .17rem .5rem; background: var(--sky-tint); color: var(--sky-dark); border-radius: 99px; white-space: nowrap; }
+.sede-pill-wrap { display: flex; flex-wrap: wrap; gap: .25rem; max-width: 180px; }
+.sede-pill      { font-size: .63rem; padding: .15rem .45rem; background: var(--cream); border: 1px solid var(--mist); border-radius: 99px; color: var(--stone); white-space: nowrap; }
+.global-pill    { font-size: .63rem; padding: .15rem .45rem; background: var(--sky-tint); color: var(--sky-dark); border-radius: 99px; white-space: nowrap; }
 
-/* Status dot */
-.status-dot { width: .48rem; height: .48rem; border-radius: 50%; flex-shrink: 0; }
-.dot-on     { background: var(--leaf); box-shadow: 0 0 0 2.5px var(--leaf-tint); }
-.dot-off    { background: var(--fog); }
+/* Action buttons */
+.action-cell { display: flex; align-items: center; gap: .3rem; justify-content: flex-end; }
+.btn-xs {
+  display: inline-flex; align-items: center; gap: .26rem;
+  height: 1.75rem; padding: 0 .65rem; border-radius: 6px;
+  border: 1px solid var(--mist); background: var(--ivory);
+  font-family: var(--sans); font-size: .71rem; font-weight: 500;
+  color: var(--stone); cursor: pointer; text-decoration: none;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.btn-xs:hover { background: var(--cream); border-color: var(--fog); color: var(--ink); }
+.btn-xs.btn-warn { background: var(--amber-pale); border-color: var(--amber-tint); color: var(--amber-dark); }
+.btn-xs.btn-warn:hover { background: var(--amber-tint); }
+.btn-xs.btn-enable { background: var(--leaf-pale); border-color: var(--leaf-tint); color: var(--leaf-dark); }
+.btn-xs.btn-enable:hover { background: var(--leaf-tint); }
+.btn-xs.btn-info { background: var(--violet-pale); border-color: #e9d5ff; color: var(--violet); }
+.btn-xs.btn-info:hover { background: #ede9fe; }
 
 /* Empty state */
-.emp-empty {
-  padding: 3rem 1rem; text-align: center; color: var(--ash);
-  display: flex; flex-direction: column; align-items: center; gap: .75rem;
-}
-.emp-empty-ico {
-  width: 4rem; height: 4rem; background: var(--cream); border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 1.75rem; color: var(--fog);
-}
+.empty-state { padding: 3rem 1rem; text-align: center; color: var(--ash); font-size: .82rem; }
+.empty-state i { font-size: 2.2rem; display: block; margin-bottom: .6rem; color: var(--fog); }
+
+/* Row animation */
+@keyframes fadeInRow { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+.tbl tbody tr { animation: fadeInRow .16s var(--ease) both; }
 </style>
 {% endblock %}
 
@@ -124,111 +174,107 @@
 {% endblock %}
 
 {% block content %}
-<div style="display:flex;flex-direction:column;gap:1.25rem;">
 
-  <!-- Stats -->
-  <div class="emp-stats">
-    <div class="emp-stat">
-      <div class="emp-stat-icon" style="background:var(--cream);color:var(--stone);">
-        <i class="bi bi-people"></i>
-      </div>
-      <div class="emp-stat-num">{{ total_empleados }}</div>
-      <div class="emp-stat-lbl">Total empleados</div>
-    </div>
-    <div class="emp-stat">
-      <div class="emp-stat-icon" style="background:var(--leaf-tint);color:var(--leaf);">
-        <i class="bi bi-person-check"></i>
-      </div>
-      <div class="emp-stat-num">{{ empleados_activos }}</div>
-      <div class="emp-stat-lbl">Activos</div>
-    </div>
-    <div class="emp-stat">
-      <div class="emp-stat-icon" style="background:var(--red-tint);color:var(--red);">
-        <i class="bi bi-person-dash"></i>
-      </div>
-      <div class="emp-stat-num">{{ empleados_inactivos }}</div>
-      <div class="emp-stat-lbl">Inactivos</div>
-    </div>
-    <div class="emp-stat">
-      <div class="emp-stat-icon" style="background:var(--sky-tint);color:var(--sky);">
-        <i class="bi bi-geo-alt"></i>
-      </div>
-      <div class="emp-stat-num">{{ sedes|length }}</div>
-      <div class="emp-stat-lbl">Sedes activas</div>
-    </div>
+{# ── KPI Strip ── #}
+<div class="emp-kpi">
+  <div class="emp-kpi-card total">
+    <div class="emp-kpi-label">Total</div>
+    <div class="emp-kpi-val">{{ total_empleados }}</div>
+    <div class="emp-kpi-sub">empleados registrados</div>
+  </div>
+  <div class="emp-kpi-card green">
+    <div class="emp-kpi-label">Activos</div>
+    <div class="emp-kpi-val">{{ empleados_activos }}</div>
+    <div class="emp-kpi-sub">con acceso habilitado</div>
+  </div>
+  <div class="emp-kpi-card red">
+    <div class="emp-kpi-label">Inactivos</div>
+    <div class="emp-kpi-val">{{ empleados_inactivos }}</div>
+    <div class="emp-kpi-sub">sin acceso</div>
+  </div>
+  <div class="emp-kpi-card sky">
+    <div class="emp-kpi-label">Sedes</div>
+    <div class="emp-kpi-val">{{ sedes|length }}</div>
+    <div class="emp-kpi-sub">sedes activas</div>
+  </div>
+</div>
+
+{# ── Filter Bar ── #}
+<form method="get" class="emp-filterbar">
+  <div class="emp-search">
+    <i class="bi bi-search"></i>
+    <input type="text" name="q" value="{{ q }}"
+           placeholder="Buscar por nombre, usuario o documento…"
+           autocomplete="off">
   </div>
 
-  <!-- Filtros -->
-  <div class="emp-filter">
-    <form method="get" style="display:contents;">
-      <i class="bi bi-search" style="color:var(--ash);font-size:.9rem;"></i>
-      <input type="text" name="q" value="{{ q }}" class="form-input"
-             placeholder="Buscar por nombre, usuario o documento..."
-             style="flex:1;min-width:200px;">
-      <select name="sede" class="form-input" style="width:auto;min-width:160px;">
-        <option value="">Todas las sedes</option>
-        {% for s in sedes %}
-        <option value="{{ s.pk }}" {% if sede_id == s.pk|stringformat:"s" %}selected{% endif %}>
-          {{ s.nombre }}
-        </option>
-        {% endfor %}
-      </select>
-      <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
-      {% if q or sede_id %}
-      <a href="{% url 'app_admin:empleados' %}" class="btn btn-ghost btn-sm">
-        <i class="bi bi-x"></i> Limpiar
-      </a>
-      {% endif %}
-    </form>
-  </div>
+  <select name="sede" class="emp-select" onchange="this.form.submit()">
+    <option value="">Todas las sedes</option>
+    {% for s in sedes %}
+    <option value="{{ s.pk }}" {% if sede_id == s.pk|stringformat:"s" %}selected{% endif %}>
+      {{ s.nombre }}
+    </option>
+    {% endfor %}
+  </select>
 
-  <!-- Lista -->
-  <div>
-    <div style="display:flex;align-items:center;margin-bottom:.75rem;padding:0 .1rem;">
-      <span style="font-size:var(--text-sm);color:var(--stone);">
-        <strong>{{ empleados|length }}</strong> resultado{{ empleados|length|pluralize:",s" }}
-        {% if q or sede_id %}
-          <span style="color:var(--ash);"> · filtro activo</span>
-        {% endif %}
-      </span>
-    </div>
+  {% if q or sede_id %}
+  <a href="{% url 'app_admin:empleados' %}" class="btn btn-ghost btn-sm" title="Limpiar filtros">
+    <i class="bi bi-x-lg"></i> Limpiar
+  </a>
+  {% endif %}
 
-    {% if empleados %}
-    <div class="emp-list">
-      {% for emp in empleados %}
-      {% with cargo=emp.cargo %}
-      <div class="emp-card">
+  <span class="emp-count">
+    {{ empleados|length }} resultado{{ empleados|length|pluralize:",s" }}
+    {% if q or sede_id %}<span style="color:var(--ash);"> · filtro activo</span>{% endif %}
+  </span>
+</form>
 
-        <!-- Avatar coloreado por cargo -->
-        <div class="emp-av
-          {% if cargo == 'cajero' %}av-cajero
-          {% elif cargo == 'atencion' %}av-atencion
-          {% elif cargo == 'supervisor' %}av-supervisor
-          {% else %}av-default{% endif %}">
-          {{ emp.perfil.user.get_full_name|default:get_full_name|default:emp.perfil.user.email|slice:":1"|upper }}
-        </div>
-
-        <!-- Nombre + usuario -->
-        <div style="flex:1;min-width:0;">
-          <div class="emp-name">
-            {{ emp.perfil.user.get_full_name|default:get_full_name|default:emp.perfil.user.email }}
+{# ── Tabla ── #}
+<div class="card">
+  {% if empleados %}
+  <div style="overflow-x:auto;">
+  <table class="tbl">
+    <thead>
+      <tr>
+        <th>Empleado</th>
+        <th>Cargo</th>
+        <th>Sedes</th>
+        <th>Estado</th>
+        <th style="text-align:right;">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for emp in empleados %}
+    {% with cargo=emp.cargo %}
+    <tr>
+      <td>
+        <div class="e-cell">
+          <div class="e-avatar
+            {% if cargo == 'cajero' %}av-cajero
+            {% elif cargo == 'atencion' %}av-atencion
+            {% elif cargo == 'supervisor' %}av-supervisor
+            {% else %}av-default{% endif %}">
+            {{ emp.perfil.user.get_full_name|default:emp.perfil.user.email|slice:":1"|upper }}
           </div>
-          <div class="emp-sub">
-            {{ emp.perfil.user.email }}{% if emp.documento %} · {{ emp.documento }}{% endif %}
+          <div>
+            <div class="e-name">{{ emp.perfil.user.get_full_name|default:emp.perfil.user.email }}</div>
+            <div class="e-email">{{ emp.perfil.user.email }}{% if emp.documento %} · {{ emp.documento }}{% endif %}</div>
           </div>
         </div>
+      </td>
 
-        <!-- Cargo -->
-        <span class="cargo-pill
-          {% if cargo == 'cajero' %}cp-cajero
-          {% elif cargo == 'atencion' %}cp-atencion
-          {% elif cargo == 'supervisor' %}cp-supervisor
-          {% else %}cp-default{% endif %}">
+      <td>
+        <span class="cargo-badge
+          {% if cargo == 'cajero' %}cb-cajero
+          {% elif cargo == 'atencion' %}cb-atencion
+          {% elif cargo == 'supervisor' %}cb-supervisor
+          {% else %}cb-default{% endif %}">
           {{ emp.get_cargo_display }}
         </span>
+      </td>
 
-        <!-- Sedes -->
-        <div class="sede-pills">
+      <td>
+        <div class="sede-pill-wrap">
           {% if emp.es_global %}
             <span class="global-pill"><i class="bi bi-globe"></i> Global</span>
           {% else %}
@@ -239,51 +285,52 @@
             {% endfor %}
           {% endif %}
         </div>
+      </td>
 
-        <!-- Estado dot -->
-        <div class="status-dot {% if emp.perfil.activo %}dot-on{% else %}dot-off{% endif %}"
-             title="{% if emp.perfil.activo %}Activo{% else %}Inactivo{% endif %}"></div>
+      <td>
+        <span class="status-badge {% if emp.perfil.activo %}sb-active{% else %}sb-inactive{% endif %}">
+          <span class="status-dot"></span>
+          {% if emp.perfil.activo %}Activo{% else %}Inactivo{% endif %}
+        </span>
+      </td>
 
-        <!-- Acciones -->
-        <div style="display:flex;gap:.4rem;flex-shrink:0;">
+      <td>
+        <div class="action-cell">
           <a href="{% url 'app_admin:empleado_detalle' emp.pk %}"
-             class="btn btn-ghost btn-xs" title="Ver detalle">
-            <i class="bi bi-arrow-right"></i>
+             class="btn-xs btn-info" title="Ver detalle">
+            <i class="bi bi-eye" style="font-size:.78rem;"></i> Ver
           </a>
           <a href="{% url 'app_admin:empleado_toggle' emp.pk %}"
-             class="btn btn-xs {% if emp.perfil.activo %}btn-ghost{% else %}btn-amber{% endif %}"
+             class="btn-xs {% if emp.perfil.activo %}btn-warn{% else %}btn-enable{% endif %}"
              title="{% if emp.perfil.activo %}Desactivar{% else %}Activar{% endif %}"
-             onclick="return confirm('¿Confirmas el cambio de estado de este empleado?')">
-            <i class="bi bi-{% if emp.perfil.activo %}pause-circle{% else %}play-circle{% endif %}"></i>
+             data-pa-confirm="¿Confirmas el cambio de estado de este empleado?" data-pa-type="warn" data-pa-ok="Cambiar estado">
+            <i class="bi bi-{% if emp.perfil.activo %}pause-circle{% else %}play-circle{% endif %}" style="font-size:.78rem;"></i>
+            {% if emp.perfil.activo %}Desactivar{% else %}Activar{% endif %}
           </a>
         </div>
-
-      </div>
-      {% endwith %}
-      {% endfor %}
-    </div>
-
-    {% else %}
-    <div class="card">
-      <div class="emp-empty">
-        <div class="emp-empty-ico"><i class="bi bi-people"></i></div>
-        <div style="font-weight:600;font-size:var(--text-base);">
-          {% if q or sede_id %}No hay empleados con ese filtro
-          {% else %}Sin empleados registrados{% endif %}
-        </div>
-        <div style="font-size:var(--text-sm);">
-          {% if q or sede_id %}Ajusta los criterios de búsqueda.
-          {% else %}Agrega el primer empleado para comenzar.{% endif %}
-        </div>
-        {% if not q and not sede_id %}
-        <a href="{% url 'app_admin:empleado_nuevo' %}" class="btn btn-primary btn-sm">
-          <i class="bi bi-person-plus"></i> Crear empleado
-        </a>
-        {% endif %}
-      </div>
-    </div>
-    {% endif %}
+      </td>
+    </tr>
+    {% endwith %}
+    {% endfor %}
+    </tbody>
+  </table>
   </div>
 
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-people"></i>
+    <p>{% if q or sede_id %}No hay empleados con esos filtros.{% else %}Sin empleados registrados.{% endif %}</p>
+    {% if q or sede_id %}
+    <a href="{% url 'app_admin:empleados' %}" class="btn btn-ghost btn-sm" style="margin-top:.65rem;">
+      <i class="bi bi-x-lg"></i> Limpiar filtros
+    </a>
+    {% else %}
+    <a href="{% url 'app_admin:empleado_nuevo' %}" class="btn btn-primary btn-sm" style="margin-top:.65rem;">
+      <i class="bi bi-person-plus"></i> Crear empleado
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
 </div>
+
 {% endblock %}

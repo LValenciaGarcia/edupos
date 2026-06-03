@@ -80,7 +80,7 @@
         <div style="display:flex;align-items:center;justify-content:space-between;margin-top:0.5rem;">
           <span class="badge badge-info">{{ prog.get_fuente_display }}</span>
           {% if prog.estado == 'activo' %}
-          <form method="post" onsubmit="return confirm('¿Cancelar este pedido programado?')">
+          <form method="post" data-pa-confirm="¿Cancelar este pedido programado?" data-pa-ok="Cancelar">
             {% csrf_token %}
             <input type="hidden" name="action" value="cancel">
             <input type="hidden" name="programado_id" value="{{ prog.pk }}">

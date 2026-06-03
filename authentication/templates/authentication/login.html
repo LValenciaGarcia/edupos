@@ -204,7 +204,7 @@
         <form method="post" action="{% url 'authentication:login' %}">
           {% csrf_token %}
           <div class="form-group">
-            <label class="field-label" for="email">Correo Gmail</label>
+            <label class="field-label" for="email">Email</label>
             <div class="input-wrap">
               <span class="i-left"><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 4-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 4"/></svg></span>
               <input type="email" id="email" name="email" placeholder="correo@gmail.com" autocomplete="email" required />

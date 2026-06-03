@@ -1,4 +1,5 @@
 {% extends 'app_admin/base_admin.html' %}
+{% load filtros %}
 {% block title %}Recargas de Saldo{% endblock %}
 {% block page_title %}Recargas de Saldo{% endblock %}
 {% block nav_recargas %}active{% endblock %}
@@ -54,7 +55,7 @@
   {% if recargas %}
     {% for r in recargas %}
     <div class="recarga-row">
-      <div class="recarga-monto">+${{ r.monto|floatformat:0 }}</div>
+      <div class="recarga-monto">+${{ r.monto|miles }}</div>
       <div class="recarga-info">
         <div class="recarga-nombre">
           {{ r.nombre }}

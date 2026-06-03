@@ -23,8 +23,9 @@
   .item-fila:focus-within { border-color: var(--amber); box-shadow: 0 0 0 3px rgba(217,119,6,0.08); }
   .fila-label { font-size: 0.65rem; font-weight: 700; color: var(--stone); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.2rem; }
   .fila-cell { display: flex; flex-direction: column; }
+  .fila-cell { min-width: 0; }
   .fila-cell select, .fila-cell input { border: none; background: transparent; padding: 0.1rem 0; font-size: 0.85rem; font-weight: 600; color: var(--ink); outline: none; width: 100%; }
-  .fila-cell select { cursor: pointer; }
+  .fila-cell select { cursor: pointer; max-width: 100%; text-overflow: ellipsis; }
   .fila-cell input::placeholder { color: var(--fog); font-weight: 400; }
   .subtotal-val { font-size: 0.92rem; font-weight: 800; color: var(--leaf-dark, #166534); }
   .btn-del { width: 2rem; height: 2rem; border-radius: 6px; border: 1.5px solid var(--mist); background: transparent; color: var(--stone); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.14s; flex-shrink: 0; }
@@ -44,7 +45,7 @@
   .prov-panel { display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--ivory); border: 1px solid var(--fog); border-radius: 9px; z-index: 60; box-shadow: 0 8px 28px rgba(0,0,0,0.14); overflow: hidden; }
   .prov-panel.open { display: block; }
   .prov-search-inp { width: 100%; padding: 0.52rem 0.85rem; border: none; border-bottom: 1px solid var(--cream); font-size: 0.82rem; outline: none; background: var(--ivory); font-family: var(--sans); color: var(--ink); }
-  .prov-list { max-height: 170px; overflow-y: auto; }
+  .prov-list { max-height: 280px; overflow-y: auto; }
   .prov-item { padding: 0.5rem 0.85rem; font-size: 0.83rem; cursor: pointer; display: flex; align-items: center; gap: 0.45rem; transition: background 0.1s; color: var(--ink); }
   .prov-item:hover { background: var(--cream); }
   .prov-item.selected { background: var(--amber-pale); color: var(--amber); font-weight: 600; }
@@ -150,7 +151,7 @@
           <div class="fila-cell fila-cell-item">
             <select name="item_id" class="item-sel">
               {% for p in productos %}
-              <option value="{{ p.pk }}" data-precio="{{ p.precio_costo|default:0|floatformat:'2' }}" {% if p.pk == producto_sel.pk %}selected{% endif %}>{{ p.nombre }}</option>
+              <option value="{{ p.pk }}" data-precio="{{ p.precio_costo|default:0|floatformat:'2' }}" title="{{ p.nombre }}{% if p.proveedor %} · {{ p.proveedor.nombre }}{% endif %}" {% if p.pk == producto_sel.pk %}selected{% endif %}>{{ p.nombre }}{% if p.proveedor %} · {{ p.proveedor.nombre }}{% endif %}</option>
               {% endfor %}
             </select>
           </div>
@@ -182,7 +183,7 @@
           <div class="fila-cell fila-cell-item">
             <select name="item_id" class="item-sel">
               {% for ing in ingredientes %}
-              <option value="{{ ing.pk }}" data-precio="0" {% if ing.pk == ingrediente_sel.pk %}selected{% endif %}>{{ ing.nombre }}</option>
+              <option value="{{ ing.pk }}" data-precio="0" title="{{ ing.nombre }}{% if ing.proveedor %} · {{ ing.proveedor.nombre }}{% endif %}" {% if ing.pk == ingrediente_sel.pk %}selected{% endif %}>{{ ing.nombre }}{% if ing.proveedor %} · {{ ing.proveedor.nombre }}{% endif %}</option>
               {% endfor %}
             </select>
           </div>
@@ -214,7 +215,7 @@
           <div class="fila-cell fila-cell-item">
             <select name="item_id" class="item-sel">
               {% for p in productos %}
-              <option value="{{ p.pk }}" data-precio="{{ p.precio_costo|default:0|floatformat:'2' }}">{{ p.nombre }}</option>
+              <option value="{{ p.pk }}" data-precio="{{ p.precio_costo|default:0|floatformat:'2' }}" title="{{ p.nombre }}{% if p.proveedor %} · {{ p.proveedor.nombre }}{% endif %}">{{ p.nombre }}{% if p.proveedor %} · {{ p.proveedor.nombre }}{% endif %}</option>
               {% endfor %}
             </select>
           </div>
@@ -284,10 +285,10 @@ function fmtPrecio(numero) {
 
 // ========== 2. DATOS SEGUROS (precios con punto decimal) ==========
 const PRODUCTOS = [
-  {% for p in productos %}{"id": {{ p.pk }}, "nombre": "{{ p.nombre|escapejs }}", "precio": {{ p.precio_costo|default:0|stringformat:".2f" }} },{% endfor %}
+  {% for p in productos %}{"id": {{ p.pk }}, "nombre": "{{ p.nombre|escapejs }}{% if p.proveedor %} · {{ p.proveedor.nombre|escapejs }}{% endif %}", "precio": {{ p.precio_costo|default:0|stringformat:".2f" }} },{% endfor %}
 ];
 const INGREDIENTES = [
-  {% for ing in ingredientes %}{"id": {{ ing.pk }}, "nombre": "{{ ing.nombre|escapejs }}", "precio": 0},{% endfor %}
+  {% for ing in ingredientes %}{"id": {{ ing.pk }}, "nombre": "{{ ing.nombre|escapejs }}{% if ing.proveedor %} · {{ ing.proveedor.nombre|escapejs }}{% endif %}", "precio": 0},{% endfor %}
 ];
 
 // ========== 3. FUNCIONES DE LA DINÁMICA ==========
@@ -432,6 +433,23 @@ function toggleVencimiento(tipoSel) {
     }
 }
 
+function ajustarStepCantidad(tipoSel) {
+    // Productos simples van por unidades enteras; ingredientes pueden ser decimales (gramos, ml)
+    const fila    = tipoSel.closest('.item-fila');
+    const cantInp = fila.querySelector('.cant-inp');
+    if (!cantInp) return;
+    if (tipoSel.value === 'producto') {
+        cantInp.step = '1';
+        cantInp.min  = '1';
+        // Si quedó valor decimal, redondear hacia abajo
+        const v = parseFloat(cantInp.value);
+        if (!isNaN(v) && v !== Math.floor(v)) cantInp.value = Math.floor(v);
+    } else {
+        cantInp.step = '0.01';
+        cantInp.min  = '0.01';
+    }
+}
+
 function agregarFila() {
     const body = document.getElementById('filas-body');
     const fila = crearFila();
@@ -452,7 +470,7 @@ function agregarFila() {
 
 function eliminarFila(btn) {
     const filas = document.querySelectorAll('.item-fila');
-    if (filas.length <= 1) { alert('Debe haber al menos un ítem.'); return; }
+    if (filas.length <= 1) { paShowToast('Debe haber al menos un ítem.', 'warn'); return; }
     const fila = btn.closest('.item-fila');
     fila.style.transition = 'opacity 0.15s ease, transform 0.15s ease';
     fila.style.opacity = '0';
@@ -467,7 +485,7 @@ function asignarEventosFila(fila) {
     const precioInp = fila.querySelector('.precio-inp');
     const delBtn = fila.querySelector('.btn-del');
 
-    if (tipoSel) tipoSel.addEventListener('change', () => { actualizarSelectItem(tipoSel); toggleVencimiento(tipoSel); });
+    if (tipoSel) tipoSel.addEventListener('change', () => { actualizarSelectItem(tipoSel); toggleVencimiento(tipoSel); ajustarStepCantidad(tipoSel); });
     if (itemSel) itemSel.addEventListener('change', () => autocompletarPrecio(itemSel));
     if (cantInp) cantInp.addEventListener('input', () => calcularSubtotal(cantInp));
     if (precioInp) precioInp.addEventListener('input', () => calcularSubtotal(precioInp));
@@ -538,7 +556,7 @@ function initProvDropdown() {
 document.getElementById('form-entrada').addEventListener('submit', function(e) {
     if (!document.getElementById('sel-proveedor').value) {
         e.preventDefault();
-        alert('Selecciona un proveedor.');
+        paShowToast('Selecciona un proveedor.', 'warn');
         document.getElementById('prov-trigger').classList.add('open');
         document.getElementById('prov-panel').classList.add('open');
         return;
@@ -556,11 +574,19 @@ document.getElementById('form-entrada').addEventListener('submit', function(e) {
         const itemId = fila.querySelector('.item-sel').value;
         const cant = parseFloat(fila.querySelector('.cant-inp').value) || 0;
         const precio = parseFloat(fila.querySelector('.precio-inp').value) || 0;
-        if (itemId && cant > 0 && precio > 0) { tieneItems = true; break; }
+        const tipo = fila.querySelector('.tipo-sel').value;
+        // Bug #6/7: productos solo aceptan unidades enteras
+        if (tipo === 'producto' && cant > 0 && cant !== Math.floor(cant)) {
+            e.preventDefault();
+            paShowToast('Los productos se ingresan en unidades enteras (sin decimales).', 'warn');
+            fila.querySelector('.cant-inp').focus();
+            return;
+        }
+        if (itemId && cant > 0 && precio > 0) { tieneItems = true; }
     }
     if (!tieneItems) {
         e.preventDefault();
-        alert('Ingresa al menos un ítem con cantidad y precio mayor a 0.');
+        paShowToast('Ingresa al menos un ítem con cantidad y precio mayor a 0.', 'warn');
     }
 });
 
@@ -570,7 +596,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.item-fila').forEach(fila => {
         asignarEventosFila(fila);
         const tipoSel = fila.querySelector('.tipo-sel');
-        if (tipoSel) toggleVencimiento(tipoSel);
+        if (tipoSel) { toggleVencimiento(tipoSel); ajustarStepCantidad(tipoSel); }
         const precioInp = fila.querySelector('.precio-inp');
         if (precioInp) initPrecioFmt(precioInp);
         const itemSel = fila.querySelector('.item-sel');
@@ -614,6 +640,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const provSearch = document.getElementById('prov-search');
     if (provTrigger) provTrigger.addEventListener('click', toggleProvPanel);
     if (provSearch) provSearch.addEventListener('input', (e) => filtrarProveedores(e.target.value));
+    // Bug #1: faltaba el listener de selección de cada proveedor
+    document.querySelectorAll('#prov-list .prov-item').forEach(item => {
+        item.addEventListener('click', () => {
+            seleccionarProveedor(item.dataset.value, item.dataset.label);
+        });
+    });
     document.addEventListener('click', function(e) {
         const wrap = document.getElementById('prov-wrap');
         if (wrap && !wrap.contains(e.target)) {

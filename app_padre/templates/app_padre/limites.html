@@ -71,7 +71,7 @@
   padding: 0.6rem 0.5rem;
   border: 1px solid var(--fog);
   border-radius: 10px;
-  background: white;
+  background: var(--ivory);
   font-family: var(--sans);
   font-size: 0.8rem;
   font-weight: 600;
@@ -156,11 +156,11 @@
         <div class="limite-stats">
           <div class="limite-stat">
             <div class="limite-stat-label">Gastado</div>
-            <div class="limite-stat-val amber">${{ item.gasto|floatformat:0|miles }}</div>
+            <div class="limite-stat-val amber">${{ item.gasto|miles }}</div>
           </div>
           <div class="limite-stat">
             <div class="limite-stat-label">Disponible</div>
-            <div class="limite-stat-val {% if item.disponible == 0 %}red{% else %}green{% endif %}">${{ item.disponible|floatformat:0|miles }}</div>
+            <div class="limite-stat-val {% if item.disponible == 0 %}red{% else %}green{% endif %}">${{ item.disponible|miles }}</div>
           </div>
           <div class="limite-stat">
             <div class="limite-stat-label">Límite</div>
@@ -180,7 +180,7 @@
             </button>
           </form>
           <form method="post" style="display:inline;"
-                onsubmit="return confirm('¿Eliminar este límite?')">
+                data-pa-confirm="¿Eliminar este límite?" data-pa-ok="Eliminar">
             {% csrf_token %}
             <input type="hidden" name="action" value="delete">
             <input type="hidden" name="limite_id" value="{{ item.limite.pk }}">
@@ -305,11 +305,11 @@ document.querySelectorAll('.btn-monto-rapido').forEach(btn => {
     let monto = parseInt(document.getElementById('monto_oculto').value, 10) || 0;
     if (monto < 1000) {
       e.preventDefault();
-      alert('El monto mínimo es $1.000');
+      paShowToast('El monto mínimo es $1.000', 'warn');
       document.getElementById('monto_display').focus();
     } else if (monto > 2000000) {
       e.preventDefault();
-      alert('El monto máximo es $2.000.000');
+      paShowToast('El monto máximo es $2.000.000', 'warn');
       document.getElementById('monto_display').focus();
     }
   });

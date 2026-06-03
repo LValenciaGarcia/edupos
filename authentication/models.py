@@ -61,10 +61,21 @@ class Estudiante(models.Model):
         Padre, on_delete=models.SET_NULL,
         null=True, blank=True, related_name='hijos'
     )
-    grado    = models.CharField(max_length=10)   # Ej: "8B", "10A"
-    codigo   = models.CharField(max_length=20, unique=True)  # Código estudiantil
-    saldo   = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    grado    = models.CharField(max_length=10)
+    codigo   = models.CharField(max_length=20, unique=True)
+    saldo    = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    puede_recargar_autonomo = models.BooleanField(
+        default=False,
+        verbose_name='Puede recargar autónomamente',
+        help_text='El padre puede habilitar que el estudiante recargue su saldo directamente con MercadoPago.',
+    )
+    huella_template    = models.BinaryField(null=True, blank=True, editable=False)
+    huella_enrolada_at = models.DateTimeField(null=True, blank=True)
     history = HistoricalRecords()
+
+    @property
+    def tiene_huella(self):
+        return self.huella_template is not None and len(self.huella_template) > 0
 
     def __str__(self):
         return f'{self.perfil} — Grado {self.grado}'
@@ -76,25 +87,17 @@ class Estudiante(models.Model):
 
 class Docente(models.Model):
     """Perfil extendido del docente. Se registra solo."""
-    perfil       = models.OneToOneField(Perfil, on_delete=models.CASCADE, related_name='docente')
-    documento    = models.CharField(max_length=20, blank=True, verbose_name='N° Documento (CC)')
-    materia      = models.CharField(max_length=100, blank=True, verbose_name='Materia / Área')
-    saldo        = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    limite_fiado = models.DecimalField(
-        max_digits=10, decimal_places=2, default=0,
-        verbose_name='Límite de crédito (fiado)',
-        help_text='Monto máximo que puede pedir sin saldo suficiente'
-    )
-    deuda_fiado  = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='Deuda de fiado')
-    history      = HistoricalRecords()
+    perfil    = models.OneToOneField(Perfil, on_delete=models.CASCADE, related_name='docente')
+    documento = models.CharField(max_length=20, blank=True, verbose_name='N° Documento (CC)')
+    materia   = models.CharField(max_length=100, blank=True, verbose_name='Materia / Área')
+    saldo     = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    huella_template    = models.BinaryField(null=True, blank=True, editable=False)
+    huella_enrolada_at = models.DateTimeField(null=True, blank=True)
+    history   = HistoricalRecords()
 
     @property
-    def credito_disponible(self):
-        return max(float(self.limite_fiado) - float(self.deuda_fiado), 0)
-
-    @property
-    def saldo_total_disponible(self):
-        return float(self.saldo) + self.credito_disponible
+    def tiene_huella(self):
+        return self.huella_template is not None and len(self.huella_template) > 0
 
     def __str__(self):
         return f'Docente: {self.perfil}'

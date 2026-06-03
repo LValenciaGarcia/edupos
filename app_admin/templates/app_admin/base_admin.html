@@ -16,6 +16,9 @@
   <meta name="theme-color" content="#0f0f0e">
   <link rel="apple-touch-icon" href="/static/img/icon.svg">
   {% block extra_css %}{% endblock %}
+  <script>
+  (function(){var t=localStorage.getItem('theme'),d=t?t==='dark':matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-theme',d?'dark':'light');})();
+  </script>
 </head>
 <body>
 
@@ -36,100 +39,127 @@
       <span class="sb-tip">Dashboard</span>
     </div>
 
-    <span class="sb-section-label">Operaciones</span>
-
-    <div class="sb-item">
-      <a href="{% url 'app_admin:inventario' %}" class="sb-link {% block nav_inventario %}{% endblock %}">
-        <i class="bi bi-box-seam"></i><span class="sb-label">Inventario</span>
-      </a>
-      <span class="sb-tip">Inventario</span>
-    </div>
-    <div class="sb-item">
-      <a href="{% url 'app_admin:productos' %}" class="sb-link {% block nav_productos %}{% endblock %}">
-        <i class="bi bi-bag"></i><span class="sb-label">Productos</span>
-      </a>
-      <span class="sb-tip">Productos</span>
-    </div>
-    <div class="sb-item">
-      <a href="{% url 'app_admin:ingredientes' %}" class="sb-link {% block nav_ingredientes %}{% endblock %}">
-        <i class="bi bi-basket"></i><span class="sb-label">Ingredientes</span>
-      </a>
-      <span class="sb-tip">Ingredientes</span>
-    </div>
-    <div class="sb-item">
-      <a href="{% url 'app_admin:insumos' %}" class="sb-link {% block nav_insumos %}{% endblock %}">
-        <i class="bi bi-box2"></i><span class="sb-label">Insumos</span>
-      </a>
-      <span class="sb-tip">Insumos</span>
-    </div>
-    <div class="sb-item">
-      <a href="{% url 'app_admin:pedidos' %}" class="sb-link {% block nav_pedidos %}{% endblock %}">
-        <i class="bi bi-receipt"></i><span class="sb-label">Pedidos</span>
-      </a>
-      <span class="sb-tip">Pedidos de Estudiantes</span>
-    </div>
-    <div class="sb-item">
-      <a href="{% url 'app_admin:pedidos_docentes' %}" class="sb-link {% block nav_pedidos_docentes %}{% endblock %}">
-        <i class="bi bi-receipt"></i><span class="sb-label">Pedidos Docentes</span>
-      </a>
-      <span class="sb-tip">Pedidos de Docentes</span>
-    </div>
-
-    <span class="sb-section-label">Gestión</span>
-
-    <div class="sb-item">
-      <a href="{% url 'app_admin:proveedores' %}" class="sb-link {% block nav_proveedores %}{% endblock %}">
-        <i class="bi bi-truck"></i><span class="sb-label">Proveedores</span>
-      </a>
-      <span class="sb-tip">Proveedores</span>
-    </div>
-    <div class="sb-item">
-      <a href="{% url 'app_admin:usuarios' %}" class="sb-link {% block nav_usuarios %}{% endblock %}">
-        <i class="bi bi-people"></i><span class="sb-label">Usuarios</span>
-      </a>
-      <span class="sb-tip">Usuarios</span>
-    </div>
-    <div class="sb-item">
-      <a href="{% url 'app_admin:recargas' %}" class="sb-link {% block nav_recargas %}{% endblock %}">
-        <i class="bi bi-cash-coin"></i><span class="sb-label">Recargas</span>
-      </a>
-      <span class="sb-tip">Recargas de Saldo</span>
-    </div>
-    <div class="sb-item">
-      <a href="{% url 'app_admin:estadisticas' %}" class="sb-link {% block nav_estadisticas %}{% endblock %}">
-        <i class="bi bi-bar-chart-line"></i><span class="sb-label">Estadísticas</span>
-      </a>
-      <span class="sb-tip">Estadísticas</span>
+    <!-- Operaciones (cerrado por defecto) -->
+    <button type="button" class="sb-section-label closed" onclick="toggleSection('operaciones')" id="sec-btn-operaciones">
+      <span>Operaciones</span>
+      <i class="bi bi-chevron-down sb-sec-chevron"></i>
+    </button>
+    <div class="sb-section-items collapsed" id="sec-operaciones">
+      <div class="sb-item">
+        <a href="{% url 'app_admin:inventario' %}" class="sb-link {% block nav_inventario %}{% endblock %}">
+          <i class="bi bi-box-seam"></i><span class="sb-label">Inventario</span>
+        </a>
+        <span class="sb-tip">Inventario</span>
+      </div>
+      <div class="sb-item">
+        <a href="{% url 'app_admin:productos' %}" class="sb-link {% block nav_productos %}{% endblock %}">
+          <i class="bi bi-bag"></i><span class="sb-label">Productos</span>
+        </a>
+        <span class="sb-tip">Productos</span>
+      </div>
+      <div class="sb-item">
+        <a href="{% url 'app_admin:ingredientes' %}" class="sb-link {% block nav_ingredientes %}{% endblock %}">
+          <i class="bi bi-basket"></i><span class="sb-label">Ingredientes</span>
+        </a>
+        <span class="sb-tip">Ingredientes</span>
+      </div>
+      <div class="sb-item">
+        <a href="{% url 'app_admin:producciones' %}" class="sb-link {% block nav_producciones %}{% endblock %}">
+          <i class="bi bi-fire"></i><span class="sb-label">Producciones</span>
+        </a>
+        <span class="sb-tip">Producciones</span>
+      </div>
+      <div class="sb-item">
+        <a href="{% url 'app_admin:insumos' %}" class="sb-link {% block nav_insumos %}{% endblock %}">
+          <i class="bi bi-box2"></i><span class="sb-label">Insumos</span>
+        </a>
+        <span class="sb-tip">Insumos</span>
+      </div>
+      <div class="sb-item">
+        <a href="{% url 'app_admin:pedidos' %}" class="sb-link {% block nav_pedidos %}{% endblock %}">
+          <i class="bi bi-receipt"></i>
+          <span class="sb-label">Pedidos</span>
+        </a>
+        <span class="sb-tip">Pedidos</span>
+      </div>
     </div>
 
-    <span class="sb-section-label">Tienda Física</span>
-
-    <div class="sb-item">
-      <a href="{% url 'app_admin:empleados' %}" class="sb-link {% block nav_empleados %}{% endblock %}">
-        <i class="bi bi-person-badge"></i><span class="sb-label">Empleados</span>
-      </a>
-      <span class="sb-tip">Empleados</span>
+    <!-- Gestión (cerrado por defecto) -->
+    <button type="button" class="sb-section-label closed" onclick="toggleSection('gestion')" id="sec-btn-gestion">
+      <span>Gestión</span>
+      <i class="bi bi-chevron-down sb-sec-chevron"></i>
+    </button>
+    <div class="sb-section-items collapsed" id="sec-gestion">
+      <div class="sb-item">
+        <a href="{% url 'app_admin:proveedores' %}" class="sb-link {% block nav_proveedores %}{% endblock %}">
+          <i class="bi bi-truck"></i><span class="sb-label">Proveedores</span>
+        </a>
+        <span class="sb-tip">Proveedores</span>
+      </div>
+      <div class="sb-item">
+        <a href="{% url 'app_admin:usuarios' %}" class="sb-link {% block nav_usuarios %}{% endblock %}">
+          <i class="bi bi-people"></i><span class="sb-label">Usuarios</span>
+        </a>
+        <span class="sb-tip">Usuarios</span>
+      </div>
+      <div class="sb-item">
+        <a href="{% url 'app_admin:recargas' %}" class="sb-link {% block nav_recargas %}{% endblock %}">
+          <i class="bi bi-cash-coin"></i><span class="sb-label">Recargas de Saldo</span>
+        </a>
+        <span class="sb-tip">Recargas de Saldo</span>
+      </div>
+      <div class="sb-item">
+        <a href="{% url 'app_admin:estadisticas' %}" class="sb-link {% block nav_estadisticas %}{% endblock %}">
+          <i class="bi bi-bar-chart-line"></i><span class="sb-label">Estadísticas</span>
+        </a>
+        <span class="sb-tip">Estadísticas</span>
+      </div>
     </div>
-    <div class="sb-item">
-      <a href="{% url 'app_admin:sedes' %}" class="sb-link {% block nav_sedes %}{% endblock %}">
-        <i class="bi bi-geo-alt"></i><span class="sb-label">Sedes</span>
-      </a>
-      <span class="sb-tip">Sedes</span>
+
+    <!-- Tienda Física (cerrado por defecto) -->
+    <button type="button" class="sb-section-label closed" onclick="toggleSection('tienda')" id="sec-btn-tienda">
+      <span>Tienda Física</span>
+      <i class="bi bi-chevron-down sb-sec-chevron"></i>
+    </button>
+    <div class="sb-section-items collapsed" id="sec-tienda">
+      <div class="sb-item">
+        <a href="{% url 'app_admin:empleados' %}" class="sb-link {% block nav_empleados %}{% endblock %}">
+          <i class="bi bi-person-badge"></i><span class="sb-label">Empleados</span>
+        </a>
+        <span class="sb-tip">Empleados</span>
+      </div>
+      <div class="sb-item">
+        <a href="{% url 'app_admin:sedes' %}" class="sb-link {% block nav_sedes %}{% endblock %}">
+          <i class="bi bi-geo-alt"></i><span class="sb-label">Sedes</span>
+        </a>
+        <span class="sb-tip">Sedes</span>
+      </div>
+      <div class="sb-item">
+        <a href="{% url 'app_admin:carnets' %}" class="sb-link {% block nav_carnets %}{% endblock %}">
+          <i class="bi bi-qr-code"></i><span class="sb-label">Carnets QR</span>
+        </a>
+        <span class="sb-tip">Carnets QR</span>
+      </div>
     </div>
 
-    <span class="sb-section-label">Registros</span>
-
-    <div class="sb-item">
-      <a href="{% url 'app_admin:historial' %}" class="sb-link {% block nav_historial %}{% endblock %}">
-        <i class="bi bi-clock-history"></i><span class="sb-label">Historial</span>
-      </a>
-      <span class="sb-tip">Historial</span>
-    </div>
-    <div class="sb-item">
-      <a href="{% url 'app_admin:calendario' %}" class="sb-link {% block nav_calendario %}{% endblock %}">
-        <i class="bi bi-calendar3"></i><span class="sb-label">Calendario</span>
-      </a>
-      <span class="sb-tip">Calendario</span>
+    <!-- Registros (cerrado por defecto) -->
+    <button type="button" class="sb-section-label closed" onclick="toggleSection('registros')" id="sec-btn-registros">
+      <span>Registros</span>
+      <i class="bi bi-chevron-down sb-sec-chevron"></i>
+    </button>
+    <div class="sb-section-items collapsed" id="sec-registros">
+      <div class="sb-item">
+        <a href="{% url 'app_admin:historial' %}" class="sb-link {% block nav_historial %}{% endblock %}">
+          <i class="bi bi-clock-history"></i><span class="sb-label">Historial</span>
+        </a>
+        <span class="sb-tip">Historial</span>
+      </div>
+      <div class="sb-item">
+        <a href="{% url 'app_admin:calendario' %}" class="sb-link {% block nav_calendario %}{% endblock %}">
+          <i class="bi bi-calendar3"></i><span class="sb-label">Calendario</span>
+        </a>
+        <span class="sb-tip">Calendario</span>
+      </div>
     </div>
   </nav>
 
@@ -192,6 +222,10 @@
     </div>
     <div class="topbar-right">
       {% block topbar_actions %}{% endblock %}
+
+      <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Cambiar tema">
+        <i class="bi bi-moon" id="themeIcon"></i>
+      </button>
 
       <!-- Campana de alertas -->
       <button class="alert-bell" onclick="toggleAlertPanel()" id="alertBell" title="Alertas">
@@ -266,27 +300,149 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 </script>
+
 {% block extra_js %}{% endblock %}
+
 <script>
-// ── Sidebar ──────────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// SIDEBAR - CORREGIDO (sin flash, sin manipulación inline de maxHeight)
+// ══════════════════════════════════════════════════════════════════════════════
+
 const STORAGE_KEY = 'sb_closed';
 
 function applySidebarState() {
   const isMobile = window.innerWidth <= 640;
   const stored = localStorage.getItem(STORAGE_KEY);
-  // En móvil: cerrado por defecto salvo que el usuario lo haya abierto explícitamente
   const closed = isMobile ? stored !== '0' : stored === '1';
   document.body.classList.toggle('sb-closed', closed);
   const icon = document.getElementById('sb-toggle-icon');
   if (icon) icon.className = closed ? 'bi bi-layout-sidebar' : 'bi bi-layout-sidebar-reverse';
 }
+
 function toggleSidebar() {
+  document.body.classList.add('sb-no-animate');
   const closed = document.body.classList.toggle('sb-closed');
   localStorage.setItem(STORAGE_KEY, closed ? '1' : '0');
   const icon = document.getElementById('sb-toggle-icon');
   if (icon) icon.className = closed ? 'bi bi-layout-sidebar' : 'bi bi-layout-sidebar-reverse';
+  setTimeout(() => document.body.classList.remove('sb-no-animate'), 300);
 }
+
+// Aplicar estado al cargar la página (esto soluciona el problema de navegación)
 applySidebarState();
+
+window.addEventListener('resize', function() {
+  applySidebarState();
+});
+
+// ── Accordion sections (sin manipulaciones de maxHeight inline) ────────────────
+const SB_SECTIONS = ['operaciones', 'gestion', 'tienda', 'registros'];
+
+function openSection(id) {
+  const items = document.getElementById('sec-' + id);
+  const btn = document.getElementById('sec-btn-' + id);
+  if (items) items.classList.remove('collapsed');
+  if (btn) btn.classList.remove('closed');
+}
+
+function closeSection(id) {
+  const items = document.getElementById('sec-' + id);
+  const btn = document.getElementById('sec-btn-' + id);
+  if (items) items.classList.add('collapsed');
+  if (btn) btn.classList.add('closed');
+}
+
+function toggleSection(id) {
+  const items = document.getElementById('sec-' + id);
+  if (!items) return;
+  const wasOpen = !items.classList.contains('collapsed');
+  if (wasOpen) {
+    closeSection(id);
+    localStorage.setItem('sec_' + id, '0');
+  } else {
+    openSection(id);
+    localStorage.setItem('sec_' + id, '1');
+  }
+}
+
+function initAccordion() {
+  SB_SECTIONS.forEach(function(id) {
+    const items = document.getElementById('sec-' + id);
+    if (!items) return;
+    // Limpiar cualquier inline style residual
+    items.style.maxHeight = '';
+    // Verificar si hay un enlace activo dentro de la sección
+    const hasActive = items.querySelector('.active');
+    if (hasActive) {
+      openSection(id);
+      localStorage.setItem('sec_' + id, '1');
+      return;
+    }
+    const saved = localStorage.getItem('sec_' + id);
+    const open = saved !== null ? saved === '1' : false; // Por defecto cerrado
+    if (open) openSection(id);
+    else closeSection(id);
+  });
+}
+
+// ── Submenu Pedidos ───────────────────────────────────────────────────────────
+function toggleSubMenu(id) {
+  const sub = document.getElementById('sub-' + id);
+  const btn = document.getElementById('sub-btn-' + id);
+  if (!sub || !btn) return;
+  const wasOpen = !sub.classList.contains('collapsed');
+  if (wasOpen) {
+    sub.classList.add('collapsed');
+    btn.classList.add('sub-collapsed');
+    localStorage.setItem('sub_' + id, '0');
+  } else {
+    sub.classList.remove('collapsed');
+    btn.classList.remove('sub-collapsed');
+    localStorage.setItem('sub_' + id, '1');
+  }
+}
+
+function initSubMenus() {
+  const sub = document.getElementById('sub-pedidos');
+  const btn = document.getElementById('sub-btn-pedidos');
+  if (!sub || !btn) return;
+  sub.style.maxHeight = '';
+  if (sub.querySelector('.active')) {
+    sub.classList.remove('collapsed');
+    btn.classList.remove('sub-collapsed');
+    return;
+  }
+  const saved = localStorage.getItem('sub_pedidos');
+  if (saved === '0') {
+    sub.classList.add('collapsed');
+    btn.classList.add('sub-collapsed');
+  } else {
+    sub.classList.remove('collapsed');
+    btn.classList.remove('sub-collapsed');
+  }
+}
+
+// Inicializar todo después de que el DOM esté listo
+document.addEventListener('DOMContentLoaded', function() {
+  initAccordion();
+  initSubMenus();
+});
+
+// ── Theme toggle ──────────────────────────────────────────────────────────────
+function toggleTheme() {
+  var html = document.documentElement;
+  var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  document.body.classList.add('theme-transitioning');
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+  var icon = document.getElementById('themeIcon');
+  if (icon) icon.className = next === 'dark' ? 'bi bi-sun' : 'bi bi-moon';
+  setTimeout(function(){ document.body.classList.remove('theme-transitioning'); }, 250);
+}
+document.addEventListener('DOMContentLoaded', function(){
+  var icon = document.getElementById('themeIcon');
+  if (icon) icon.className = document.documentElement.getAttribute('data-theme') === 'dark' ? 'bi bi-sun' : 'bi bi-moon';
+});
 
 // ── Dropdown usuario ─────────────────────────────────────────────────────────
 function toggleUserDrop() { document.getElementById('userDrop').classList.toggle('open'); }
@@ -349,6 +505,76 @@ document.addEventListener('click', function(e) {
 });
 cargarAlertas();
 </script>
+
+<!-- ══ PA CONFIRM MODAL ══ -->
+<div id="pa-confirm" class="pa-overlay" onclick="if(event.target===this)paCerrarConfirm()">
+  <div class="pa-confirm-box">
+    <div class="pa-confirm-icon" id="pa-confirm-icon"><i class="bi bi-trash3-fill"></i></div>
+    <div class="pa-confirm-title" id="pa-confirm-title">¿Confirmar acción?</div>
+    <p class="pa-confirm-msg" id="pa-confirm-msg"></p>
+    <div class="pa-confirm-actions">
+      <button type="button" class="btn btn-ghost" id="pa-cancel-btn" onclick="paCerrarConfirm()">Cancelar</button>
+      <button type="button" class="btn btn-danger" id="pa-confirm-ok">Confirmar</button>
+    </div>
+  </div>
+</div>
+<!-- ══ PA TOAST ══ -->
+<div id="pa-toast" class="pa-toast">
+  <i class="bi bi-exclamation-triangle-fill pa-toast-icon"></i>
+  <span class="pa-toast-msg"></span>
+  <button type="button" onclick="this.closest('.pa-toast').classList.remove('open')" class="pa-toast-close"><i class="bi bi-x"></i></button>
+</div>
+<script>
+function paShowConfirm(msg, onConfirm, opts) {
+  opts = opts || {};
+  var t = opts.type || 'danger';
+  var icon = document.getElementById('pa-confirm-icon');
+  icon.className = 'pa-confirm-icon'+(t==='warn'?' warn':t==='info'?' info':t==='leaf'?' leaf':'');
+  icon.innerHTML = t==='warn'  ? '<i class="bi bi-exclamation-triangle-fill"></i>' :
+                   t==='info'  ? '<i class="bi bi-bell-fill"></i>' :
+                   t==='leaf'  ? '<i class="bi bi-check-circle-fill"></i>' :
+                                 '<i class="bi bi-trash3-fill"></i>';
+  document.getElementById('pa-confirm-title').textContent = opts.title || '¿Confirmar acción?';
+  document.getElementById('pa-confirm-msg').textContent = msg;
+  var ok = document.getElementById('pa-confirm-ok');
+  ok.className = 'btn '+(t==='warn'?'btn-amber':t==='info'||t==='leaf'?'btn-primary':'btn-danger');
+  ok.textContent = opts.okText || 'Confirmar';
+  ok.onclick = function() { paCerrarConfirm(); onConfirm(); };
+  document.getElementById('pa-cancel-btn').style.display = opts.hideCancel ? 'none' : '';
+  document.getElementById('pa-confirm').classList.add('open');
+}
+function paCerrarConfirm() { document.getElementById('pa-confirm').classList.remove('open'); }
+function paShowToast(msg, type) {
+  var t = document.getElementById('pa-toast');
+  if (!t) return;
+  t.querySelector('.pa-toast-msg').textContent = msg;
+  t.className = 'pa-toast '+(type||'warn')+' open';
+  clearTimeout(t._tid);
+  t._tid = setTimeout(function(){ t.classList.remove('open'); }, 4000);
+}
+document.addEventListener('keydown', function(e){ if(e.key==='Escape') paCerrarConfirm(); });
+window.addEventListener('pageshow', function(e){ if(e.persisted) paCerrarConfirm(); });
+document.addEventListener('submit', function(e) {
+  var form = e.target.closest('form[data-pa-confirm]');
+  if (!form) return;
+  if (form._paOk) { form._paOk = false; return; }
+  e.preventDefault();
+  paShowConfirm(form.dataset.paConfirm, function(){
+    form._paOk = true; form.submit();
+  }, { type: form.dataset.paType, title: form.dataset.paTitle, okText: form.dataset.paOk });
+}, true);
+document.addEventListener('click', function(e) {
+  var el = e.target.closest('[data-pa-confirm]');
+  if (!el || el.tagName === 'FORM') return;
+  if (el._paOk) { el._paOk = false; return; }
+  e.preventDefault(); e.stopImmediatePropagation();
+  paShowConfirm(el.dataset.paConfirm, function(){
+    if (el.tagName === 'A') { location.href = el.href; }
+    else { el._paOk = true; el.click(); }
+  }, { type: el.dataset.paType, title: el.dataset.paTitle, okText: el.dataset.paOk });
+}, true);
+</script>
+
 <script>
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});

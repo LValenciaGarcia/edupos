@@ -49,8 +49,13 @@ urlpatterns = [
     path('historial/api/',                      views.historial_api,            name='historial_api'),
 
     # ── Calendario de movimientos ──────────────────────────────────────────
-    path('calendario/',                         views.calendario,               name='calendario'),
-    path('calendario/api/',                     views.calendario_api,           name='calendario_api'),
+    path('calendario/',                              views.calendario,                      name='calendario'),
+    path('calendario/api/',                          views.calendario_api,                  name='calendario_api'),
+    path('calendario/ical/<str:token>/',             views.calendario_ical,                 name='calendario_ical'),
+    path('calendario/google/auth/',                  views.calendario_google_auth,          name='calendario_google_auth'),
+    path('calendario/google/callback/',              views.calendario_google_callback,      name='calendario_google_callback'),
+    path('calendario/google/sync/',                  views.calendario_google_sync,          name='calendario_google_sync'),
+    path('calendario/google/disconnect/',            views.calendario_google_disconnect,    name='calendario_google_disconnect'),
 
     # ── Proveedores ────────────────────────────────────────────────────────
     path('proveedores/',                        views.proveedores,              name='proveedores'),
@@ -133,4 +138,8 @@ urlpatterns = [
     # ── Sedes ──────────────────────────────────────────────────────────────
     path('sedes/',                              views.sedes,                    name='sedes'),
     path('sedes/<int:pk>/toggle/',              views.sede_toggle,              name='sede_toggle'),
+
+    # ── Carnets QR (impresión) ─────────────────────────────────────────────
+    path('carnets/',                            views.carnets,           name='carnets'),
+    path('carnets/pdf/',                        views.carnets_pdf,       name='carnets_pdf'),
 ]

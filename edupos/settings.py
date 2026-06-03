@@ -1,18 +1,37 @@
 from pathlib import Path
+import os
 import environ
+import dj_database_url
+from dotenv import load_dotenv
+
+load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ─── Variables de entorno ─────────────────────────────────────────────────────
 env = environ.Env(
     DEBUG=(bool, False),
+    DEBUG_TOOLBAR_ENABLED=(bool, True),
     ALLOWED_HOSTS=(list, ['localhost', '127.0.0.1', '192.168.1.9']),
 )
 environ.Env.read_env(BASE_DIR / '.env')
 
 SECRET_KEY   = env('SECRET_KEY')
 DEBUG        = env('DEBUG')
-ALLOWED_HOSTS = env('ALLOWED_HOSTS')
+DEBUG_TOOLBAR_ENABLED = env('DEBUG_TOOLBAR_ENABLED')
+ALLOWED_HOSTS = env('ALLOWED_HOSTS') + ['.railway.app']
+
+CSRF_TRUSTED_ORIGINS = env.list(
+    'CSRF_TRUSTED_ORIGINS',
+    default=['http://localhost', 'http://127.0.0.1', 'https://cohesive-salutary-irritable.ngrok-free.dev']
+)
+
+# ─── Cloudinary ──────────────────────────────────────────────────────────────
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': env('CLOUDINARY_CLOUD_NAME', default=''),
+    'API_KEY':    env('CLOUDINARY_API_KEY',    default=''),
+    'API_SECRET': env('CLOUDINARY_API_SECRET', default=''),
+}
 
 # ─── Aplicaciones ─────────────────────────────────────────────────────────────
 INSTALLED_APPS = [
@@ -23,6 +42,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     # Librerías de terceros
+    'cloudinary',
+    'cloudinary_storage',
     'axes',
     'simple_history',
     'csp',
@@ -41,10 +62,11 @@ INSTALLED_APPS = [
     'app_padre',
     'app_docente',
     'app_empleado',
+    'pagos',
 ]
 SITE_ID = 1
 
-if DEBUG:
+if DEBUG and env('DEBUG_TOOLBAR_ENABLED'):
     INSTALLED_APPS += ['debug_toolbar']
 
 # ─── Autenticación ────────────────────────────────────────────────────────────
@@ -73,7 +95,7 @@ MIDDLEWARE = [
     'axes.middleware.AxesMiddleware',   # ← al final para no interferir con allauth
 ]
 
-if DEBUG:
+if DEBUG and env('DEBUG_TOOLBAR_ENABLED'):
     MIDDLEWARE += ['debug_toolbar.middleware.DebugToolbarMiddleware']
 
 ROOT_URLCONF = 'edupos.urls'
@@ -97,9 +119,11 @@ TEMPLATES = [
 WSGI_APPLICATION = 'edupos.wsgi.application'
 
 # ─── Base de datos ────────────────────────────────────────────────────────────
-DATABASES = {
-    'default': env.db(default=f'sqlite:///{BASE_DIR / "db.sqlite3"}')
-}
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if DATABASE_URL:
+    DATABASES = {'default': dj_database_url.config(default=DATABASE_URL, conn_max_age=600)}
+else:
+    DATABASES = {'default': {'ENGINE': 'django.db.backends.sqlite3', 'NAME': BASE_DIR / 'db.sqlite3'}}
 
 # ─── Validadores de contraseña ────────────────────────────────────────────────
 AUTH_PASSWORD_VALIDATORS = [
@@ -124,7 +148,11 @@ MEDIA_ROOT    = BASE_DIR / 'media'
 
 STORAGES = {
     'default': {
-        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        'BACKEND': (
+            'cloudinary_storage.storage.MediaCloudinaryStorage'
+            if not DEBUG
+            else 'django.core.files.storage.FileSystemStorage'
+        ),
     },
     'staticfiles': {
         'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
@@ -174,7 +202,7 @@ CONTENT_SECURITY_POLICY = {
             'fonts.gstatic.com',
             'cdn.jsdelivr.net',
         ),
-        'img-src': ("'self'", 'data:', 'blob:'),
+        'img-src': ("'self'", 'data:', 'blob:', 'res.cloudinary.com'),
         'connect-src': ("'self'",),
         'frame-ancestors': ("'none'",),
     }
@@ -239,7 +267,7 @@ ACCOUNT_EMAIL_VERIFICATION = 'none'
 SOCIALACCOUNT_AUTO_SIGNUP  = True
 SOCIALACCOUNT_LOGIN_ON_GET = True
 SOCIALACCOUNT_ADAPTER      = 'authentication.adapters.RolSocialAccountAdapter'
-ACCOUNT_ADAPTER             = 'allauth.account.adapter.DefaultAccountAdapter'
+ACCOUNT_ADAPTER            = 'allauth.account.adapter.DefaultAccountAdapter'
 
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
@@ -249,7 +277,24 @@ SOCIALACCOUNT_PROVIDERS = {
             'key': ''
         },
         'SCOPE': ['profile', 'email'],
-        'AUTH_PARAMS': {'access_type': 'online'},
+        'AUTH_PARAMS': {
+            'access_type': 'online',
+            'prompt': 'select_account consent',  
+        },
         'OAUTH_PKCE_ENABLED': True,
     }
 }
+# ─── Google Calendar API ─────────────────────────────────────────────────────
+# Reutiliza las mismas credenciales OAuth del login social (allauth)
+GOOGLE_CLIENT_ID     = env('GOOGLE_CLIENT_ID', default='')
+GOOGLE_CLIENT_SECRET = env('GOOGLE_SECRET', default='')
+
+# ─── ngrok (solo en desarrollo) ──────────────────────────────────────────────
+if DEBUG:
+    USE_X_FORWARDED_HOST = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# ─── MercadoPago ─────────────────────────────────────────────────────────────
+MERCADOPAGO_ACCESS_TOKEN  = env('MERCADOPAGO_ACCESS_TOKEN',  default='')
+MERCADOPAGO_WEBHOOK_SECRET = env('MERCADOPAGO_WEBHOOK_SECRET', default='')
+SITE_URL = env('SITE_URL', default='http://127.0.0.1:8000')

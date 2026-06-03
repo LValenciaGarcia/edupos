@@ -1,44 +1,60 @@
 {% extends 'app_empleado/base_empleado.html' %}
 {% load static %}
+{% load filtros %}
 
 {% block title %}Inventario{% endblock %}
 {% block page_title %}Inventario{% endblock %}
 {% block nav_inventario %}active{% endblock %}
 
 {% block content %}
-<div style="display:flex;flex-direction:column;gap:1.25rem;">
+<div class="emp-page">
 
-  <!-- Resumen de stock -->
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;" class="anim-1">
-    <div class="emp-stat">
-      <div class="emp-stat-icon"><i class="bi bi-bag-check"></i></div>
-      <div class="emp-stat-label">Productos disponibles</div>
-      <div class="emp-stat-val">{{ total_productos }}</div>
-      <div class="emp-stat-sub">en catálogo activo</div>
+  <div class="emp-hero">
+    <div>
+      <div class="emp-hero-eyebrow"><i class="bi bi-box-seam"></i> Consulta</div>
+      <div class="emp-hero-title">Inventario</div>
+      <div class="emp-hero-sub">Vista de solo lectura — los precios y stock los gestiona el administrador.</div>
+    </div>
+    <div class="emp-hero-right">
+      {% if stock_bajo_count %}
+        <span class="emp-hero-chip emp-hero-chip-amber">
+          <i class="bi bi-exclamation-triangle-fill"></i> {{ stock_bajo_count }} stock bajo
+        </span>
+      {% endif %}
+      {% if sin_stock_count %}
+        <span class="emp-hero-chip emp-hero-chip-red">
+          <i class="bi bi-x-circle-fill"></i> {{ sin_stock_count }} agotados
+        </span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card green">
+      <div class="stat-label">Disponibles</div>
+      <div class="stat-val">{{ total_productos }}</div>
+      <div class="stat-sub">en catálogo activo</div>
     </div>
     {% if stock_bajo_count %}
-    <div class="emp-stat">
-      <div class="emp-stat-icon" style="background:var(--amber-tint);color:var(--amber-dark);"><i class="bi bi-exclamation-triangle"></i></div>
-      <div class="emp-stat-label">Stock bajo</div>
-      <div class="emp-stat-val" style="color:var(--amber);">{{ stock_bajo_count }}</div>
-      <div class="emp-stat-sub">por debajo del mínimo</div>
+    <div class="stat-card amber">
+      <div class="stat-label">Stock bajo</div>
+      <div class="stat-val">{{ stock_bajo_count }}</div>
+      <div class="stat-sub">por debajo del mínimo</div>
     </div>
     {% endif %}
     {% if sin_stock_count %}
-    <div class="emp-stat">
-      <div class="emp-stat-icon" style="background:var(--red-pale);color:var(--red-dark);"><i class="bi bi-x-circle"></i></div>
-      <div class="emp-stat-label">Sin stock</div>
-      <div class="emp-stat-val" style="color:var(--red);">{{ sin_stock_count }}</div>
-      <div class="emp-stat-sub">agotados</div>
+    <div class="stat-card red">
+      <div class="stat-label">Sin stock</div>
+      <div class="stat-val">{{ sin_stock_count }}</div>
+      <div class="stat-sub">agotados</div>
     </div>
     {% endif %}
   </div>
 
-  <!-- Filtros -->
-  <div class="card anim-2" style="padding:1rem 1.25rem;">
-    <form method="get" style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center;">
+  <div class="filter-bar">
+    <form method="get" style="display:contents;">
       <input type="text" name="q" value="{{ q }}" class="form-input"
-             placeholder="Buscar producto..." style="flex:1;min-width:180px;">
+             placeholder="Buscar producto…" style="flex:1;min-width:180px;">
       <select name="cat" class="form-input" style="width:auto;">
         <option value="">Todas las categorías</option>
         {% for cat in categorias %}
@@ -46,15 +62,16 @@
         {% endfor %}
       </select>
       <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
-      {% if q or cat_id %}<a href="{% url 'app_empleado:inventario' %}" class="btn btn-ghost btn-sm">Limpiar</a>{% endif %}
+      {% if q or cat_id %}
+        <a href="{% url 'app_empleado:inventario' %}" class="btn btn-ghost btn-sm">Limpiar</a>
+      {% endif %}
     </form>
   </div>
 
-  <!-- Grid de productos -->
-  <div class="card anim-3">
-    <div class="card-head" style="display:flex;align-items:center;justify-content:space-between;">
-      <span>Productos</span>
-      <span style="font-size:var(--text-xs);color:var(--ash);">Solo lectura — no puedes modificar precios ni stock</span>
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Productos</span>
+      <span style="font-size:var(--text-xs);color:var(--ash);">Solo lectura</span>
     </div>
     {% if productos %}
     <div class="inv-grid">
@@ -70,7 +87,7 @@
         <div class="inv-card-body">
           <div class="inv-card-name">{{ p.nombre }}</div>
           <div class="inv-card-cat">{{ p.categoria.get_nombre_display }}</div>
-          <div class="inv-card-price">${{ p.precio_venta|floatformat:0 }}</div>
+          <div class="inv-card-price">${{ p.precio_venta|miles }}</div>
           {% if p.tipo == 'simple' %}
           <div class="inv-stock-row">
             {% if p.sin_stock %}
@@ -98,9 +115,10 @@
       {% endfor %}
     </div>
     {% else %}
-    <div style="padding:2.5rem;text-align:center;color:var(--ash);">
-      <i class="bi bi-box-seam" style="font-size:2.5rem;display:block;margin-bottom:.5rem;color:var(--fog);"></i>
-      No se encontraron productos con ese filtro.
+    <div class="empty-state">
+      <i class="bi bi-box-seam es-icon"></i>
+      <h3>Sin resultados</h3>
+      <p>No se encontraron productos con ese filtro.</p>
     </div>
     {% endif %}
   </div>

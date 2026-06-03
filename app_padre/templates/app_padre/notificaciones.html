@@ -74,7 +74,7 @@
     {% endif %}
   </div>
   {% if notificaciones %}
-  <form method="post" onsubmit="return confirm('¿Eliminar todas las notificaciones leídas?')">
+  <form method="post" data-pa-confirm="¿Eliminar todas las notificaciones leídas?" data-pa-ok="Eliminar">
     {% csrf_token %}
     <input type="hidden" name="action" value="eliminar_leidas">
     <button type="submit" class="btn btn-danger btn-sm"><i class="bi bi-trash"></i> Limpiar leídas</button>
@@ -122,7 +122,7 @@
         <button type="submit" class="btn btn-ghost btn-xs" title="Marcar leída"><i class="bi bi-check2"></i></button>
       </form>
       {% endif %}
-      <form method="post" onsubmit="return confirm('¿Eliminar esta notificación?')">
+      <form method="post" data-pa-confirm="¿Eliminar esta notificación?" data-pa-ok="Eliminar">
         {% csrf_token %}
         <input type="hidden" name="action" value="eliminar">
         <input type="hidden" name="notif_id" value="{{ notif.pk }}">

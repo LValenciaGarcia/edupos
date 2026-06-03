@@ -731,3 +731,25 @@ class PerfilAdmin(models.Model):
     class Meta:
         verbose_name = 'Perfil Administrador'
         verbose_name_plural = 'Perfiles Administrador'
+
+
+# ─── GOOGLE CALENDAR ──────────────────────────────────────────────────────────
+
+class GoogleCalendarToken(models.Model):
+    """Token OAuth2 de Google Calendar vinculado a un PerfilAdmin."""
+    admin         = models.OneToOneField(
+        PerfilAdmin, on_delete=models.CASCADE, related_name='gcal'
+    )
+    access_token  = models.TextField()
+    refresh_token = models.TextField(blank=True)
+    token_expiry  = models.DateTimeField(null=True, blank=True)
+    gcal_id       = models.CharField(max_length=300, default='primary',
+                                     help_text='ID del calendario de Google (se asigna automáticamente)')
+    synced_at     = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f'GCal token — {self.admin}'
+
+    class Meta:
+        verbose_name = 'Token Google Calendar'
+        verbose_name_plural = 'Tokens Google Calendar'

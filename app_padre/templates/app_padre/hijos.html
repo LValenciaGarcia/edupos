@@ -89,10 +89,10 @@
   <div class="hijo-header">
     <div class="hijo-ava">{{ hijo.perfil.user.first_name|slice:":1"|upper }}</div>
     <div class="hijo-h-info">
-      <div class="hijo-h-name">{{ hijo.perfil.user.get_full_name|default:get_full_name|default:hijo.perfil.user.email }}</div>
+      <div class="hijo-h-name">{{ hijo.perfil.user.get_full_name|default:hijo.perfil.user.email }}</div>
       <div class="hijo-h-meta">Grado {{ hijo.grado }} &nbsp;·&nbsp; Código: {{ hijo.codigo }} &nbsp;·&nbsp; @{{ hijo.perfil.user.email }}</div>
       {% if item.gasto_hoy > 0 %}
-      <div class="gasto-hoy-chip"><i class="bi bi-sun"></i> Gasto hoy: ${{ item.gasto_hoy|floatformat:0|miles }}</div>
+      <div class="gasto-hoy-chip"><i class="bi bi-sun"></i> Gasto hoy: ${{ item.gasto_hoy|miles }}</div>
       {% endif %}
     </div>
     <div class="hijo-h-saldo">
@@ -160,7 +160,7 @@
                  style="width:{{ l.porcentaje_uso }}%;"></div>
           </div>
         </div>
-        <div class="limite-info">{{ l.porcentaje_uso }}% · disp. ${{ l.disponible|floatformat:0|miles }}</div>
+        <div class="limite-info">{{ l.porcentaje_uso }}% · disp. ${{ l.disponible|miles }}</div>
       </div>
       {% endfor %}
     </div>
@@ -177,6 +177,17 @@
     <a href="{% url 'app_padre:pedidos_programados' hijo.pk %}" class="btn btn-violet btn-sm"><i class="bi bi-calendar-plus"></i> Programar pedido</a>
     <a href="{% url 'app_padre:estadisticas' %}?hijo={{ hijo.pk }}" class="btn btn-ghost btn-sm"><i class="bi bi-bar-chart-line"></i> Estadísticas</a>
     <a href="{% url 'app_padre:historial' %}?hijo={{ hijo.pk }}" class="btn btn-ghost btn-sm"><i class="bi bi-clock-history"></i> Historial</a>
+    <!-- Toggle recarga autónoma -->
+    <form method="post" action="{% url 'app_padre:toggle_recarga_autonoma' hijo.pk %}" style="display:inline">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.path }}">
+      <button type="submit"
+              class="btn btn-sm {% if hijo.puede_recargar_autonomo %}btn-sky{% else %}btn-ghost{% endif %}"
+              title="{% if hijo.puede_recargar_autonomo %}Deshabilitar que {{ hijo.perfil.user.first_name }} recargue solo{% else %}Habilitar que {{ hijo.perfil.user.first_name }} recargue solo{% endif %}">
+        <i class="bi {% if hijo.puede_recargar_autonomo %}bi-toggle-on{% else %}bi-toggle-off{% endif %}"></i>
+        Recarga autónoma: {% if hijo.puede_recargar_autonomo %}ON{% else %}OFF{% endif %}
+      </button>
+    </form>
   </div>
 </div>
 {% endwith %}

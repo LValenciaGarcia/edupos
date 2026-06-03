@@ -111,7 +111,7 @@
         <div>
           {% if lote.vencido or lote.cantidad_base == 0 %}
             <form method="post" action="{% url 'app_admin:lote_eliminar' lote.pk %}"
-                  onsubmit="return confirm('¿Eliminar este lote? Esta acción no se puede deshacer.');" style="display:inline;">
+                  data-pa-confirm="¿Eliminar este lote? Esta acción no se puede deshacer." data-pa-ok="Eliminar" style="display:inline;">
               {% csrf_token %}
               <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red);">
                 <i class="bi bi-trash"></i>

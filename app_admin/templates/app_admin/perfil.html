@@ -175,7 +175,7 @@
     </div>
 
     <div class="user-name">
-      {{ perfil_auth.user.get_full_name|default:get_full_name|default:perfil_auth.user.email }}
+      {{ perfil_auth.user.get_full_name|default:perfil_auth.user.email }}
     </div>
     <span class="badge" style="background:var(--green-pale);color:var(--green-mid);display:inline-block;">
       {{ perfil_auth.get_rol_display }}

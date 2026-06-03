@@ -1,0 +1,78 @@
+{% load filtros %}
+<div class="ticket-card" onclick="window.location='{{ pedido.detalle_url }}'">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.25rem;">
+    <div class="ticket-id">{{ pedido.ticket }}</div>
+    {% if pedido.tipo == 'docente' %}
+    <span style="font-size:.65rem;background:var(--purple-pale,#ede9fe);color:#7c3aed;
+                 border-radius:4px;padding:.15rem .45rem;font-weight:600;letter-spacing:.02em;">
+      Docente
+    </span>
+    {% else %}
+    <span style="font-size:.65rem;background:var(--blue-pale,#e0f2fe);color:var(--blue,#0284c7);
+                 border-radius:4px;padding:.15rem .45rem;font-weight:600;letter-spacing:.02em;">
+      Estudiante
+    </span>
+    {% endif %}
+  </div>
+  <div class="ticket-name">{{ pedido.nombre }}</div>
+  <div class="ticket-grade">{{ pedido.subtitulo }}</div>
+  <div class="ticket-items">
+    {% for d in pedido.detalles.all %}
+      {{ d.cantidad }}× {{ d.producto.nombre }}<br>
+    {% endfor %}
+  </div>
+  {% if pedido.nota %}
+  <div style="font-size:.72rem;background:var(--amber-pale);color:var(--amber);
+              border-radius:6px;padding:.3rem .5rem;margin-bottom:.5rem;">
+    <i class="bi bi-chat-left-text"></i> {{ pedido.nota }}
+  </div>
+  {% endif %}
+  <div class="ticket-foot">
+    <span class="ticket-total">${{ pedido.total|miles }}</span>
+    <span class="ticket-time">{{ pedido.fecha_pedido|time:"H:i" }}</span>
+  </div>
+
+  {% if pedido.estado == 'entregado' and pedido.tipo == 'estudiante' %}
+  <div onclick="event.stopPropagation();" style="margin-top:.6rem;">
+    <a href="{% url 'app_admin:factura_vista' pedido.pk %}"
+       class="btn btn-ghost btn-sm btn-full"
+       style="font-size:.72rem;">
+      <i class="bi bi-receipt"></i> Ver factura
+    </a>
+  </div>
+  {% endif %}
+
+  {% if next_estado %}
+  <div onclick="event.stopPropagation();" style="margin-top:.6rem;">
+    {% if confirmar and next_estado == 'entregado' %}
+      <button type="button"
+        onclick="abrirEntrega(
+          '{{ pedido.estado_url }}',
+          '{{ pedido.ticket }}',
+          [{% for d in pedido.detalles.all %}{nombre:'{{ d.producto.nombre|escapejs }}',cantidad:{{ d.cantidad }}},{% endfor %}]
+        )"
+        class="btn btn-primary btn-sm btn-full">
+        <i class="bi bi-check-lg"></i> {{ next_label }}
+      </button>
+    {% else %}
+      <form method="post" action="{{ pedido.estado_url }}">
+        {% csrf_token %}
+        <input type="hidden" name="estado" value="{{ next_estado }}">
+        <input type="hidden" name="next" value="{% url 'app_admin:pedidos' %}">
+        <button type="submit" class="btn btn-primary btn-sm btn-full">
+          <i class="bi bi-arrow-right"></i> {{ next_label }}
+        </button>
+      </form>
+    {% endif %}
+    <form method="post" action="{{ pedido.estado_url }}" style="margin-top:.3rem;">
+      {% csrf_token %}
+      <input type="hidden" name="estado" value="cancelado">
+      <input type="hidden" name="next" value="{% url 'app_admin:pedidos' %}">
+      <button type="submit" class="btn btn-danger btn-sm btn-full"
+              data-pa-confirm="¿Cancelar pedido {{ pedido.ticket }}?" data-pa-ok="Cancelar">
+        <i class="bi bi-x"></i> Cancelar pedido
+      </button>
+    </form>
+  </div>
+  {% endif %}
+</div>

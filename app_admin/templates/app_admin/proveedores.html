@@ -458,10 +458,6 @@
                   onclick='abrirItemsProveedor("{{ prov.nombre|escapejs }}", {{ pd.items_json }})'>
             <i class="bi bi-box-seam"></i> Items
           </button>
-          <button class="action-btn info" title="Ver detalles"
-                  onclick="abrirInfoProveedor({{ prov.pk }})">
-            <i class="bi bi-info-circle"></i>
-          </button>
           <a href="{% url 'app_admin:proveedor_compras' prov.pk %}" class="action-btn historial" title="Historial de compras">
             <i class="bi bi-clock-history"></i>
           </a>
@@ -472,25 +468,6 @@
                   onclick="confirmarEliminarProv('{{ prov.nombre|escapejs }}', '{% url 'app_admin:proveedor_eliminar' prov.pk %}')">
             <i class="bi bi-trash3"></i>
           </button>
-
-          <!-- Data JSON oculta para modal de info -->
-          <script type="application/json" id="prov-data-{{ prov.pk }}">
-          {
-            "nombre":    "{{ prov.nombre|escapejs }}",
-            "nit":       "{{ prov.nit|escapejs }}",
-            "contacto":  "{{ prov.contacto|escapejs }}",
-            "telefono":  "{{ prov.telefono|escapejs }}",
-            "email":     "{{ prov.email|escapejs }}",
-            "direccion": "{{ prov.direccion|escapejs }}",
-            "activo":    {{ prov.activo|yesno:"true,false" }},
-            "total_compras": "${{ prov.total_compras|miles }}",
-            "num_productos": {{ prov.num_productos }},
-            "num_ingredientes": {{ prov.num_ingredientes }},
-            "num_insumos": {{ prov.num_insumos }},
-            "num_compras": {{ prov.num_compras }},
-            "logo_url":  "{% if prov.logo %}{{ prov.logo.url }}{% endif %}"
-          }
-          </script>
         </div>
       </td>
     </tr>
@@ -527,55 +504,6 @@
         </button>
       </div>
     </form>
-  </div>
-</div>
-
-<!-- ── Modal info proveedor ─────────────────────────────────────────────── -->
-<div id="modal-info-prov" class="modal-overlay" onclick="if(event.target===this)cerrarInfoProv()">
-  <div class="info-modal-box">
-    <div class="info-modal-header">
-      <div style="display:flex;align-items:center;gap:0.65rem;">
-        <div id="info-prov-logo" style="width:2.4rem;height:2.4rem;border-radius:10px;background:var(--ink);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;">
-          <i class="bi bi-truck" style="color:var(--leaf-bright);font-size:1.1rem;"></i>
-        </div>
-        <div>
-          <div class="modal-title" id="info-prov-nombre" style="margin-bottom:0;font-size:1.05rem;"></div>
-          <span id="info-prov-nit" style="font-size:0.65rem;color:var(--leaf);font-weight:600;letter-spacing:0.03em;"></span>
-        </div>
-      </div>
-      <button class="info-close" onclick="cerrarInfoProv()"><i class="bi bi-x-lg"></i></button>
-    </div>
-    <div class="info-modal-scroll">
-      <!-- Status badge -->
-      <div id="info-prov-status" style="margin-bottom:1rem;"></div>
-
-      <!-- Contact info -->
-      <div id="info-prov-grid" class="info-grid"></div>
-
-      <!-- Address -->
-      <div id="info-prov-address" style="display:none;margin-bottom:1rem;padding:0.65rem 0.85rem;border-radius:8px;background:var(--cream);border:1px solid var(--mist);">
-        <div style="font-size:0.58rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--ash);margin-bottom:0.25rem;">
-          <i class="bi bi-geo-alt"></i> Direccion
-        </div>
-        <div id="info-prov-address-text" style="font-size:0.82rem;color:var(--ink);"></div>
-      </div>
-
-      <!-- Stats -->
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.55rem;margin-bottom:0.5rem;">
-        <div style="text-align:center;padding:0.7rem;background:var(--leaf-pale);border-radius:8px;">
-          <div id="info-prov-total" style="font-family:var(--serif);font-size:1.1rem;color:var(--leaf-dark);"></div>
-          <div style="font-size:0.58rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--leaf);margin-top:0.15rem;">Total comprado</div>
-        </div>
-        <div style="text-align:center;padding:0.7rem;background:var(--sky-pale);border-radius:8px;">
-          <div id="info-prov-items" style="font-family:var(--serif);font-size:1.1rem;color:var(--sky);"></div>
-          <div style="font-size:0.58rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--sky);margin-top:0.15rem;">Items</div>
-        </div>
-        <div style="text-align:center;padding:0.7rem;background:var(--amber-pale);border-radius:8px;">
-          <div id="info-prov-compras" style="font-family:var(--serif);font-size:1.1rem;color:var(--amber);"></div>
-          <div style="font-size:0.58rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--amber);margin-top:0.15rem;">Compras</div>
-        </div>
-      </div>
-    </div>
   </div>
 </div>
 
@@ -635,66 +563,6 @@ function confirmarEliminarProv(nombre, url) {
 }
 function cerrarElimProv() {
   document.getElementById('modal-eliminar-prov').classList.remove('open');
-}
-
-// ── Modal info proveedor ─────────────────────────────────────────────────
-function abrirInfoProveedor(pk) {
-  const raw = document.getElementById('prov-data-' + pk);
-  if (!raw) return;
-  const d = JSON.parse(raw.textContent);
-
-  document.getElementById('info-prov-nombre').textContent = d.nombre;
-  document.getElementById('info-prov-nit').textContent = d.nit ? 'NIT ' + d.nit : '';
-
-  // Logo
-  const logoEl = document.getElementById('info-prov-logo');
-  if (d.logo_url) {
-    logoEl.innerHTML = '<img src="' + d.logo_url + '" style="width:100%;height:100%;object-fit:contain;border-radius:10px;">';
-  } else {
-    logoEl.innerHTML = '<i class="bi bi-truck" style="color:var(--leaf-bright);font-size:1.1rem;"></i>';
-  }
-
-  // Status
-  const statusEl = document.getElementById('info-prov-status');
-  if (d.activo) {
-    statusEl.innerHTML = '<span class="badge badge-ok"><i class="bi bi-check-circle-fill"></i> Activo</span>';
-  } else {
-    statusEl.innerHTML = '<span class="badge badge-out"><i class="bi bi-x-circle-fill"></i> Inactivo</span>';
-  }
-
-  // Contact grid
-  const grid = document.getElementById('info-prov-grid');
-  const fields = [];
-  if (d.contacto) fields.push({ label: 'Contacto', value: d.contacto });
-  if (d.telefono) fields.push({ label: 'Telefono', value: d.telefono });
-  if (d.email)    fields.push({ label: 'Email', value: d.email });
-  if (d.nit)      fields.push({ label: 'NIT', value: d.nit });
-  grid.innerHTML = fields.map(f => `
-    <div class="info-field">
-      <span class="info-label">${f.label}</span>
-      <span class="info-value">${f.value}</span>
-    </div>
-  `).join('');
-
-  // Address
-  const addrEl = document.getElementById('info-prov-address');
-  const addrText = document.getElementById('info-prov-address-text');
-  if (d.direccion) {
-    addrEl.style.display = '';
-    addrText.textContent = d.direccion;
-  } else {
-    addrEl.style.display = 'none';
-  }
-
-  // Stats
-  document.getElementById('info-prov-total').textContent = d.total_compras;
-  document.getElementById('info-prov-items').textContent = d.num_productos + d.num_ingredientes + d.num_insumos;
-  document.getElementById('info-prov-compras').textContent = d.num_compras;
-
-  document.getElementById('modal-info-prov').classList.add('open');
-}
-function cerrarInfoProv() {
-  document.getElementById('modal-info-prov').classList.remove('open');
 }
 
 // ── Modal items asociados ────────────────────────────────────────────────
@@ -766,7 +634,6 @@ function cerrarItemsProv() {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     cerrarElimProv();
-    cerrarInfoProv();
     cerrarItemsProv();
   }
 });

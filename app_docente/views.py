@@ -22,6 +22,7 @@ from .models import (
     PedidoGrupal, NotificacionDocente,
     RecargaDocente,
 )
+from .services import PedidoDocenteService
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -148,7 +149,9 @@ def menu(request):
     # Reseñas propias del docente
     reseñas_propias = {
         r.producto_id: r
-        for r in ReseñaProducto.objects.filter(docente=docente)
+        for r in ReseñaProducto.objects.filter(docente=docente).only(
+            'producto_id', 'calificacion', 'sentimiento', 'visible', 'razon_rechazo'
+        )
     }
 
     # Promedio de reseñas por producto
@@ -193,15 +196,23 @@ def pedir(request):
 
     items = []
     total = Decimal('0')
+    sin_stock = []
     for item in carrito:
         try:
             p = Producto.objects.get(pk=item['id'], disponible=True)
             cant = max(int(item.get('cantidad', 1)), 1)
+            if p.tipo == 'simple' and p.stock < cant:
+                sin_stock.append(f'{p.nombre} (disponible: {p.stock})')
+                continue
             subtotal = p.precio_venta * cant
             items.append({'producto': p, 'cantidad': cant, 'subtotal': subtotal})
             total += subtotal
         except (Producto.DoesNotExist, KeyError, ValueError):
             continue
+
+    if sin_stock:
+        messages.error(request, 'Stock insuficiente: ' + ', '.join(sin_stock))
+        return redirect('app_docente:menu')
 
     if not items:
         messages.error(request, 'No hay productos válidos en el carrito.')
@@ -224,46 +235,15 @@ def confirmar_pedido(request):
     docente = _get_docente(request)
     carrito_raw = request.session.get('carrito_docente', '[]')
     nota = request.session.get('nota_docente', '')
-    tipo_pago = request.POST.get('tipo_pago', 'saldo')
 
     try:
-        carrito = json.loads(carrito_raw)
-    except json.JSONDecodeError:
-        messages.error(request, 'Error procesando el carrito.')
+        pedido = PedidoDocenteService.confirmar_desde_carrito(
+            docente=docente, carrito_raw=carrito_raw, nota=nota,
+        )
+    except ValueError as e:
+        messages.error(request, str(e))
         return redirect('app_docente:menu')
 
-    with transaction.atomic():
-        pedido = PedidoDocente.objects.create(
-            docente=docente,
-            nota=nota,
-            tipo_pago=tipo_pago,
-        )
-        total = Decimal('0')
-        for item in carrito:
-            try:
-                p = Producto.objects.get(pk=item['id'], disponible=True)
-                cant = max(int(item.get('cantidad', 1)), 1)
-                d = DetallePedidoDocente.objects.create(
-                    pedido=pedido,
-                    producto=p,
-                    cantidad=cant,
-                    precio_unitario=p.precio_venta,
-                )
-                total += Decimal(str(d.subtotal))
-            except (Producto.DoesNotExist, KeyError, ValueError):
-                continue
-
-        pedido.total = total
-        pedido.save(update_fields=['total'])
-
-        # Descontar saldo o acumular fiado
-        if tipo_pago == 'saldo':
-            docente.saldo = Decimal(str(docente.saldo)) - total
-        else:
-            docente.deuda_fiado = Decimal(str(docente.deuda_fiado)) + total
-        docente.save(update_fields=['saldo', 'deuda_fiado'])
-
-    # Limpiar sesión
     request.session.pop('carrito_docente', None)
     request.session.pop('nota_docente', None)
 
@@ -338,37 +318,14 @@ def unirse_grupal(request, pk):
 
     carrito_raw = request.POST.get('carrito', '[]')
     nota        = request.POST.get('nota', '')
-    tipo_pago   = request.POST.get('tipo_pago', 'saldo')
 
     try:
-        carrito = json.loads(carrito_raw)
-    except json.JSONDecodeError:
-        messages.error(request, 'Error en el carrito.')
-        return redirect('app_docente:detalle_grupal', pk=pk)
-
-    with transaction.atomic():
-        pedido = PedidoDocente.objects.create(
-            docente=docente, nota=nota, tipo_pago=tipo_pago, pedido_grupal=grupal,
+        PedidoDocenteService.confirmar_desde_carrito(
+            docente=docente, carrito_raw=carrito_raw, nota=nota, pedido_grupal=grupal,
         )
-        total = Decimal('0')
-        for item in carrito:
-            try:
-                p = Producto.objects.get(pk=item['id'], disponible=True)
-                cant = max(int(item.get('cantidad', 1)), 1)
-                d = DetallePedidoDocente.objects.create(
-                    pedido=pedido, producto=p, cantidad=cant, precio_unitario=p.precio_venta,
-                )
-                total += Decimal(str(d.subtotal))
-            except (Producto.DoesNotExist, KeyError, ValueError):
-                continue
-        pedido.total = total
-        pedido.save(update_fields=['total'])
-
-        if tipo_pago == 'saldo':
-            docente.saldo = Decimal(str(docente.saldo)) - total
-        else:
-            docente.deuda_fiado = Decimal(str(docente.deuda_fiado)) + total
-        docente.save(update_fields=['saldo', 'deuda_fiado'])
+    except ValueError as e:
+        messages.error(request, str(e))
+        return redirect('app_docente:detalle_grupal', pk=pk)
 
     messages.success(request, '¡Te uniste al pedido grupal!')
     return redirect('app_docente:detalle_grupal', pk=pk)
@@ -415,7 +372,6 @@ def nuevo_programado(request):
     fecha_str   = request.POST.get('fecha_entrega', '')
     hora_str    = request.POST.get('hora_entrega', '')
     nota        = request.POST.get('nota', '').strip()
-    tipo_pago   = request.POST.get('tipo_pago', 'saldo')
     carrito_raw = request.POST.get('carrito', '[]')
 
     try:
@@ -434,7 +390,7 @@ def nuevo_programado(request):
     with transaction.atomic():
         prog = PedidoProgramadoDocente.objects.create(
             docente=docente, fecha_entrega=fecha,
-            hora_entrega=hora, nota=nota, tipo_pago=tipo_pago,
+            hora_entrega=hora, nota=nota,
         )
         for item in carrito:
             try:
@@ -463,7 +419,12 @@ def cancelar_programado(request, pk):
 def api_programados(request):
     docente = _get_docente(request)
     eventos = []
-    for prog in PedidoProgramadoDocente.objects.filter(docente=docente, estado='activo'):
+    qs = (
+        PedidoProgramadoDocente.objects
+        .filter(docente=docente, estado='activo')
+        .prefetch_related('detalles__producto')
+    )
+    for prog in qs:
         total = prog.total
         color = '#16a34a' if prog.estado == 'activo' else '#6b6b63'
         eventos.append({
@@ -472,9 +433,8 @@ def api_programados(request):
             'start': str(prog.fecha_entrega),
             'color': color,
             'extendedProps': {
-                'nota':     prog.nota,
-                'tipo_pago': prog.tipo_pago,
-                'items':    [f'{d.cantidad}× {d.producto.nombre}' for d in prog.detalles.all()],
+                'nota':  prog.nota,
+                'items': [f'{d.cantidad}× {d.producto.nombre}' for d in prog.detalles.all()],
             },
         })
     return JsonResponse(eventos, safe=False)
@@ -526,9 +486,9 @@ def exportar_csv(request):
     response['Content-Disposition'] = 'attachment; filename="historial_docente.csv"'
     response.write('\ufeff')
     writer = csv.writer(response)
-    writer.writerow(['Ticket', 'Fecha', 'Estado', 'Tipo Pago', 'Total'])
+    writer.writerow(['Ticket', 'Fecha', 'Estado', 'Total'])
     for p in pedidos:
-        writer.writerow([p.ticket, p.fecha_pedido.strftime('%d/%m/%Y %H:%M'), p.get_estado_display(), p.get_tipo_pago_display(), p.total])
+        writer.writerow([p.ticket, p.fecha_pedido.strftime('%d/%m/%Y %H:%M'), p.get_estado_display(), p.total])
     return response
 
 
@@ -584,15 +544,12 @@ def estadisticas(request):
         if row['t']
     ]
 
-    # Resumen fiado — una sola query de agregación
+    # Resumen — una sola query de agregación
     agg_res = PedidoDocente.objects.filter(docente=docente, estado='entregado').aggregate(
         total_gastado=Sum('total')
     )
     resumen = {
         'saldo':         docente.saldo,
-        'limite_fiado':  docente.limite_fiado,
-        'deuda_fiado':   docente.deuda_fiado,
-        'credito_disp':  docente.credito_disponible,
         'total_gastado': agg_res['total_gastado'] or 0,
         'total_pedidos': PedidoDocente.objects.filter(docente=docente).count(),
     }
@@ -721,12 +678,16 @@ def perfil(request):
         docente.perfil.save(update_fields=['telefono'])
         docente.save(update_fields=['documento', 'materia'])
 
-        # Cambio de contraseña
+        # Cambio de contraseña (requiere re-autenticación con la actual)
         p1 = request.POST.get('password1', '')
         p2 = request.POST.get('password2', '')
         if p1:
+            password_actual = request.POST.get('password_actual', '')
+            if not user.check_password(password_actual):
+                messages.error(request, 'La contraseña actual es incorrecta.')
+                return redirect('app_docente:perfil')
             if p1 != p2:
-                messages.error(request, 'Las contraseñas no coinciden.')
+                messages.error(request, 'Las contraseñas nuevas no coinciden.')
             elif len(p1) < 8:
                 messages.error(request, 'La contraseña debe tener al menos 8 caracteres.')
             else:
@@ -746,6 +707,38 @@ def perfil(request):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# MI QR (carnet digital del docente)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@docente_required
+def mi_qr(request):
+    import qrcode, base64
+    docente = _get_docente(request)
+
+    qr_payload = f'DOC-{docente.pk}'
+
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=10,
+        border=2,
+    )
+    qr.add_data(qr_payload)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color='#0f0f0e', back_color='#ffffff')
+
+    buf = io.BytesIO()          # io ya está importado al tope del archivo
+    img.save(buf, format='PNG')
+    qr_b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    return render(request, 'app_docente/mi_qr.html', _ctx(docente, {
+        'docente':    docente,
+        'qr_data':   qr_payload,
+        'qr_img_b64': qr_b64,
+    }))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # RECARGA DE SALDO
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -753,26 +746,45 @@ def perfil(request):
 def recargar_saldo(request):
     docente = _get_docente(request)
     if request.method == 'POST':
-        monto_raw    = request.POST.get('monto', '').strip()
-        nota         = request.POST.get('nota', '').strip()[:300]
-        comprobante  = request.FILES.get('comprobante')
+        monto_raw = request.POST.get('monto', '').strip()
+        nota      = request.POST.get('nota', '').strip()[:300]
 
         try:
             monto = Decimal(monto_raw)
             if monto < 1000:
-                raise ValueError('Mínimo $1.000')
+                raise ValueError
         except Exception:
             messages.error(request, 'Monto inválido. El mínimo es $1.000.')
             return redirect('app_docente:recargar_saldo')
 
-        RecargaDocente.objects.create(
-            docente=docente,
-            monto=monto,
-            comprobante=comprobante,
-            nota=nota,
+        if monto > 2_000_000:
+            messages.error(request, 'El monto máximo por recarga es $2.000.000.')
+            return redirect('app_docente:recargar_saldo')
+
+        # Cancelar recargas MP iniciadas pero abandonadas (sin pago real)
+        RecargaDocente.objects.filter(
+            docente=docente, estado='pendiente',
+            mp_preference_id__gt='', mp_payment_id='',
+        ).update(estado='rechazada', nota_admin='Cancelada al iniciar nueva recarga', fecha_resolucion=timezone.now())
+
+        recarga = RecargaDocente.objects.create(
+            docente=docente, monto=monto, nota=nota, estado='pendiente',
         )
-        messages.success(request, 'Solicitud de recarga enviada. Un administrador la revisará pronto.')
-        return redirect('app_docente:recargar_saldo')
+        try:
+            from pagos.utils import crear_preferencia_mp
+            nombre = docente.perfil.user.get_full_name() or docente.perfil.user.email
+            pref = crear_preferencia_mp(
+                titulo=f'Recarga Punto Asis — {nombre}',
+                monto=float(monto),
+                external_reference=f'docente-{recarga.pk}',
+            )
+            recarga.mp_preference_id = pref['id']
+            recarga.save(update_fields=['mp_preference_id'])
+            return redirect(pref['init_point'])
+        except Exception:
+            recarga.delete()
+            messages.error(request, 'No se pudo conectar con MercadoPago. Intenta de nuevo.')
+            return redirect('app_docente:recargar_saldo')
 
     historial = RecargaDocente.objects.filter(docente=docente)[:20]
     return render(request, 'app_docente/recargar_saldo.html', _ctx(docente, {

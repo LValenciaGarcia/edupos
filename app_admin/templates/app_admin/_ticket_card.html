@@ -1,7 +1,7 @@
 {% load filtros %}
 <div class="ticket-card" onclick="window.location='{% url 'app_admin:pedido_detalle' pedido.pk %}'">
   <div class="ticket-id">{{ pedido.ticket }}</div>
-  <div class="ticket-name">{{ pedido.estudiante.perfil.user.get_full_name|default:get_full_name|default:pedido.estudiante.perfil.user.email }}</div>
+  <div class="ticket-name">{{ pedido.estudiante.perfil.user.get_full_name|default:pedido.estudiante.perfil.user.email }}</div>
   <div class="ticket-grade">Grado {{ pedido.estudiante.grado }}</div>
   <div class="ticket-items">
     {% for d in pedido.detalles.all %}
@@ -58,7 +58,7 @@
       <input type="hidden" name="estado" value="cancelado">
       <input type="hidden" name="next" value="{% url 'app_admin:pedidos' %}">
       <button type="submit" class="btn btn-danger btn-sm btn-full"
-              onclick="return confirm('¿Cancelar pedido {{ pedido.ticket }}?')">
+              data-pa-confirm="¿Cancelar pedido {{ pedido.ticket }}?" data-pa-ok="Cancelar">
         <i class="bi bi-x"></i> Cancelar pedido
       </button>
     </form>

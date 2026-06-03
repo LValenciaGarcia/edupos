@@ -25,40 +25,29 @@
 <!-- Filtros -->
 <form method="get" class="filter-bar" style="margin-bottom:1.5rem;">
   <input type="date" name="fecha" value="{{ fecha }}" onchange="this.form.submit()">
-  <input type="text" name="q" value="{{ q }}" placeholder="Buscar ticket o estudiante…"
+  <input type="text" name="q" value="{{ q }}" placeholder="Buscar ticket, estudiante o docente…"
          style="min-width:14rem;">
   <button type="submit" class="btn btn-ghost btn-sm"><i class="bi bi-search"></i></button>
   {% if fecha != fecha_hoy|date:"Y-m-d" or q %}
   <a href="{% url 'app_admin:pedidos' %}" class="btn btn-ghost btn-sm"><i class="bi bi-x-lg"></i> Hoy</a>
   {% endif %}
   <span style="font-size:.82rem;color:var(--gray-400);margin-left:auto;">
-    {{ pedidos.count }} pedido{{ pedidos.count|pluralize }}
+    {{ pedidos|length }} pedido{{ pedidos|length|pluralize }}
   </span>
 </form>
 
 <!-- KANBAN -->
 <div class="kanban">
 
-  {% for estado_key, titulo, icono in estados_kanban %}
-  <div class="kanban-col">
-    <div class="kanban-col-head">
-      <span class="kanban-col-title col-head-{{ estado_key }}">
-        <i class="bi bi-{{ icono }}"></i> {{ titulo }}
-      </span>
-      <span class="kanban-count">{{ kanban|dictsortreversed:estado_key|length }}</span>
-    </div>
-    <div class="kanban-cards">
-    {% endfor %}
-
   <!-- PENDIENTE -->
   <div class="kanban-col">
     <div class="kanban-col-head">
       <span class="kanban-col-title col-head-pendiente"><i class="bi bi-hourglass-split"></i> Pendiente</span>
-      <span class="kanban-count">{{ kanban.pendiente.count }}</span>
+      <span class="kanban-count">{{ kanban.pendiente|length }}</span>
     </div>
     <div class="kanban-cards">
       {% for pedido in kanban.pendiente %}
-        {% include 'app_admin/_ticket_card.html' with pedido=pedido next_estado='preparando' next_label='Preparar' confirmar=False %}
+        {% include 'app_admin/_ticket_card_unified.html' with pedido=pedido next_estado='preparando' next_label='Preparar' confirmar=False %}
       {% empty %}
         <div style="text-align:center;padding:1.5rem .5rem;color:var(--gray-400);font-size:.8rem;">Sin pedidos</div>
       {% endfor %}
@@ -69,11 +58,11 @@
   <div class="kanban-col">
     <div class="kanban-col-head">
       <span class="kanban-col-title col-head-preparando"><i class="bi bi-fire"></i> Preparando</span>
-      <span class="kanban-count">{{ kanban.preparando.count }}</span>
+      <span class="kanban-count">{{ kanban.preparando|length }}</span>
     </div>
     <div class="kanban-cards">
       {% for pedido in kanban.preparando %}
-        {% include 'app_admin/_ticket_card.html' with pedido=pedido next_estado='listo' next_label='Marcar listo' confirmar=False %}
+        {% include 'app_admin/_ticket_card_unified.html' with pedido=pedido next_estado='listo' next_label='Marcar listo' confirmar=False %}
       {% empty %}
         <div style="text-align:center;padding:1.5rem .5rem;color:var(--gray-400);font-size:.8rem;">Sin pedidos</div>
       {% endfor %}
@@ -84,11 +73,11 @@
   <div class="kanban-col">
     <div class="kanban-col-head">
       <span class="kanban-col-title col-head-listo"><i class="bi bi-check-circle"></i> Listo</span>
-      <span class="kanban-count">{{ kanban.listo.count }}</span>
+      <span class="kanban-count">{{ kanban.listo|length }}</span>
     </div>
     <div class="kanban-cards">
       {% for pedido in kanban.listo %}
-        {% include 'app_admin/_ticket_card.html' with pedido=pedido next_estado='entregado' next_label='Entregar' confirmar=True %}
+        {% include 'app_admin/_ticket_card_unified.html' with pedido=pedido next_estado='entregado' next_label='Entregar' confirmar=True %}
       {% empty %}
         <div style="text-align:center;padding:1.5rem .5rem;color:var(--gray-400);font-size:.8rem;">Sin pedidos</div>
       {% endfor %}
@@ -99,11 +88,11 @@
   <div class="kanban-col">
     <div class="kanban-col-head">
       <span class="kanban-col-title col-head-entregado"><i class="bi bi-box-seam"></i> Entregado</span>
-      <span class="kanban-count">{{ kanban.entregado.count }}</span>
+      <span class="kanban-count">{{ kanban.entregado|length }}</span>
     </div>
     <div class="kanban-cards">
       {% for pedido in kanban.entregado %}
-        {% include 'app_admin/_ticket_card.html' with pedido=pedido next_estado='' next_label='' confirmar=False %}
+        {% include 'app_admin/_ticket_card_unified.html' with pedido=pedido next_estado='' next_label='' confirmar=False %}
       {% empty %}
         <div style="text-align:center;padding:1.5rem .5rem;color:var(--gray-400);font-size:.8rem;">Sin pedidos</div>
       {% endfor %}
@@ -114,11 +103,11 @@
   <div class="kanban-col">
     <div class="kanban-col-head">
       <span class="kanban-col-title col-head-cancelado"><i class="bi bi-x-circle"></i> Cancelado</span>
-      <span class="kanban-count">{{ kanban.cancelado.count }}</span>
+      <span class="kanban-count">{{ kanban.cancelado|length }}</span>
     </div>
     <div class="kanban-cards">
       {% for pedido in kanban.cancelado %}
-        {% include 'app_admin/_ticket_card.html' with pedido=pedido next_estado='' next_label='' confirmar=False %}
+        {% include 'app_admin/_ticket_card_unified.html' with pedido=pedido next_estado='' next_label='' confirmar=False %}
       {% empty %}
         <div style="text-align:center;padding:1.5rem .5rem;color:var(--gray-400);font-size:.8rem;">Sin pedidos</div>
       {% endfor %}
@@ -130,7 +119,7 @@
 <!-- Modal confirmación entrega -->
 <div id="modal-entrega" style="display:none; position:fixed; inset:0; background:rgba(15,15,14,0.6); backdrop-filter:blur(2px); z-index:500; align-items:center; justify-content:center;">
   <div style="background:var(--ivory); border-radius:12px; width:100%; max-width:420px; box-shadow:0 20px 40px rgba(0,0,0,0.3); overflow:hidden; border:1px solid var(--mist);">
-    <div style="background:var(--ink); padding:1rem 1.2rem; display:flex; align-items:center; justify-content:space-between;">
+    <div class="modal-head" style="padding:1rem 1.2rem; display:flex; align-items:center; justify-content:space-between;">
       <span style="font-family:var(--serif); font-size:1.05rem; color:rgba(255,255,255,0.86);">
         <i class="bi bi-box-seam"></i> Confirmar entrega
       </span>
@@ -165,10 +154,8 @@
 
 {% block extra_js %}
 <script>
-function abrirEntrega(pk, ticket, detalles) {
-  const form = document.getElementById('form-entrega');
-  form.action = '/admin-panel/pedidos/' + pk + '/estado/';  // Ajusta si tu URL es otra
-
+function abrirEntrega(estadoUrl, ticket, detalles) {
+  document.getElementById('form-entrega').action = estadoUrl;
   const resumen = document.getElementById('entrega-resumen');
   resumen.innerHTML = `
     <strong style="display:block; margin-bottom:0.5rem;">${ticket}</strong>

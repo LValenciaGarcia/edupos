@@ -74,7 +74,7 @@
                     <i class="bi bi-{% if a.activo %}pause{% else %}play{% endif %}"></i>
                   </button>
                 </form>
-                <form method="post" onsubmit="return confirm('¿Eliminar esta alergia?')">
+                <form method="post" data-pa-confirm="¿Eliminar esta alergia?" data-pa-ok="Eliminar">
                   {% csrf_token %}
                   <input type="hidden" name="accion" value="eliminar">
                   <input type="hidden" name="alergia_pk" value="{{ a.pk }}">
@@ -105,6 +105,7 @@
         <form method="post">
           {% csrf_token %}
           <input type="hidden" name="accion" value="crear">
+          <input type="hidden" name="alergeno_codigo" id="input-alergeno-codigo">
           <div style="display:flex;flex-direction:column;gap:1rem">
 
             {% if alergenos_catalogo %}
@@ -114,7 +115,7 @@
               <div style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.3rem;">
                 {% for alerg in alergenos_catalogo %}
                 <button type="button"
-                        onclick="seleccionarAlergeno('{{ alerg.get_codigo_display|escapejs }}')"
+                        onclick="seleccionarAlergeno('{{ alerg.get_codigo_display|escapejs }}', '{{ alerg.codigo }}')"
                         style="display:inline-flex;align-items:center;gap:0.3rem;padding:0.3rem 0.7rem;border:1px solid var(--fog);border-radius:99px;background:var(--ivory);font-size:0.76rem;font-weight:600;cursor:pointer;transition:all 0.14s;"
                         onmouseover="this.style.borderColor='var(--red)';this.style.background='var(--red-pale)';this.style.color='var(--red)'"
                         onmouseout="this.style.borderColor='var(--fog)';this.style.background='var(--ivory)';this.style.color=''">
@@ -189,8 +190,9 @@
 const CSRF_TOKEN = '{{ csrf_token }}';
 let _iaData = null;
 
-function seleccionarAlergeno(nombre) {
+function seleccionarAlergeno(nombre, codigo) {
   document.getElementById('input-nombre-alergia').value = nombre;
+  document.getElementById('input-alergeno-codigo').value = codigo || '';
   document.getElementById('input-nombre-alergia').focus();
   ocultarSugerencia();
 }
@@ -203,6 +205,7 @@ function ocultarSugerencia() {
 // Debounce: consulta IA 800ms después de que el usuario deja de escribir
 let _timer = null;
 document.getElementById('input-nombre-alergia').addEventListener('input', function () {
+  document.getElementById('input-alergeno-codigo').value = '';
   clearTimeout(_timer);
   ocultarSugerencia();
   const val = this.value.trim();

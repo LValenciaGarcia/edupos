@@ -1,4 +1,5 @@
 {% extends 'app_docente/base_docente.html' %}
+{% load filtros %}
 {% block title %}Pedidos programados{% endblock %}
 {% block topbar_title %}Pedidos Programados{% endblock %}
 
@@ -243,10 +244,9 @@
             <div style="font-size:.71rem; color:var(--stone); margin:.15rem 0 .35rem; max-width:180px;">
               {% for d in prog.detalles.all %}{{ d.cantidad }}× {{ d.producto.nombre }}{% if not forloop.last %}, {% endif %}{% endfor %}
             </div>
-            <span class="badge badge-{{ prog.tipo_pago }}">{{ prog.get_tipo_pago_display }}</span>
           </div>
           <form action="{% url 'app_docente:cancelar_programado' prog.pk %}" method="post"
-                onsubmit="return confirm('¿Cancelar este pedido programado?');">
+                data-pa-confirm="¿Cancelar este pedido programado?" data-pa-ok="Cancelar">
             {% csrf_token %}
             <button type="submit" class="btn btn-ghost btn-xs" style="color:var(--red); border-color:var(--red-tint);" title="Cancelar">
               <i class="bi bi-trash"></i>
@@ -255,7 +255,7 @@
         </div>
         <div style="display:flex; align-items:center; justify-content:space-between; margin-top:.55rem; padding-top:.5rem; border-top:1px solid var(--mist);">
           <span style="font-size:.68rem; color:var(--stone);">Total estimado</span>
-          <span style="font-family:var(--serif); font-size:.95rem; font-weight:400; color:var(--ink);">${{ prog.total|floatformat:0 }}</span>
+          <span style="font-family:var(--serif); font-size:.95rem; font-weight:400; color:var(--ink);">${{ prog.total|miles }}</span>
         </div>
       </div>
       {% endfor %}
@@ -308,13 +308,6 @@
           <label>Hora (opcional)</label>
           <input type="time" name="hora_entrega">
         </div>
-        <div class="field">
-          <label>Tipo de pago</label>
-          <select name="tipo_pago">
-            <option value="saldo">Saldo</option>
-            <option value="fiado">Fiado (crédito)</option>
-          </select>
-        </div>
         <div class="field full">
           <label>Nota (opcional)</label>
           <textarea name="nota" rows="2" placeholder="Ej: Sin cebolla…"></textarea>
@@ -328,7 +321,7 @@
           <div style="display:flex; align-items:center; justify-content:space-between; padding:.4rem .55rem; border-radius:7px; transition:background .12s;" onmouseenter="this.style.background='var(--leaf-pale)'" onmouseleave="this.style.background='transparent'">
             <div>
               <span style="font-size:.78rem; font-weight:600;">{{ p.nombre }}</span>
-              <span style="font-size:.64rem; color:var(--stone);"> &middot; ${{ p.precio_venta|floatformat:0 }}</span>
+              <span style="font-size:.64rem; color:var(--stone);"> &middot; ${{ p.precio_venta|miles }}</span>
             </div>
             <div style="display:flex; align-items:center; gap:.3rem;">
               <button type="button" class="btn btn-ghost btn-xs" onclick="cambiarCantidad({{ p.pk }}, -1)" style="width:1.5rem; height:1.5rem; padding:0; justify-content:center;">−</button>
@@ -406,7 +399,6 @@
         map.get(d).push({
           title: ev.title || '',
           nota:  ev.extendedProps?.nota || '',
-          tipo_pago: ev.extendedProps?.tipo_pago || '',
           items: ev.extendedProps?.items || [],
           id:    ev.id,
         });
@@ -506,10 +498,6 @@
           <div class="cal-ev-info">
             <div class="cal-ev-title">${ev.title}</div>
             <div class="cal-ev-meta">${ev.items.join(' · ')}</div>
-            ${ev.tipo_pago ? `<div class="cal-ev-meta" style="margin-top:.15rem;">
-              <i class="bi bi-${ev.tipo_pago === 'saldo' ? 'wallet2' : 'receipt'}"></i>
-              ${ev.tipo_pago === 'saldo' ? 'Saldo' : 'Fiado'}
-            </div>` : ''}
             ${ev.nota ? `<div class="cal-ev-meta" style="font-style:italic;margin-top:.1rem;">"${ev.nota}"</div>` : ''}
           </div>
         </div>`).join('');
@@ -548,7 +536,7 @@ function cambiarCantidad(pk, delta) {
 
 document.getElementById('prog-form').addEventListener('submit', e => {
   const items = Object.values(progCart).filter(i => i.cantidad > 0);
-  if (items.length === 0) { e.preventDefault(); alert('Agrega al menos un producto.'); return; }
+  if (items.length === 0) { e.preventDefault(); paShowToast('Agrega al menos un producto.', 'warn'); return; }
   document.getElementById('prog-carrito').value = JSON.stringify(items);
 });
 </script>

@@ -144,7 +144,7 @@
           {% endif %}
           <a href="{% url 'app_admin:sede_toggle' s.pk %}"
              class="btn btn-xs {% if s.activa %}btn-ghost{% else %}btn-amber{% endif %}"
-             onclick="return confirm('¿Confirmas el cambio de estado de «{{ s.nombre }}»?')"
+             data-pa-confirm="¿Confirmas el cambio de estado de «{{ s.nombre }}»?" data-pa-type="warn" data-pa-ok="Cambiar estado"
              title="{% if s.activa %}Desactivar{% else %}Activar{% endif %}">
             <i class="bi bi-{% if s.activa %}pause-circle{% else %}play-circle{% endif %}"></i>
           </a>

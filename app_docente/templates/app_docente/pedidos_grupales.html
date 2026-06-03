@@ -1,4 +1,5 @@
 {% extends 'app_docente/base_docente.html' %}
+{% load filtros %}
 {% block title %}Sala de Profes{% endblock %}
 {% block topbar_title %}Sala de Profes{% endblock %}
 
@@ -63,7 +64,7 @@
               {{ g.fecha|date:"d M Y" }} &middot; {{ g.participantes_count }} participante{{ g.participantes_count|pluralize }}
             </div>
             <div style="font-size:.7rem; color:var(--stone); margin-top:.1rem;">
-              Total: <strong style="color:var(--ink);">${{ g.total_grupal|floatformat:0 }}</strong>
+              Total: <strong style="color:var(--ink);">${{ g.total_grupal|miles }}</strong>
             </div>
           </div>
           <div style="display:flex; flex-direction:column; align-items:flex-end; gap:.35rem;">

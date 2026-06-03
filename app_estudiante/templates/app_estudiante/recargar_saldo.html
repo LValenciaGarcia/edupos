@@ -1,0 +1,284 @@
+{% extends 'app_estudiante/base_estudiante.html' %}
+{% load filtros %}
+{% load static %}
+{% block title %}Recargar Saldo{% endblock %}
+{% block page_title %}Recargar Saldo{% endblock %}
+{% block nav_mi_saldo %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+  .recarga-layout {
+    display: grid; grid-template-columns: 1fr 320px; gap: 1.4rem; align-items: start;
+  }
+  @media (max-width: 900px) { .recarga-layout { grid-template-columns: 1fr; } }
+
+  .est-info-box {
+    display: flex; align-items: center; gap: 1.1rem;
+    background: var(--leaf-pale); border: 1px solid var(--leaf-tint);
+    border-radius: 10px; padding: 1.1rem 1.3rem; margin-bottom: 1.4rem;
+  }
+  .est-avatar {
+    width: 3rem; height: 3rem; border-radius: 50%; flex-shrink: 0;
+    background: var(--leaf-tint); border: 2px solid rgba(34,197,94,0.3);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--serif); font-size: 1.25rem; color: var(--leaf-dark);
+  }
+  .est-name  { font-family: var(--serif); font-size: 1.1rem; font-weight: 500; }
+  .est-meta  { font-size: 0.72rem; color: var(--stone); margin-top: 0.15rem; }
+  .est-saldo-box { margin-left: auto; text-align: right; }
+  .est-saldo-val { font-family: var(--serif); font-size: 1.5rem; color: var(--leaf); line-height: 1; }
+  .est-saldo-lbl { font-size: 0.62rem; color: var(--stone); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 0.1rem; }
+
+  .proceso-steps {
+    display: flex; align-items: center; gap: 0; margin-bottom: 1.4rem;
+    background: var(--cream); border: 1px solid var(--mist); border-radius: 9px; padding: 0.9rem 1.2rem;
+  }
+  .step { display: flex; align-items: center; gap: 0.5rem; flex: 1; }
+  .step-num {
+    width: 1.6rem; height: 1.6rem; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.7rem; font-weight: 700;
+  }
+  .step-num.active { background: var(--leaf); color: #fff; }
+  .step-num.wait   { background: var(--mist); color: var(--ash); }
+  .step-text { font-size: 0.75rem; font-weight: 600; }
+  .step-text.active { color: var(--leaf-dark); }
+  .step-text.wait   { color: var(--ash); }
+  .step-sep { width: 2rem; height: 1px; background: var(--fog); flex-shrink: 0; margin: 0 0.35rem; }
+
+  .montos-rapidos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem; margin: 0.75rem 0 1.1rem; }
+  .monto-btn {
+    padding: 0.65rem 0.5rem; border: 1px solid var(--fog);
+    border-radius: 8px; background: var(--ivory); cursor: pointer;
+    font-family: var(--sans); font-size: 0.79rem; font-weight: 600; color: var(--ink);
+    transition: all 0.15s; text-align: center;
+  }
+  .monto-btn:hover, .monto-btn.selected { border-color: var(--leaf); color: var(--leaf); background: var(--leaf-pale); }
+
+  .btn-mp {
+    display: flex; align-items: center; justify-content: center; gap: 0.75rem;
+    width: 100%; padding: 0.9rem 1rem; border: none; border-radius: 12px;
+    background: #009ee3; color: #fff; font-family: var(--sans);
+    font-size: 0.97rem; font-weight: 700; cursor: pointer;
+    transition: background 0.18s, box-shadow 0.18s;
+    box-shadow: 0 4px 14px rgba(0,158,227,0.35);
+  }
+  .btn-mp:hover   { background: #0082c1; box-shadow: 0 6px 20px rgba(0,158,227,0.45); }
+  .btn-mp:active  { transform: translateY(1px); box-shadow: 0 2px 8px rgba(0,158,227,0.3); }
+  .btn-mp-logo {
+    background: #fff; border-radius: 6px; padding: 3px 6px;
+    display: flex; align-items: center; flex-shrink: 0;
+  }
+
+  .hist-row { display: flex; align-items: flex-start; justify-content: space-between; padding: 0.8rem 1.5rem; border-bottom: 1px solid var(--mist); font-size: 0.8rem; }
+  .hist-row:last-child { border-bottom: none; }
+  .hist-monto { font-family: var(--serif); font-size: 0.95rem; color: var(--leaf); font-weight: 500; }
+  .hist-fecha { font-size: 0.68rem; color: var(--ash); margin-top: 0.07rem; }
+  .hist-nota  { font-size: 0.71rem; color: var(--stone); margin-top: 0.08rem; font-style: italic; }
+
+  .monto-input-wrap { position: relative; display: flex; align-items: center; }
+  .monto-prefix {
+    position: absolute; left: 0.75rem; font-weight: 600; color: var(--stone);
+    pointer-events: none; font-size: 0.95rem; z-index: 1;
+  }
+  .monto-input-wrap input[type=text] { padding-left: 1.5rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="recarga-layout">
+
+  <!-- Formulario -->
+  <div>
+
+    <!-- Info del estudiante -->
+    <div class="est-info-box">
+      <div class="est-avatar">{{ estudiante.perfil.user.first_name|slice:":1"|upper }}</div>
+      <div>
+        <div class="est-name">{{ estudiante.perfil.user.get_full_name|default:estudiante.perfil.user.email }}</div>
+        <div class="est-meta">Grado {{ estudiante.grado }} · {{ estudiante.codigo }}</div>
+      </div>
+      <div class="est-saldo-box">
+        <div class="est-saldo-val">${{ estudiante.saldo|miles }}</div>
+        <div class="est-saldo-lbl">saldo actual</div>
+      </div>
+    </div>
+
+    <!-- Proceso -->
+    <div class="proceso-steps">
+      <div class="step">
+        <div class="step-num active">1</div>
+        <div class="step-text active">Ingresar monto</div>
+      </div>
+      <div class="step-sep"></div>
+      <div class="step">
+        <div class="step-num wait">2</div>
+        <div class="step-text wait">Pagar en MP</div>
+      </div>
+      <div class="step-sep"></div>
+      <div class="step">
+        <div class="step-num wait">3</div>
+        <div class="step-text wait">Saldo acreditado</div>
+      </div>
+    </div>
+
+    <!-- Formulario recarga -->
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Nueva recarga</span>
+      </div>
+      <div class="card-body">
+        <form method="post" novalidate id="recargaForm">
+          {% csrf_token %}
+
+          <input type="hidden" id="monto" name="monto" value="">
+
+          <div class="field" style="margin-bottom:0.75rem;">
+            <label for="monto_display">Monto a recargar *</label>
+            <div class="monto-input-wrap">
+              <span class="monto-prefix">$</span>
+              <input type="text" id="monto_display" name="monto_display"
+                     inputmode="numeric" placeholder="0" required autocomplete="off"
+                     oninput="onMontoInput(this)">
+            </div>
+            <span class="hint">Mínimo: $1.000 · Máximo: $2.000.000</span>
+          </div>
+
+          <div class="montos-rapidos">
+            <button type="button" class="monto-btn" data-monto="5000"  onclick="setMonto(5000,this)">$5.000</button>
+            <button type="button" class="monto-btn" data-monto="10000" onclick="setMonto(10000,this)">$10.000</button>
+            <button type="button" class="monto-btn" data-monto="20000" onclick="setMonto(20000,this)">$20.000</button>
+            <button type="button" class="monto-btn" data-monto="50000" onclick="setMonto(50000,this)">$50.000</button>
+          </div>
+
+          <div class="field" style="margin-bottom:1.1rem;">
+            <label for="nota">Nota (opcional)</label>
+            <input type="text" id="nota" name="nota" placeholder="Ej: Para la semana" maxlength="300">
+          </div>
+
+          <!-- Preview saldo nuevo -->
+          <div id="saldo-preview" style="display:none;background:var(--leaf-pale);border:1px solid var(--leaf-tint);border-radius:8px;padding:0.85rem 1rem;margin-bottom:1.2rem;font-size:0.82rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="color:var(--stone);">Saldo actual:</span>
+              <span style="font-weight:600;">${{ estudiante.saldo|miles }}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.3rem;">
+              <span style="color:var(--stone);">+ Recarga:</span>
+              <span style="font-weight:600;color:var(--leaf);" id="monto-preview">$0</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--leaf-tint);margin-top:0.4rem;padding-top:0.4rem;">
+              <span style="font-weight:700;color:var(--leaf-dark);">Saldo tras aprobación:</span>
+              <span style="font-family:var(--serif);font-size:1.1rem;color:var(--leaf);" id="saldo-nuevo">$0</span>
+            </div>
+          </div>
+
+          <!-- Aviso MP -->
+          <div style="background:#e0f2fe;border:1px solid #bae6fd;border-radius:8px;padding:0.75rem 1rem;margin-bottom:1.2rem;font-size:0.8rem;color:#0369a1;display:flex;gap:0.5rem;align-items:flex-start;">
+            <i class="bi bi-shield-check-fill" style="flex-shrink:0;margin-top:0.1rem;"></i>
+            <span>Serás redirigido a <strong>MercadoPago</strong> para completar el pago. El saldo se acredita <strong>automáticamente</strong> al confirmar. Tu acudiente recibirá una notificación.</span>
+          </div>
+
+          <div style="margin-bottom:1rem;">
+            <button type="submit" class="btn-mp">
+              <span class="btn-mp-logo">
+                <img src="{% static 'img/mercado-pago-icono.png' %}" alt="Mercado Pago" style="height: 20px; object-fit: contain;">
+              </span>
+              Pagar ahora
+            </button>
+          </div>
+          <div style="text-align:center;">
+            <a href="{% url 'app_estudiante:mi_saldo' %}" class="btn btn-ghost">Cancelar</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Historial lateral -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Mis recargas</span>
+    </div>
+    {% if historial %}
+      {% for recarga in historial %}
+      <div class="hist-row">
+        <div>
+          <div class="hist-monto">+${{ recarga.monto|miles }}</div>
+          <div class="hist-fecha">{{ recarga.fecha|date:"d M Y, H:i" }}</div>
+          {% if recarga.nota %}<div class="hist-nota">{{ recarga.nota }}</div>{% endif %}
+        </div>
+        <span class="badge badge-{{ recarga.estado }}">{{ recarga.get_estado_display }}</span>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">
+        <i class="bi bi-clock-history es-icon"></i>
+        <p>Sin recargas previas</p>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function obtenerSaldoActual() {
+    const el = document.querySelector('.est-saldo-val');
+    if (!el) return 0;
+    return parseInt(el.innerText.replace(/[^0-9]/g, ''), 10) || 0;
+  }
+  function formatearMiles(v) {
+    return v === 0 ? '' : v.toLocaleString('es-CO').replace(/,/g, '.');
+  }
+  function formatPesos(v) { return '$' + formatearMiles(v); }
+
+  function actualizarEstado(n) {
+    const hidden  = document.getElementById('monto');
+    const preview = document.getElementById('saldo-preview');
+    const montoEl = document.getElementById('monto-preview');
+    const nuevoEl = document.getElementById('saldo-nuevo');
+    if (hidden) hidden.value = n > 0 ? n : '';
+    if (n > 0 && preview) {
+      preview.style.display = 'block';
+      if (montoEl) montoEl.textContent = formatPesos(n);
+      if (nuevoEl) nuevoEl.textContent = formatPesos(obtenerSaldoActual() + n);
+    } else if (preview) {
+      preview.style.display = 'none';
+    }
+    document.querySelectorAll('.monto-btn').forEach(btn => {
+      btn.classList.toggle('selected', parseInt(btn.dataset.monto, 10) === n);
+    });
+  }
+
+  window.onMontoInput = function(el) {
+    const digitos = el.value.replace(/\D/g, '');
+    const n = digitos === '' ? 0 : parseInt(digitos, 10);
+    el.value = n === 0 ? '' : formatearMiles(n);
+    actualizarEstado(n);
+  };
+
+  window.setMonto = function(valor) {
+    const display = document.getElementById('monto_display');
+    if (display) { display.value = formatearMiles(valor); actualizarEstado(valor); }
+  };
+
+  document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('recargaForm');
+    if (!form) return;
+    form.addEventListener('submit', function(e) {
+      const n = parseInt(document.getElementById('monto').value, 10) || 0;
+      if (n < 1000) {
+        e.preventDefault();
+        paShowToast('El monto mínimo es $1.000.', 'warn');
+        document.getElementById('monto_display').focus();
+      } else if (n > 2000000) {
+        e.preventDefault();
+        paShowToast('El monto máximo es $2.000.000.', 'warn');
+        document.getElementById('monto_display').focus();
+      }
+    });
+  });
+</script>
+{% endblock %}

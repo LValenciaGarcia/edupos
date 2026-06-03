@@ -90,7 +90,7 @@
     <option value="">Todos los hijos</option>
     {% for hijo in hijos %}
     <option value="{{ hijo.pk }}" {% if hijo_activo == hijo.pk|stringformat:"s" %}selected{% endif %}>
-      {{ hijo.perfil.user.get_full_name|default:get_full_name|default:hijo.perfil.user.email }}
+      {{ hijo.perfil.user.get_full_name|default:hijo.perfil.user.email }}
     </option>
     {% endfor %}
   </select>
@@ -127,7 +127,7 @@
       </div>
 
       <div class="ped-details">
-        <div class="ped-est">{{ pedido.estudiante.perfil.user.get_full_name|default:get_full_name|default:pedido.estudiante.perfil.user.email }}</div>
+        <div class="ped-est">{{ pedido.estudiante.perfil.user.get_full_name|default:pedido.estudiante.perfil.user.email }}</div>
         <div class="ped-items">
           {% for det in pedido.detalles.all %}{{ det.cantidad }}× {{ det.producto.nombre }}{% if not forloop.last %} · {% endif %}{% endfor %}
         </div>

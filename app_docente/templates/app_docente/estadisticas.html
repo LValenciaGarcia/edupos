@@ -1,4 +1,5 @@
 {% extends 'app_docente/base_docente.html' %}
+{% load filtros %}
 {% block title %}Estadísticas{% endblock %}
 {% block topbar_title %}Mis Estadísticas{% endblock %}
 {% block extra_head %}
@@ -19,7 +20,7 @@
   <div class="kpi kpi-green">
     <div class="kpi-icon"><i class="bi bi-cash-stack"></i></div>
     <div class="kpi-label">Total gastado</div>
-    <div class="kpi-value">${{ resumen.total_gastado|floatformat:0 }}</div>
+    <div class="kpi-value">${{ resumen.total_gastado|miles }}</div>
   </div>
   <div class="kpi kpi-violet">
     <div class="kpi-icon"><i class="bi bi-bag-check"></i></div>
@@ -29,15 +30,7 @@
   <div class="kpi kpi-sky">
     <div class="kpi-icon"><i class="bi bi-wallet2"></i></div>
     <div class="kpi-label">Saldo actual</div>
-    <div class="kpi-value">${{ resumen.saldo|floatformat:0 }}</div>
-  </div>
-  <div class="kpi {% if resumen.deuda_fiado > 0 %}kpi-amber{% endif %}">
-    <div class="kpi-icon"><i class="bi bi-receipt"></i></div>
-    <div class="kpi-label">Deuda fiado</div>
-    <div class="kpi-value" style="{% if resumen.deuda_fiado > 0 %}color:var(--amber);{% else %}color:var(--leaf);{% endif %}">
-      ${{ resumen.deuda_fiado|floatformat:0 }}
-    </div>
-    <div class="kpi-sub">Límite: ${{ resumen.limite_fiado|floatformat:0 }}</div>
+    <div class="kpi-value">${{ resumen.saldo|miles }}</div>
   </div>
 </div>
 
@@ -65,7 +58,7 @@
 </div>
 
 <!-- Top productos -->
-<div class="card card-flat" style="overflow:hidden; margin-bottom:{% if resumen.deuda_fiado > 0 %}1.25rem{% else %}0{% endif %};">
+<div class="card card-flat" style="overflow:hidden;">
   <div class="card-head">
     <span class="card-title" style="font-size:.9rem;">Top 5 productos más pedidos</span>
   </div>
@@ -93,25 +86,6 @@
   </div>
   {% endif %}
 </div>
-
-<!-- Fiado gauge -->
-{% if resumen.deuda_fiado > 0 %}
-<div class="card" style="background:linear-gradient(135deg,var(--amber-pale),#fffdf5); border-color:var(--amber-tint);">
-  <div style="display:flex; align-items:center; gap:.75rem; margin-bottom:.75rem;">
-    <div style="width:2.2rem; height:2.2rem; background:var(--amber-tint); border-radius:50%; display:flex; align-items:center; justify-content:center;">
-      <i class="bi bi-exclamation-triangle" style="color:var(--amber); font-size:.85rem;"></i>
-    </div>
-    <div class="section-title" style="margin-bottom:0; color:var(--amber);">Estado del crédito (fiado)</div>
-  </div>
-  <div class="progress-bar" style="height:10px; margin-bottom:.55rem;">
-    <div class="progress-fill" id="fiado-bar" style="height:100%;"></div>
-  </div>
-  <div style="display:flex; justify-content:space-between; font-size:.78rem; font-weight:700; color:var(--amber);">
-    <span>Deuda: ${{ resumen.deuda_fiado|floatformat:0 }}</span>
-    <span>Límite: ${{ resumen.limite_fiado|floatformat:0 }}</span>
-  </div>
-</div>
-{% endif %}
 
 {% endblock %}
 
@@ -181,15 +155,5 @@ document.querySelectorAll('[id^="bar-"]').forEach(bar => {
   bar.classList.add('green');
   bar.style.width = Math.min((cant / maxCant) * 100, 100) + '%';
 });
-
-// Fiado bar
-const fiadoBar = document.getElementById('fiado-bar');
-if (fiadoBar) {
-  const deuda  = {{ resumen.deuda_fiado }};
-  const limite = {{ resumen.limite_fiado }};
-  const pct = Math.min((deuda / limite) * 100, 100);
-  fiadoBar.style.width = pct + '%';
-  fiadoBar.style.background = pct > 80 ? 'var(--red)' : 'var(--amber)';
-}
 </script>
 {% endblock %}

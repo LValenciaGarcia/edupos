@@ -92,7 +92,7 @@
               <i class="bi bi-{% if h.activo %}pause-circle{% else %}play-circle{% endif %}"></i>
             </button>
           </form>
-          <form method="post" style="display:inline;" onsubmit="return confirm('¿Eliminar este horario?')">
+          <form method="post" style="display:inline;" data-pa-confirm="¿Eliminar este horario?" data-pa-ok="Eliminar">
             {% csrf_token %}
             <input type="hidden" name="action" value="delete">
             <input type="hidden" name="horario_id" value="{{ h.pk }}">

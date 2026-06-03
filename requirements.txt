@@ -37,5 +37,22 @@ django-debug-toolbar==6.3.0  # Panel SQL/queries en desarrollo (solo DEBUG=True)
 # ─── Inteligencia Artificial ──────────────────────────────────────────────────
 anthropic>=0.40.0            # SDK oficial de Claude (Anthropic)
 
+# ─── Pagos ────────────────────────────────────────────────────────────────────
+mercado-pago>=3.0.0          # SDK oficial de Mercado Pago
+
 # ─── Despliegue ───────────────────────────────────────────────────────────────
 gunicorn==25.3.0             # Servidor WSGI de producción
+psycopg2-binary>=2.9.0       # Adaptador PostgreSQL para Railway
+psycopg[binary]>=3.1.0       # Adaptador PostgreSQL moderno (requerido por Railway)
+dj-database-url>=2.1.0       # Parsea DATABASE_URL a config Django
+python-dotenv>=1.0.0         # Carga variables desde .env
+cloudinary>=1.35.0           # SDK Cloudinary para subida de imágenes
+django-cloudinary-storage>=0.3.0  # Backend Django Storage para Cloudinary
+
+# ─── Carnets QR ───────────────────────────────────────────────────────────────
+qrcode[pil]==8.2             # Genera códigos QR de los carnets de estudiantes
+
+# ─── Google Calendar API ──────────────────────────────────────────────────────
+google-auth>=2.0.0
+google-auth-oauthlib>=1.0.0
+google-api-python-client>=2.0.0

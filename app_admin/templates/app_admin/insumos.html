@@ -725,16 +725,20 @@ function limpiarSeleccionIns() {
 function insBulkAccion(accion) {
   const checks = document.querySelectorAll('.ins-check:checked');
   if (!checks.length) return;
-  if (accion === 'eliminar' && !confirm('¿Desactivar ' + checks.length + ' insumo(s)?')) return;
-  document.getElementById('ins-bulk-accion').value = accion;
-  const container = document.getElementById('ins-bulk-pks');
-  container.innerHTML = '';
-  checks.forEach(c => {
-    const inp = document.createElement('input');
-    inp.type = 'hidden'; inp.name = 'pks'; inp.value = c.value;
-    container.appendChild(inp);
-  });
-  document.getElementById('form-ins-bulk').submit();
+  const ejecutar = function() {
+    document.getElementById('ins-bulk-accion').value = accion;
+    const container = document.getElementById('ins-bulk-pks');
+    container.innerHTML = '';
+    checks.forEach(c => {
+      const inp = document.createElement('input');
+      inp.type = 'hidden'; inp.name = 'pks'; inp.value = c.value;
+      container.appendChild(inp);
+    });
+    document.getElementById('form-ins-bulk').submit();
+  };
+  if (accion === 'eliminar') {
+    paShowConfirm('¿Desactivar ' + checks.length + ' insumo(s)?', ejecutar, { type: 'warn', okText: 'Desactivar' });
+  } else { ejecutar(); }
 }
 </script>
 {% endblock %}

@@ -14,6 +14,9 @@
   <link rel="manifest" href="/static/manifest.json">
   <meta name="theme-color" content="#d97706">
   {% block extra_css %}{% endblock %}
+  <script>
+  (function(){var t=localStorage.getItem('theme'),d=t?t==='dark':matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-theme',d?'dark':'light');})();
+  </script>
 </head>
 <body>
 
@@ -44,7 +47,7 @@
     </div>
     <div class="sb-item">
       <a href="{% url 'app_empleado:caja' %}" class="sb-link {% block nav_caja %}{% endblock %}">
-        <i class="bi bi-cash-register"></i><span class="sb-label">Caja / POS</span>
+        <i class="bi bi-cart3"></i><span class="sb-label">Caja</span>
       </a>
       <span class="sb-tip">Caja</span>
     </div>
@@ -126,6 +129,9 @@
     </div>
     <div class="topbar-right">
       {% block topbar_actions %}{% endblock %}
+      <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Cambiar tema">
+        <i class="bi bi-moon" id="themeIcon"></i>
+      </button>
       {% with emp=request.user.perfil.empleado %}
         {% if emp.es_global %}
           <span class="sede-badge"><i class="bi bi-globe2"></i> Global</span>
@@ -205,6 +211,22 @@ function toggleSidebar() {
 
 applySidebarState();
 
+// ── Theme toggle ──────────────────────────────────────────────────────────────
+function toggleTheme() {
+  var html = document.documentElement;
+  var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  document.body.classList.add('theme-transitioning');
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+  var icon = document.getElementById('themeIcon');
+  if (icon) icon.className = next === 'dark' ? 'bi bi-sun' : 'bi bi-moon';
+  setTimeout(function(){ document.body.classList.remove('theme-transitioning'); }, 250);
+}
+document.addEventListener('DOMContentLoaded', function(){
+  var icon = document.getElementById('themeIcon');
+  if (icon) icon.className = document.documentElement.getAttribute('data-theme') === 'dark' ? 'bi bi-sun' : 'bi bi-moon';
+});
+
 // ── Dropdown usuario ──────────────────────────────────────────────────────────
 function toggleUserDrop() {
   document.getElementById('userDrop').classList.toggle('open');
@@ -246,6 +268,62 @@ function showToast(msg, type, duration) {
   toast.addEventListener('click', dismiss);
   setTimeout(dismiss, duration);
 }
+function paShowToast(msg, type) { showToast(msg, type || 'warning'); }
+</script>
+
+<!-- ══ PA CONFIRM MODAL ══ -->
+<div id="pa-confirm" class="pa-overlay" onclick="if(event.target===this)paCerrarConfirm()">
+  <div class="pa-confirm-box">
+    <div class="pa-confirm-icon" id="pa-confirm-icon"><i class="bi bi-trash3-fill"></i></div>
+    <div class="pa-confirm-title" id="pa-confirm-title">¿Confirmar acción?</div>
+    <p class="pa-confirm-msg" id="pa-confirm-msg"></p>
+    <div class="pa-confirm-actions">
+      <button type="button" class="btn btn-ghost" id="pa-cancel-btn" onclick="paCerrarConfirm()">Cancelar</button>
+      <button type="button" class="btn btn-danger" id="pa-confirm-ok">Confirmar</button>
+    </div>
+  </div>
+</div>
+<script>
+function paShowConfirm(msg, onConfirm, opts) {
+  opts = opts || {};
+  var t = opts.type || 'danger';
+  var icon = document.getElementById('pa-confirm-icon');
+  icon.className = 'pa-confirm-icon'+(t==='warn'?' warn':t==='info'?' info':t==='leaf'?' leaf':'');
+  icon.innerHTML = t==='warn'  ? '<i class="bi bi-exclamation-triangle-fill"></i>' :
+                   t==='info'  ? '<i class="bi bi-bell-fill"></i>' :
+                   t==='leaf'  ? '<i class="bi bi-check-circle-fill"></i>' :
+                                 '<i class="bi bi-trash3-fill"></i>';
+  document.getElementById('pa-confirm-title').textContent = opts.title || '¿Confirmar acción?';
+  document.getElementById('pa-confirm-msg').textContent = msg;
+  var ok = document.getElementById('pa-confirm-ok');
+  ok.className = 'btn '+(t==='warn'?'btn-amber':t==='info'||t==='leaf'?'btn-primary':'btn-danger');
+  ok.textContent = opts.okText || 'Confirmar';
+  ok.onclick = function() { paCerrarConfirm(); onConfirm(); };
+  document.getElementById('pa-cancel-btn').style.display = opts.hideCancel ? 'none' : '';
+  document.getElementById('pa-confirm').classList.add('open');
+}
+function paCerrarConfirm() { document.getElementById('pa-confirm').classList.remove('open'); }
+document.addEventListener('keydown', function(e){ if(e.key==='Escape') paCerrarConfirm(); });
+window.addEventListener('pageshow', function(e){ if(e.persisted) paCerrarConfirm(); });
+document.addEventListener('submit', function(e) {
+  var form = e.target.closest('form[data-pa-confirm]');
+  if (!form) return;
+  if (form._paOk) { form._paOk = false; return; }
+  e.preventDefault();
+  paShowConfirm(form.dataset.paConfirm, function(){
+    form._paOk = true; form.submit();
+  }, { type: form.dataset.paType, title: form.dataset.paTitle, okText: form.dataset.paOk });
+}, true);
+document.addEventListener('click', function(e) {
+  var el = e.target.closest('[data-pa-confirm]');
+  if (!el || el.tagName === 'FORM') return;
+  if (el._paOk) { el._paOk = false; return; }
+  e.preventDefault(); e.stopImmediatePropagation();
+  paShowConfirm(el.dataset.paConfirm, function(){
+    if (el.tagName === 'A') { location.href = el.href; }
+    else { el._paOk = true; el.click(); }
+  }, { type: el.dataset.paType, title: el.dataset.paTitle, okText: el.dataset.paOk });
+}, true);
 </script>
 </body>
 </html>

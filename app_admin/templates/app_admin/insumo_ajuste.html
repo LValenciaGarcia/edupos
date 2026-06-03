@@ -1,4 +1,5 @@
 {% extends 'app_admin/base_admin.html' %}
+{% load filtros %}
 {% block title %}Movimiento — {{ insumo.nombre }}{% endblock %}
 {% block page_title %}Movimiento de insumo{% endblock %}
 {% block nav_insumos %}active{% endblock %}
@@ -131,7 +132,7 @@
         </div>
         <div class="stock-stat">
           <div class="stock-stat-label">Precio ref.</div>
-          <div class="stock-stat-val green">${{ insumo.precio_unitario|floatformat:0 }}</div>
+          <div class="stock-stat-val green">${{ insumo.precio_unitario|miles }}</div>
           <div class="stock-stat-sub">/ {{ insumo.get_unidad_display }}</div>
         </div>
       </div>
@@ -376,7 +377,7 @@ document.getElementById('form-ajuste').addEventListener('submit', function(e) {
   const num = parseFloat(valor);
   if (!valor || isNaN(num) || num <= 0) {
     e.preventDefault();
-    alert('La cantidad debe ser mayor a 0.');
+    paShowToast('La cantidad debe ser mayor a 0.', 'warn');
     return;
   }
 

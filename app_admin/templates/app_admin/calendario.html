@@ -315,7 +315,70 @@
       <div class="cal-month-name" id="calMonthName">—</div>
       <div class="cal-year-label" id="calYearLabel">—</div>
     </div>
-    <div class="cal-header-spacer"></div>
+    <div style="display:flex;align-items:center;gap:.5rem;">
+      {% if gcal_token %}
+        <form method="post" action="{% url 'app_admin:calendario_google_sync' %}" style="margin:0;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-ghost btn-sm"
+                  style="display:flex;align-items:center;gap:.35rem;color:#16a34a;border-color:#bbf7d0;"
+                  title="Sincronizar con Google Calendar">
+            <i class="bi bi-arrow-repeat"></i> Sincronizar
+          </button>
+        </form>
+        <button class="btn btn-ghost btn-sm" onclick="toggleGcalPanel()"
+                style="display:flex;align-items:center;gap:.35rem;">
+          <i class="bi bi-google" style="color:#4285f4;"></i>
+          <span style="font-size:.75rem;color:var(--stone);">Conectado</span>
+        </button>
+      {% else %}
+        <a href="{% url 'app_admin:calendario_google_auth' %}"
+           class="btn btn-ghost btn-sm"
+           style="display:flex;align-items:center;gap:.38rem;white-space:nowrap;">
+          <i class="bi bi-google" style="color:#4285f4;font-size:.85rem;"></i>
+          Conectar
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── Panel Google Calendar ── -->
+  <div id="gcalPanel" style="display:none;padding:.85rem 2rem;border-bottom:1px solid var(--mist);background:var(--cream);">
+    {% if gcal_token %}
+    <div style="display:flex;align-items:flex-start;gap:1.2rem;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;">
+        <div style="font-size:.8rem;font-weight:700;color:var(--ink);margin-bottom:.2rem;">
+          <i class="bi bi-google" style="color:#4285f4;"></i> Google Calendar conectado
+        </div>
+        <div style="font-size:.72rem;color:var(--stone);line-height:1.5;">
+          Calendario: <strong>Punto Asis</strong>
+          {% if gcal_token.synced_at %}
+            · Última sync: <strong>{{ gcal_token.synced_at|date:"d/m/Y H:i" }}</strong>
+          {% else %}
+            · <em>Sin sincronizar todavía</em>
+          {% endif %}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:.5rem;flex-shrink:0;">
+        <form method="post" action="{% url 'app_admin:calendario_google_sync' %}" style="margin:0;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-arrow-repeat"></i> Sincronizar ahora
+          </button>
+        </form>
+        <form method="post" action="{% url 'app_admin:calendario_google_disconnect' %}" style="margin:0;"
+              data-pa-confirm="¿Desconectar Google Calendar? Los eventos ya creados en Google no se eliminarán."
+              data-pa-type="warn" data-pa-title="Desconectar Google Calendar" data-pa-ok="Desconectar">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--red);">
+            <i class="bi bi-plug"></i> Desconectar
+          </button>
+        </form>
+        <button onclick="toggleGcalPanel()" style="background:none;border:none;color:var(--ash);cursor:pointer;font-size:1rem;">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+    </div>
+    {% endif %}
   </div>
 
   <!-- ── Legend ── -->
@@ -604,5 +667,29 @@
   /* ── Init ──────────────────────────────────────────────────────────────── */
   loadMonth();
 })();
+
+/* ── Google Calendar panel ───────────────────────────────────────────────── */
+function toggleGcalPanel() {
+  const panel = document.getElementById('gcalPanel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function copyIcalUrl() {
+  const val = document.getElementById('icalUrlInput').value;
+  const btn  = document.getElementById('gcalCopyBtn');
+  navigator.clipboard.writeText(val).then(() => {
+    btn.innerHTML = '<i class="bi bi-check-lg"></i> Copiado';
+    btn.style.background = '#16a34a';
+    setTimeout(() => {
+      btn.innerHTML = '<i class="bi bi-clipboard"></i> Copiar';
+      btn.style.background = '#1d4ed8';
+    }, 2200);
+  }).catch(() => {
+    /* fallback para navegadores sin clipboard API */
+    const inp = document.getElementById('icalUrlInput');
+    inp.select();
+    document.execCommand('copy');
+  });
+}
 </script>
 {% endblock %}

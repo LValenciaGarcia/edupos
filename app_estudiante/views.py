@@ -14,7 +14,7 @@ from django.utils import timezone
 
 from authentication.models import Perfil, Estudiante
 from app_admin.models import Producto, Categoria, Pedido, DetallePedido
-from app_padre.models import RestriccionAlimento, LimiteGasto, Notificacion, AlergiaEstudiante
+from app_padre.models import RestriccionAlimento, LimiteGasto, Notificacion, AlergiaEstudiante, HorarioCompra
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -54,6 +54,18 @@ def _get_restricciones(estudiante):
         RestriccionAlimento.objects.filter(base_q, categoria__isnull=False)
         .values_list('categoria_id', flat=True)
     )
+    # Restricción automática: productos con ingredientes que contienen alérgenos del estudiante
+    alergeno_ids = set(
+        AlergiaEstudiante.objects.filter(
+            estudiante=estudiante, activo=True, alergeno__isnull=False
+        ).values_list('alergeno_id', flat=True)
+    )
+    if alergeno_ids:
+        prod_ids |= set(
+            Producto.objects.filter(
+                receta__ingrediente__alergenos__in=alergeno_ids
+            ).values_list('pk', flat=True)
+        )
     return prod_ids, cat_ids
 
 
@@ -155,6 +167,16 @@ def menu(request):
             messages.error(request, 'El carrito esta vacio.')
             return redirect('app_estudiante:menu')
 
+        # Validar horario de compra asignado por el padre
+        if estudiante.padre:
+            horarios_activos = HorarioCompra.objects.filter(estudiante=estudiante, activo=True)
+            if horarios_activos.exists():
+                ahora_hora = timezone.localtime().time()
+                en_horario = any(h.hora_inicio <= ahora_hora <= h.hora_fin for h in horarios_activos)
+                if not en_horario:
+                    messages.error(request, 'No es un horario permitido para realizar pedidos.')
+                    return redirect('app_estudiante:menu')
+
         total = Decimal('0')
         lineas = []
         for prod_id, qty in carrito.items():
@@ -166,6 +188,13 @@ def menu(request):
 
             if prod.id in restricciones_prod or prod.categoria_id in restricciones_cat:
                 messages.error(request, f'"{prod.nombre}" esta restringido por tu acudiente.')
+                return redirect('app_estudiante:menu')
+
+            if prod.tipo == 'simple' and prod.stock < qty:
+                messages.error(
+                    request,
+                    f'Stock insuficiente para "{prod.nombre}" (disponible: {prod.stock}).'
+                )
                 return redirect('app_estudiante:menu')
 
             subtotal = Decimal(str(prod.precio_venta)) * qty
@@ -244,6 +273,14 @@ def menu(request):
         for p in productos_qs
     ]
 
+    # Determinar si el estudiante está dentro de su horario permitido
+    fuera_de_horario = False
+    if estudiante.padre:
+        horarios_activos = HorarioCompra.objects.filter(estudiante=estudiante, activo=True)
+        if horarios_activos.exists():
+            ahora_hora = timezone.localtime().time()
+            fuera_de_horario = not any(h.hora_inicio <= ahora_hora <= h.hora_fin for h in horarios_activos)
+
     return render(request, 'app_estudiante/menu.html', {
         'estudiante': estudiante,
         'prods_lista': prods_lista,
@@ -252,6 +289,7 @@ def menu(request):
         'q': q,
         'restricciones_prod': restricciones_prod,
         'restricciones_cat': restricciones_cat,
+        'fuera_de_horario': fuera_de_horario,
     })
 
 
@@ -325,8 +363,12 @@ def perfil(request):
         perfil_obj.save(update_fields=['telefono'])
 
         if password1:
+            password_actual = request.POST.get('password_actual', '')
+            if not user.check_password(password_actual):
+                messages.error(request, 'La contrasena actual es incorrecta.')
+                return redirect('app_estudiante:perfil')
             if password1 != password2:
-                messages.error(request, 'Las contrasenas no coinciden.')
+                messages.error(request, 'Las contrasenas nuevas no coinciden.')
                 return redirect('app_estudiante:perfil')
             if len(password1) < 8:
                 messages.error(request, 'La contrasena debe tener minimo 8 caracteres.')
@@ -534,27 +576,37 @@ def mi_saldo(request):
     estudiante = _get_estudiante(request)
     ahora      = timezone.now()
 
-    # Últimas recargas recibidas
     from app_padre.models import RecargaSaldo
-    recargas = RecargaSaldo.objects.filter(
+    from app_estudiante.models import RecargaEstudiante
+
+    recargas_padre = RecargaSaldo.objects.filter(
         estudiante=estudiante
     ).order_by('-fecha')[:20]
 
-    # Últimos pedidos (como movimientos de salida)
+    recargas_propias = RecargaEstudiante.objects.filter(
+        estudiante=estudiante
+    ).order_by('-fecha')[:20]
+
     pedidos_recientes = Pedido.objects.filter(
         estudiante=estudiante, estado__in=['pendiente', 'preparando', 'listo', 'entregado']
     ).order_by('-fecha_pedido')[:20]
 
-    # Totales del mes
     gasto_mes = Pedido.objects.filter(
         estudiante=estudiante, estado='entregado',
         fecha_pedido__month=ahora.month, fecha_pedido__year=ahora.year,
     ).aggregate(t=Sum('total'))['t'] or 0
 
-    recargado_mes = RecargaSaldo.objects.filter(
+    recargado_padre_mes = RecargaSaldo.objects.filter(
         estudiante=estudiante, estado='aprobada',
         fecha__month=ahora.month, fecha__year=ahora.year,
     ).aggregate(t=Sum('monto'))['t'] or 0
+
+    recargado_propio_mes = RecargaEstudiante.objects.filter(
+        estudiante=estudiante, estado='aprobada',
+        fecha__month=ahora.month, fecha__year=ahora.year,
+    ).aggregate(t=Sum('monto'))['t'] or 0
+
+    recargado_mes = (recargado_padre_mes or 0) + (recargado_propio_mes or 0)
 
     limites_data = []
     for lim in _get_limites(estudiante):
@@ -566,10 +618,105 @@ def mi_saldo(request):
         })
 
     return render(request, 'app_estudiante/mi_saldo.html', {
-        'estudiante':      estudiante,
-        'recargas':        recargas,
+        'estudiante':        estudiante,
+        'recargas_padre':    recargas_padre,
+        'recargas_propias':  recargas_propias,
         'pedidos_recientes': pedidos_recientes,
-        'gasto_mes':       gasto_mes,
-        'recargado_mes':   recargado_mes,
-        'limites_data':    limites_data,
+        'gasto_mes':         gasto_mes,
+        'recargado_mes':     recargado_mes,
+        'limites_data':      limites_data,
+    })
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MI QR (carnet digital del estudiante)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@estudiante_required
+# ══════════════════════════════════════════════════════════════════════════════
+# MI QR (carnet digital del estudiante)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@estudiante_required
+def mi_qr(request):
+    import qrcode, io, base64
+    estudiante = _get_estudiante(request)
+
+    # Generar QR en el servidor → imagen PNG en base64
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=10,
+        border=2,
+    )
+    qr.add_data(str(estudiante.codigo))
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="#0f0f0e", back_color="#ffffff")
+
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    qr_b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    return render(request, 'app_estudiante/mi_qr.html', {
+        'estudiante': estudiante,
+        'qr_data':    str(estudiante.codigo),   # por si aún lo necesitas
+        'qr_img_b64': qr_b64,
+    })
+
+# ══════════════════════════════════════════════════════════════════════════════
+# RECARGAR SALDO AUTÓNOMO (MP directo del estudiante)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@estudiante_required
+def recargar_saldo(request):
+    from app_estudiante.models import RecargaEstudiante
+
+    estudiante = _get_estudiante(request)
+
+    if not estudiante.puede_recargar_autonomo:
+        messages.error(request, 'Tu acudiente no ha habilitado las recargas autónomas. Pídele que lo active desde su panel.')
+        return redirect('app_estudiante:mi_saldo')
+
+    if request.method == 'POST':
+        try:
+            monto = float(request.POST.get('monto', 0))
+            nota  = request.POST.get('nota', '').strip()
+        except (ValueError, TypeError):
+            messages.error(request, 'Monto inválido.')
+            return redirect('app_estudiante:recargar_saldo')
+
+        if monto < 1000:
+            messages.error(request, 'El monto mínimo es $1.000.')
+        elif monto > 2_000_000:
+            messages.error(request, 'El monto máximo por recarga es $2.000.000.')
+        else:
+            RecargaEstudiante.objects.filter(
+                estudiante=estudiante, estado='pendiente',
+                mp_preference_id__gt='', mp_payment_id='',
+            ).update(estado='rechazada', nota_admin='Cancelada al iniciar nueva recarga', fecha_resolucion=timezone.now())
+
+            recarga = RecargaEstudiante.objects.create(
+                estudiante=estudiante,
+                monto=monto, nota=nota, estado='pendiente',
+            )
+            try:
+                from pagos.utils import crear_preferencia_mp
+                nombre = estudiante.perfil.user.get_full_name() or estudiante.codigo
+                pref = crear_preferencia_mp(
+                    titulo=f'Recarga Punto Asis — {nombre}',
+                    monto=monto,
+                    external_reference=f'est-{recarga.pk}',
+                )
+                recarga.mp_preference_id = pref['id']
+                recarga.save(update_fields=['mp_preference_id'])
+                return redirect(pref['init_point'])
+            except Exception:
+                recarga.delete()
+                messages.error(request, 'No se pudo conectar con MercadoPago. Intenta de nuevo.')
+                return redirect('app_estudiante:recargar_saldo')
+
+    historial = RecargaEstudiante.objects.filter(estudiante=estudiante).order_by('-fecha')[:15]
+    return render(request, 'app_estudiante/recargar_saldo.html', {
+        'estudiante': estudiante,
+        'historial':  historial,
     })

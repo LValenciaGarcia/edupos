@@ -1,4 +1,5 @@
 {% extends 'app_docente/base_docente.html' %}
+{% load filtros %}
 {% block title %}Historial{% endblock %}
 {% block topbar_title %}Historial de Pedidos{% endblock %}
 
@@ -68,7 +69,7 @@
           </div>
         </td>
         <td><span class="badge badge-{{ p.tipo_pago }}">{{ p.get_tipo_pago_display }}</span></td>
-        <td style="font-weight:800; color:var(--leaf); font-family:var(--serif); font-size:.95rem;">${{ p.total|floatformat:0 }}</td>
+        <td style="font-weight:800; color:var(--leaf); font-family:var(--serif); font-size:.95rem;">${{ p.total|miles }}</td>
         <td><span class="badge badge-{{ p.estado }}">{{ p.get_estado_display }}</span></td>
       </tr>
       {% endfor %}

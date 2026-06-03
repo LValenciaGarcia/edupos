@@ -1,4 +1,5 @@
 {% extends 'app_admin/base_admin.html' %}
+{% load l10n %}
 {% block title %}{{ accion }}{% endblock %}
 {% block page_title %}{{ accion }}{% endblock %}
 {% block nav_productos %}active{% endblock %}
@@ -114,7 +115,7 @@
               <option value="{{ ing.pk }}" {% if ing.pk == r.ingrediente_id %}selected{% endif %}>{{ ing.nombre }} ({{ ing.get_unidad_base_display }})</option>
               {% endfor %}
             </select>
-            <input type="number" name="ingrediente_cant" value="{{ r.cantidad }}" min="0.01" step="0.01" placeholder="Cantidad">
+            <input type="number" name="ingrediente_cant" value="{{ r.cantidad|unlocalize }}" min="0.01" step="0.01" placeholder="Cantidad">
             <button type="button" class="btn-rm-row" onclick="this.closest('.receta-row').remove()"><i class="bi bi-x-lg"></i></button>
           </div>
           {% endfor %}
