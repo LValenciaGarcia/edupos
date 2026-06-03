@@ -38,7 +38,7 @@ django-debug-toolbar==6.3.0  # Panel SQL/queries en desarrollo (solo DEBUG=True)
 anthropic>=0.40.0            # SDK oficial de Claude (Anthropic)
 
 # ─── Pagos ────────────────────────────────────────────────────────────────────
-mercado-pago>=3.0.0          # SDK oficial de Mercado Pago
+mercadopago>=2.2.0           # SDK oficial de Mercado Pago
 
 # ─── Despliegue ───────────────────────────────────────────────────────────────
 gunicorn==25.3.0             # Servidor WSGI de producción
