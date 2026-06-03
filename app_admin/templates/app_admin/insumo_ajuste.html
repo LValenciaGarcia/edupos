@@ -108,7 +108,7 @@
       <div class="card-head">
         <span class="card-title" style="font-size:0.95rem;display:flex;align-items:center;gap:0.5rem;">
           {% if insumo.imagen %}
-          <img src="{{ insumo.imagen.url|cloudinary_jpg }}" alt="{{ insumo.nombre }}"
+          <img src="{{ insumo.imagen.name|cloudinary_jpg }}" alt="{{ insumo.nombre }}"
                style="width:2rem;height:2rem;object-fit:cover;border-radius:6px;flex-shrink:0;border:1px solid var(--mist);">
           {% endif %}
           {{ insumo.nombre }}

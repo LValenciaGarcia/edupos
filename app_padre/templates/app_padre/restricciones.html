@@ -164,7 +164,7 @@
       <div class="restriccion-card {% if not r.activo %}inactiva{% endif %}">
         <div class="restriccion-thumb">
           {% if r.producto and r.producto.imagen %}
-            <img src="{{ r.producto.imagen.url|cloudinary_jpg }}" alt="{{ r.producto.nombre }}">
+            <img src="{{ r.producto.imagen.name|cloudinary_jpg }}" alt="{{ r.producto.nombre }}">
           {% elif r.producto %}
             <i class="bi bi-box-seam restriccion-thumb-icon"></i>
           {% else %}
@@ -255,12 +255,12 @@
             {% for p in productos %}
             <div class="prod-card-restr"
                  data-name="{{ p.nombre|lower }}" data-id="{{ p.pk }}"
-                 data-img="{% if p.imagen %}{{ p.imagen.url|cloudinary_jpg }}{% endif %}"
+                 data-img="{% if p.imagen %}{{ p.imagen.name|cloudinary_jpg }}{% endif %}"
                  data-cat="{{ p.categoria.get_nombre_display }}"
-                 onclick="selectProd({{ p.pk }}, '{{ p.nombre|escapejs }}', '{% if p.imagen %}{{ p.imagen.url|cloudinary_jpg }}{% endif %}', '{{ p.categoria.get_nombre_display|escapejs }}')">
+                 onclick="selectProd({{ p.pk }}, '{{ p.nombre|escapejs }}', '{% if p.imagen %}{{ p.imagen.name|cloudinary_jpg }}{% endif %}', '{{ p.categoria.get_nombre_display|escapejs }}')">
               <div class="prod-card-img">
                 {% if p.imagen %}
-                  <img src="{{ p.imagen.url|cloudinary_jpg }}" alt="{{ p.nombre }}" loading="lazy">
+                  <img src="{{ p.imagen.name|cloudinary_jpg }}" alt="{{ p.nombre }}" loading="lazy">
                 {% else %}
                   <i class="bi bi-box-seam prod-no-img"></i>
                 {% endif %}

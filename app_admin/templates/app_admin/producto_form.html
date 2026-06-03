@@ -132,7 +132,7 @@
       <div class="field">
         <label>Imagen del producto</label>
         {% if producto and producto.imagen %}
-        <img src="{{ producto.imagen.url|cloudinary_jpg }}" id="img-preview" style="display:block;">
+        <img src="{{ producto.imagen.name|cloudinary_jpg }}" id="img-preview" style="display:block;">
         {% else %}
         <img id="img-preview" alt="">
         {% endif %}

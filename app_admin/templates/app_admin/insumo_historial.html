@@ -73,7 +73,7 @@
 <div class="hist-header">
   <div class="hist-avatar">
     {% if insumo.imagen %}
-    <img src="{{ insumo.imagen.url|cloudinary_jpg }}" alt="{{ insumo.nombre }}">
+    <img src="{{ insumo.imagen.name|cloudinary_jpg }}" alt="{{ insumo.nombre }}">
     {% else %}
     <i class="bi bi-box2"></i>
     {% endif %}

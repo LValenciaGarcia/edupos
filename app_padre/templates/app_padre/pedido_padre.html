@@ -288,7 +288,7 @@
        data-prod-id="{{ prod.pk }}" data-nombre="{{ prod.nombre|lower }}">
     <div class="prod-img-wrap">
       {% if prod.imagen %}
-        <img src="{{ prod.imagen.url|cloudinary_jpg }}" alt="{{ prod.nombre }}" loading="lazy">
+        <img src="{{ prod.imagen.name|cloudinary_jpg }}" alt="{{ prod.nombre }}" loading="lazy">
       {% else %}
         <div class="prod-img-placeholder">
           <i class="bi bi-{% if prod.categoria.nombre == 'desayuno' %}cup-hot{% elif prod.categoria.nombre == 'almuerzo' %}egg-fried{% elif prod.categoria.nombre == 'bebidas' %}cup-straw{% else %}bag{% endif %}"></i>

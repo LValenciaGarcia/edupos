@@ -30,7 +30,7 @@
     <!-- Imagen -->
     <div class="prod-img-wrap">
       {% if fav.producto.imagen %}
-      <img src="{{ fav.producto.imagen.url|cloudinary_jpg }}" alt="{{ fav.producto.nombre }}">
+      <img src="{{ fav.producto.imagen.name|cloudinary_jpg }}" alt="{{ fav.producto.nombre }}">
       {% else %}
       <div class="prod-img-placeholder"><i class="bi bi-egg-fried"></i></div>
       {% endif %}

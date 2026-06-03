@@ -374,7 +374,7 @@
         <td>
           <div style="display:flex;align-items:center;gap:0.55rem;">
             {% if ins.imagen %}
-            <img src="{{ ins.imagen.url|cloudinary_jpg }}" alt="{{ ins.nombre }}"
+            <img src="{{ ins.imagen.name|cloudinary_jpg }}" alt="{{ ins.nombre }}"
                  style="width:2rem;height:2rem;border-radius:6px;object-fit:cover;flex-shrink:0;border:1px solid var(--mist);">
             {% else %}
             <div style="width:2rem;height:2rem;border-radius:6px;background:var(--cream);border:1px solid var(--mist);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
@@ -453,7 +453,7 @@
               "activo": {{ ins.activo|yesno:"true,false" }},
               "sin_stock":  {{ ins.sin_stock|yesno:"true,false" }},
               "stock_bajo": {{ ins.stock_bajo|yesno:"true,false" }},
-              "imagen_url": "{% if ins.imagen %}{{ ins.imagen.url|cloudinary_jpg }}{% endif %}"
+              "imagen_url": "{% if ins.imagen %}{{ ins.imagen.name|cloudinary_jpg }}{% endif %}"
             }
             </script>
           </div>

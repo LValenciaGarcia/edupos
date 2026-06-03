@@ -345,7 +345,7 @@
         <td>
           <div style="display:flex;align-items:center;gap:0.55rem;">
             {% if ing.imagen %}
-            <img src="{{ ing.imagen.url|cloudinary_jpg }}" alt="{{ ing.nombre }}"
+            <img src="{{ ing.imagen.name|cloudinary_jpg }}" alt="{{ ing.nombre }}"
                  style="width:2.2rem;height:2.2rem;object-fit:cover;border-radius:5px;flex-shrink:0;border:1px solid var(--mist);">
             {% else %}
             <div style="width:2.2rem;height:2.2rem;border-radius:5px;background:var(--cream);border:1px solid var(--mist);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
@@ -468,7 +468,7 @@
               "sin_stock":         {{ ing.sin_stock|yesno:"true,false" }},
               "stock_bajo":        {{ ing.stock_bajo|yesno:"true,false" }},
               "dias_restantes":    "{% if ing.dias_restantes %}~{{ ing.dias_restantes }}d{% endif %}",
-              "imagen_url":        "{% if ing.imagen %}{{ ing.imagen.url|cloudinary_jpg }}{% endif %}",
+              "imagen_url":        "{% if ing.imagen %}{{ ing.imagen.name|cloudinary_jpg }}{% endif %}",
               "alergenos": [{% for a in ing.alergenos.all %}"{{ a.get_codigo_display }}"{% if not forloop.last %},{% endif %}{% endfor %}]
             }
             </script>
