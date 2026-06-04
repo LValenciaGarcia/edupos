@@ -378,11 +378,31 @@ class Producto(models.Model):
         return round((self.ganancia / float(self.precio_venta)) * 100, 1)
 
     @property
+    def stock_elaborado(self):
+        """Porciones posibles según stock de ingredientes (solo para tipo='elaborado')."""
+        if self.tipo != 'elaborado':
+            return None
+        lineas = list(self.receta.select_related('ingrediente').all())
+        if not lineas:
+            return None
+        return int(min(
+            ri.ingrediente.stock_real / float(ri.cantidad)
+            for ri in lineas
+            if float(ri.cantidad) > 0
+        ))
+
+    @property
     def stock_bajo(self):
+        if self.tipo == 'elaborado':
+            s = self.stock_elaborado
+            return s is not None and 0 < s <= self.stock_minimo
         return 0 < self.stock <= self.stock_minimo
 
     @property
     def sin_stock(self):
+        if self.tipo == 'elaborado':
+            s = self.stock_elaborado
+            return s is None or s <= 0
         return self.stock <= 0
 
     @property

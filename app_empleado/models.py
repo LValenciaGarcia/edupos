@@ -20,12 +20,15 @@ class TurnoCaja(models.Model):
     efectivo_final   = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     nota             = models.TextField(blank=True)
 
+    MAX_HORAS = 8
+
     @property
     def duracion_str(self):
-        fin = self.cierre or timezone.now()
+        fin   = self.cierre or timezone.now()
         delta = fin - self.apertura
-        h = int(delta.total_seconds() // 3600)
-        m = int((delta.total_seconds() % 3600) // 60)
+        secs  = min(int(delta.total_seconds()), self.MAX_HORAS * 3600)
+        h = secs // 3600
+        m = (secs % 3600) // 60
         return f'{h}h {m}m'
 
     @property

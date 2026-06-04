@@ -60,9 +60,24 @@ def _ventas_qs(request):
     return qs
 
 
+MAX_HORAS_TURNO = 8
+
 def _turno_activo(request):
-    emp = _empleado(request)
-    return TurnoCaja.objects.filter(empleado=emp, estado='abierto').first()
+    emp   = _empleado(request)
+    turno = TurnoCaja.objects.filter(empleado=emp, estado='abierto').first()
+    if turno:
+        limite = turno.apertura + timezone.timedelta(hours=MAX_HORAS_TURNO)
+        if timezone.now() > limite:
+            turno.cierre  = limite
+            turno.estado  = 'cerrado'
+            turno.nota    = (turno.nota + '\n[Cerrado automáticamente por superar 8 h]').strip()
+            turno.save(update_fields=['cierre', 'estado', 'nota'])
+            messages.warning(
+                request,
+                'Tu turno anterior fue cerrado automáticamente por superar las 8 horas de jornada. Abre un nuevo turno para continuar.',
+            )
+            return None
+    return turno
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -450,7 +465,7 @@ def inventario_empleado(request):
     emp  = _empleado(request)
     sede = _sede_activa(request)
 
-    productos  = Producto.objects.select_related('categoria').order_by('categoria__nombre', 'nombre')
+    productos  = Producto.objects.select_related('categoria').prefetch_related('receta__ingrediente__lotes').order_by('categoria__nombre', 'nombre')
     categorias = Categoria.objects.filter(activa=True)
 
     q      = request.GET.get('q', '').strip()

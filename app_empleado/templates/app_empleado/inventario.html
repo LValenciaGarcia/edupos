@@ -88,23 +88,31 @@
           <div class="inv-card-name">{{ p.nombre }}</div>
           <div class="inv-card-cat">{{ p.categoria.get_nombre_display }}</div>
           <div class="inv-card-price">${{ p.precio_venta|miles }}</div>
-          {% if p.tipo == 'simple' %}
           <div class="inv-stock-row">
-            {% if p.sin_stock %}
-              <span class="inv-stock-badge inv-stock-out"><i class="bi bi-x-circle-fill"></i> Agotado</span>
-            {% elif p.stock_bajo %}
-              <span class="inv-stock-badge inv-stock-low"><i class="bi bi-exclamation-triangle-fill"></i> Stock bajo: {{ p.stock }}</span>
+            {% if p.tipo == 'elaborado' %}
+              {% with s=p.stock_elaborado %}
+                {% if s == None %}
+                  <span class="inv-stock-badge" style="background:var(--fog);color:var(--stone);border-color:var(--fog);">
+                    <i class="bi bi-tools"></i> Sin receta
+                  </span>
+                {% elif s == 0 %}
+                  <span class="inv-stock-badge inv-stock-out"><i class="bi bi-x-circle-fill"></i> Agotado</span>
+                {% elif p.stock_bajo %}
+                  <span class="inv-stock-badge inv-stock-low"><i class="bi bi-exclamation-triangle-fill"></i> ~{{ s }} porciones</span>
+                {% else %}
+                  <span class="inv-stock-badge inv-stock-ok"><i class="bi bi-tools"></i> ~{{ s }} porciones</span>
+                {% endif %}
+              {% endwith %}
             {% else %}
-              <span class="inv-stock-badge inv-stock-ok"><i class="bi bi-check-circle-fill"></i> {{ p.stock }} uds.</span>
+              {% if p.sin_stock %}
+                <span class="inv-stock-badge inv-stock-out"><i class="bi bi-x-circle-fill"></i> Agotado</span>
+              {% elif p.stock_bajo %}
+                <span class="inv-stock-badge inv-stock-low"><i class="bi bi-exclamation-triangle-fill"></i> Stock bajo: {{ p.stock }}</span>
+              {% else %}
+                <span class="inv-stock-badge inv-stock-ok"><i class="bi bi-check-circle-fill"></i> {{ p.stock }} uds.</span>
+              {% endif %}
             {% endif %}
           </div>
-          {% else %}
-          <div class="inv-stock-row">
-            <span class="inv-stock-badge" style="background:var(--sky-pale);color:var(--sky-dark);border-color:var(--sky-tint);">
-              <i class="bi bi-tools"></i> Elaborado
-            </span>
-          </div>
-          {% endif %}
           {% if not p.disponible %}
           <div class="inv-stock-row">
             <span class="inv-stock-badge" style="background:var(--fog);color:var(--stone);">Deshabilitado</span>

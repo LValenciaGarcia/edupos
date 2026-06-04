@@ -172,9 +172,10 @@ document.querySelectorAll('form').forEach(f => f.addEventListener('submit', func
 </script>
 {% if turno_activo %}
 <script>
-const apertura = new Date('{{ turno_activo.apertura|date:"c" }}');
+const apertura   = new Date('{{ turno_activo.apertura|date:"c" }}');
+const MAX_SECS   = 8 * 3600;
 function actualizarTimer() {
-  const diff = Math.floor((Date.now() - apertura) / 1000);
+  const diff = Math.min(Math.floor((Date.now() - apertura) / 1000), MAX_SECS);
   const h    = Math.floor(diff / 3600);
   const m    = Math.floor((diff % 3600) / 60);
   const s    = diff % 60;
