@@ -1525,9 +1525,8 @@ def calendario_google_auth(request):
         messages.error(request, 'Paquetes de Google no instalados. Ejecuta: pip install google-auth google-auth-oauthlib google-api-python-client')
         return redirect('app_admin:calendario')
 
-    redirect_uri = request.build_absolute_uri(
-        reverse('app_admin:calendario_google_callback')
-    )
+    site_url = settings.SITE_URL.rstrip('/')
+    redirect_uri = site_url + reverse('app_admin:calendario_google_callback')
     state = secrets.token_urlsafe(16)
     request.session['gcal_state']        = state
     request.session['gcal_redirect_uri'] = redirect_uri
