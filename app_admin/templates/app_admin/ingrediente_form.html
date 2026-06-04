@@ -43,16 +43,15 @@
       <!-- Imagen -->
       <div class="field full">
         <label>Imagen del ingrediente</label>
-        {% if ingrediente.imagen %}
-          <img src="{{ ingrediente.imagen.name|cloudinary_jpg }}" id="img-preview"
-               style="display:block;width:6rem;height:6rem;object-fit:cover;border-radius:8px;
-                      border:1px solid var(--gray-200);margin-bottom:.5rem;">
-        {% else %}
-          <img id="img-preview"
-               style="display:none;width:6rem;height:6rem;object-fit:cover;border-radius:8px;
-                      border:1px solid var(--gray-200);margin-bottom:.5rem;">
-        {% endif %}
-        <input type="file" name="imagen" accept="image/*" onchange="previewImg(this)">
+        <div class="file-picker">
+          <input type="file" name="imagen" id="img-input" accept="image/*">
+          <label for="img-input" class="file-picker-btn">
+            <i class="bi bi-image"></i> Seleccionar imagen
+          </label>
+          <span class="file-picker-name" id="img-name">
+            {% if ingrediente.imagen %}{{ ingrediente.imagen.name|cut:"ingredientes/" }}{% else %}Sin archivo seleccionado{% endif %}
+          </span>
+        </div>
         <span class="hint">JPG, PNG o WEBP.{% if ingrediente.imagen %} Dejar vacío para conservar la actual.{% endif %}</span>
       </div>
 
@@ -169,13 +168,11 @@
 
 {% block extra_js %}
 <script>
-function previewImg(input) {
-  if (input.files && input.files[0]) {
-    const preview = document.getElementById('img-preview');
-    preview.src = URL.createObjectURL(input.files[0]);
-    preview.style.display = 'block';
-  }
-}
+document.getElementById('img-input').addEventListener('change', function () {
+  const el = document.getElementById('img-name');
+  if (this.files.length) { el.textContent = this.files[0].name; el.classList.add('has-file'); }
+  else { el.textContent = 'Sin archivo seleccionado'; el.classList.remove('has-file'); }
+});
 function toggleAlergLabel(input, pk) {
   const label = document.getElementById('alerg-label-' + pk);
   if (input.checked) {

@@ -1254,3 +1254,24 @@ html[data-theme="dark"] input[type="checkbox"] {
 .pa-toast-msg  { flex: 1; font-size: .83rem; line-height: 1.4; }
 .pa-toast-close { background: none; border: none; color: #fff; opacity: .55; cursor: pointer; font-size: 1rem; padding: 0; line-height: 1; }
 .pa-toast-close:hover { opacity: 1; }
+
+/* ── File picker ─────────────────────────────────────────────────────────── */
+.file-picker { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.file-picker input[type="file"] { display: none; }
+.file-picker-btn {
+  display: inline-flex; align-items: center; gap: .45rem;
+  padding: .42rem .9rem; border-radius: 8px;
+  border: 1.5px solid var(--leaf); background: transparent;
+  color: var(--leaf-dark); font-size: .82rem; font-weight: 600;
+  cursor: pointer; transition: background .15s, color .15s;
+  white-space: nowrap;
+}
+.file-picker-btn:hover { background: var(--leaf); color: #fff; }
+[data-theme="dark"] .file-picker-btn { color: var(--leaf-bright); border-color: var(--leaf-bright); }
+[data-theme="dark"] .file-picker-btn:hover { background: var(--leaf-bright); color: #111; }
+.file-picker-name {
+  font-size: .8rem; color: var(--stone); max-width: 220px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.file-picker-name.has-file { color: var(--leaf-dark); font-weight: 500; }
+[data-theme="dark"] .file-picker-name.has-file { color: var(--leaf-bright); }

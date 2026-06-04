@@ -66,17 +66,16 @@
           <!-- Imagen -->
           <div class="field">
             <label>Imagen</label>
-            {% if insumo.imagen %}
-            <div style="margin-bottom:0.5rem;">
-              <img src="{{ insumo.imagen.name|cloudinary_jpg }}" alt="{{ insumo.nombre }}"
-                   style="width:5rem;height:5rem;object-fit:cover;border-radius:8px;border:1px solid var(--mist);">
+            <div class="file-picker">
+              <input type="file" name="imagen" id="img-input" accept="image/*">
+              <label for="img-input" class="file-picker-btn">
+                <i class="bi bi-image"></i> Seleccionar imagen
+              </label>
+              <span class="file-picker-name" id="img-name">
+                {% if insumo.imagen %}{{ insumo.imagen.name|cut:"insumos/" }}{% else %}Sin archivo seleccionado{% endif %}
+              </span>
             </div>
-            {% endif %}
-            <input type="file" name="imagen" accept="image/*" id="img-input" style="display:none;">
-            <label for="img-input" style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.42rem 0.9rem;border:1px dashed var(--fog);border-radius:7px;cursor:pointer;font-size:0.81rem;color:var(--stone);background:var(--ivory);transition:all 0.15s;" onmouseover="this.style.borderColor='var(--leaf)';this.style.color='var(--leaf)'" onmouseout="this.style.borderColor='var(--fog)';this.style.color='var(--stone)'">
-              <i class="bi bi-image"></i> <span id="img-label">{% if insumo.imagen %}Cambiar imagen{% else %}Seleccionar imagen{% endif %}</span>
-            </label>
-            <span class="hint">Opcional. PNG, JPG o WEBP.</span>
+            <span class="hint">Opcional. PNG, JPG o WEBP.{% if insumo.imagen %} Dejar vacío para conservar la actual.{% endif %}</span>
           </div>
           <div class="field full">
             <label>Descripción</label>
@@ -95,8 +94,9 @@
 </div>
 <script>
 document.getElementById('img-input').addEventListener('change', function () {
-  const label = document.getElementById('img-label');
-  label.textContent = this.files.length ? this.files[0].name : '{% if insumo.imagen %}Cambiar imagen{% else %}Seleccionar imagen{% endif %}';
+  const el = document.getElementById('img-name');
+  if (this.files.length) { el.textContent = this.files[0].name; el.classList.add('has-file'); }
+  else { el.textContent = 'Sin archivo seleccionado'; el.classList.remove('has-file'); }
 });
 </script>
 {% endblock %}

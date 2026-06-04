@@ -131,12 +131,15 @@
     <div style="margin-top:1.2rem;padding-top:1.2rem;border-top:1px solid var(--gray-200);">
       <div class="field">
         <label>Imagen del producto</label>
-        {% if producto and producto.imagen %}
-        <img src="{{ producto.imagen.name|cloudinary_jpg }}" id="img-preview" style="display:block;">
-        {% else %}
-        <img id="img-preview" alt="">
-        {% endif %}
-        <input type="file" name="imagen" accept="image/*" onchange="previewImg(this)">
+        <div class="file-picker">
+          <input type="file" name="imagen" id="img-input" accept="image/*">
+          <label for="img-input" class="file-picker-btn">
+            <i class="bi bi-image"></i> Seleccionar imagen
+          </label>
+          <span class="file-picker-name" id="img-name">
+            {% if producto and producto.imagen %}{{ producto.imagen.name|cut:"productos/" }}{% else %}Sin archivo seleccionado{% endif %}
+          </span>
+        </div>
         <span class="hint">JPG, PNG o WEBP. Max 2MB. {% if producto and producto.imagen %}Dejar vacío para conservar la actual.{% endif %}</span>
       </div>
     </div>
@@ -192,13 +195,11 @@ function agregarIngrediente() {
   container.appendChild(row);
 }
 
-function previewImg(input) {
-  const preview = document.getElementById('img-preview');
-  if (input.files && input.files[0]) {
-    preview.src = URL.createObjectURL(input.files[0]);
-    preview.style.display = 'block';
-  }
-}
+document.getElementById('img-input').addEventListener('change', function () {
+  const el = document.getElementById('img-name');
+  if (this.files.length) { el.textContent = this.files[0].name; el.classList.add('has-file'); }
+  else { el.textContent = 'Sin archivo seleccionado'; el.classList.remove('has-file'); }
+});
 
 // ── Generador de descripción con IA ────────────────────────────────────────
 document.getElementById('btn-generar-desc').addEventListener('click', async function () {
