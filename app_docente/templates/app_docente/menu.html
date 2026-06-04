@@ -162,7 +162,6 @@
     <!-- Body -->
     <div class="prod-body">
       <div class="prod-name">{{ p.nombre }}</div>
-      <div class="prod-tipo">{{ p.get_tipo_display }}</div>
       {% if p.stock_bajo %}
       <span style="display:inline-flex;align-items:center;gap:.25rem;padding:.15rem .48rem;border-radius:99px;font-size:.6rem;font-weight:700;background:#fef3c7;color:#92400e;margin-bottom:.2rem;">
         <i class="bi bi-exclamation-triangle-fill" style="font-size:.55rem;"></i> {{ p.stock }} uds

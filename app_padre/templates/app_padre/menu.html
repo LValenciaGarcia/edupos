@@ -68,7 +68,7 @@
   .prod-card:hover { transform:translateY(-4px); box-shadow:0 4px 16px rgba(22,163,74,.1),0 2px 8px rgba(0,0,0,.06); }
   .prod-card.restringido { opacity:.42; pointer-events:none; }
   .prod-card.restringido::after {
-    content:'RESTRINGIDO'; position:absolute; inset:0;
+    content:''; position:absolute; inset:0;
     display:flex; align-items:center; justify-content:center;
     font-size:.58rem; font-weight:800; color:var(--red); letter-spacing:.12em;
     border:1.5px dashed var(--red); border-radius:var(--radius); pointer-events:none;
@@ -116,7 +116,6 @@
   /* Card body */
   .prod-body { padding:.75rem .85rem .5rem; flex:1; display:flex; flex-direction:column; }
   .prod-name  { font-family:var(--serif); font-size:.92rem; font-weight:500; line-height:1.25; color:var(--ink); }
-  .prod-tipo  { font-size:.6rem; color:var(--ash); text-transform:uppercase; letter-spacing:.05em; margin-top:.06rem; }
   .prod-stock {
     display:inline-flex; align-items:center; gap:.25rem;
     padding:.15rem .48rem; border-radius:99px; font-size:.6rem; font-weight:700;
@@ -317,7 +316,6 @@
 
     <div class="prod-body">
       <div class="prod-name">{{ prod.nombre }}</div>
-      <div class="prod-tipo">{{ prod.get_tipo_display }}</div>
       {% if prod.stock_bajo %}
       <span class="prod-stock stock-low">
         <i class="bi bi-exclamation-triangle-fill" style="font-size:.55rem;"></i> {{ prod.stock }} uds
