@@ -134,6 +134,53 @@
   .qr-modal-actions {
     display: flex; gap: .6rem; justify-content: center;
   }
+
+  /* ── Dark mode: modal QR ── */
+  html[data-theme="dark"] .qr-modal-backdrop {
+    background: rgba(0,0,0,.72);
+  }
+  html[data-theme="dark"] .qr-modal {
+    background: var(--ivory);
+    box-shadow: 0 24px 60px rgba(0,0,0,.55);
+  }
+  html[data-theme="dark"] .qr-modal-close {
+    background: var(--mist); color: var(--stone);
+  }
+  html[data-theme="dark"] .qr-modal-close:hover {
+    background: var(--fog);
+  }
+  html[data-theme="dark"] .qr-modal-role.est {
+    background: #0e2a1a; color: #4ade80;
+  }
+  html[data-theme="dark"] .qr-modal-role.doc {
+    background: var(--violet-pale); color: var(--violet-dark);
+  }
+  html[data-theme="dark"] .qr-modal-name {
+    color: var(--ink);
+  }
+  html[data-theme="dark"] .qr-modal-sub {
+    color: var(--stone);
+  }
+  html[data-theme="dark"] .qr-modal-canvas-wrap {
+    background: #fff;
+    border-color: var(--mist);
+  }
+  html[data-theme="dark"] .qr-modal-code {
+    color: var(--ash);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    html:not([data-theme="light"]) .qr-modal-backdrop { background: rgba(0,0,0,.72); }
+    html:not([data-theme="light"]) .qr-modal { background: var(--ivory); box-shadow: 0 24px 60px rgba(0,0,0,.55); }
+    html:not([data-theme="light"]) .qr-modal-close { background: var(--mist); color: var(--stone); }
+    html:not([data-theme="light"]) .qr-modal-close:hover { background: var(--fog); }
+    html:not([data-theme="light"]) .qr-modal-role.est { background: #0e2a1a; color: #4ade80; }
+    html:not([data-theme="light"]) .qr-modal-role.doc { background: var(--violet-pale); color: var(--violet-dark); }
+    html:not([data-theme="light"]) .qr-modal-name { color: var(--ink); }
+    html:not([data-theme="light"]) .qr-modal-sub { color: var(--stone); }
+    html:not([data-theme="light"]) .qr-modal-canvas-wrap { background: #fff; border-color: var(--mist); }
+    html:not([data-theme="light"]) .qr-modal-code { color: var(--ash); }
+  }
 </style>
 
 <!-- Tabs -->
