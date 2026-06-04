@@ -6,6 +6,7 @@ from django.contrib import messages
 from django.http import JsonResponse
 from django.db import transaction, models as dm
 from django.utils import timezone
+from decimal import Decimal
 import json
 
 from authentication.models import Perfil, Estudiante, Docente, Sede
@@ -224,7 +225,6 @@ def procesar_venta(request):
         tipo_pago    = data.get('tipo_pago', 'efectivo')
         nota         = data.get('nota', '')
         cliente_id   = data.get('cliente_id')
-        tipo_cliente = data.get('tipo_cliente', '')
 
         if not items:
             return JsonResponse({'ok': False, 'error': 'El carrito está vacío'})
@@ -255,7 +255,7 @@ def procesar_venta(request):
                     return JsonResponse({'ok': False, 'error': f'Stock insuficiente para "{p.nombre}" (disponible: {p.stock}).'})
                 validados.append((p, cantidad))
 
-            total_calculado = sum(float(p.precio_venta) * c for p, c in validados)
+            total_calculado = sum((p.precio_venta * c for p, c in validados), Decimal('0'))
 
             venta = VentaEmpleado(
                 empleado=emp,
@@ -267,13 +267,13 @@ def procesar_venta(request):
 
             if tipo_pago == 'cuenta_estudiante' and cliente_id:
                 est = Estudiante.objects.select_for_update().get(pk=cliente_id)
-                if float(est.saldo) < total_calculado:
+                if est.saldo < total_calculado:
                     return JsonResponse({'ok': False, 'error': f'Saldo insuficiente. Disponible: ${est.saldo:,.0f}'})
                 venta.estudiante = est
 
             elif tipo_pago == 'cuenta_docente' and cliente_id:
                 doc = Docente.objects.select_for_update().get(pk=cliente_id)
-                if float(doc.saldo) < total_calculado:
+                if doc.saldo < total_calculado:
                     return JsonResponse({'ok': False, 'error': f'Saldo insuficiente. Disponible: ${doc.saldo:,.0f}'})
                 venta.docente = doc
 
@@ -291,14 +291,14 @@ def procesar_venta(request):
 
             venta.recalcular_total()
 
-            # Descontar saldo del cliente
+            # Descontar saldo del cliente (mismo monto validado arriba)
             if tipo_pago == 'cuenta_estudiante' and venta.estudiante:
-                venta.estudiante.saldo = float(venta.estudiante.saldo) - float(venta.total)
+                venta.estudiante.saldo = venta.estudiante.saldo - total_calculado
                 venta.estudiante.save(update_fields=['saldo'])
 
             elif tipo_pago == 'cuenta_docente' and venta.docente:
                 doc = venta.docente
-                doc.saldo = float(doc.saldo) - float(venta.total)
+                doc.saldo = doc.saldo - total_calculado
                 doc.save(update_fields=['saldo'])
 
         detalles = [
@@ -428,12 +428,12 @@ def anular_venta(request):
 
             # Revertir saldo
             if venta.tipo_pago == 'cuenta_estudiante' and venta.estudiante:
-                venta.estudiante.saldo = float(venta.estudiante.saldo) + float(venta.total)
+                venta.estudiante.saldo = venta.estudiante.saldo + venta.total
                 venta.estudiante.save(update_fields=['saldo'])
 
             elif venta.tipo_pago == 'cuenta_docente' and venta.docente:
                 doc = venta.docente
-                doc.saldo = float(doc.saldo) + float(venta.total)
+                doc.saldo = doc.saldo + venta.total
                 doc.save(update_fields=['saldo'])
 
             # Restaurar stock

@@ -25,8 +25,8 @@ from .models import (
     GoogleCalendarToken,
     descontar_fifo, verificar_lotes_vencidos,
 )
-from .forms import LoteIngredienteForm, ProduccionForm
-from app_docente.models import PedidoDocente, DetallePedidoDocente
+from .forms import LoteIngredienteForm
+from app_docente.models import PedidoDocente
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -256,7 +256,6 @@ def producto_editar(request, pk):
     receta       = producto.receta.select_related('ingrediente').all()
 
     if request.method == 'POST':
-        tipo_orig = producto.tipo
         producto.nombre       = request.POST.get('nombre', producto.nombre).strip()
         producto.descripcion  = request.POST.get('descripcion', '').strip()
         producto.precio_venta = request.POST.get('precio_venta', producto.precio_venta)
@@ -943,11 +942,11 @@ def produccion_nueva(request):
             with transaction.atomic():
                 receta_items = list(prod.receta.select_related('ingrediente').all())
                 # Bug #3/#9b: producción por tandas — para ingredientes
-                # con unidad_base='unidad' (huevos, etc.) la cantidad necesaria
+                # con unidad_base='und' (huevos, etc.) la cantidad necesaria
                 # debe ser un entero, si no la receta exige fraccionar lo no fraccionable.
                 for receta_ing in receta_items:
                     needed = float(receta_ing.cantidad) * cantidad
-                    if receta_ing.ingrediente.unidad_base == 'unidad' and abs(needed - round(needed)) > 1e-6:
+                    if receta_ing.ingrediente.unidad_base == 'und' and abs(needed - round(needed)) > 1e-6:
                         # Calcular el menor múltiplo de tanda que daría enteros
                         cant_receta = float(receta_ing.cantidad)
                         sugerido = None
@@ -1040,7 +1039,7 @@ def produccion_nueva(request):
                 'unidad': r.ingrediente.get_unidad_base_display(),
                 'stock_real': r.ingrediente.stock_real,
                 # Bug #3/#9b: marcamos los ingredientes que solo aceptan unidades enteras
-                'unitario': r.ingrediente.unidad_base == 'unidad',
+                'unitario': r.ingrediente.unidad_base == 'und',
             }
             for r in p.receta.select_related('ingrediente').all()
         ]
@@ -1994,6 +1993,22 @@ TRANSICIONES_VALIDAS = {
 }
 
 
+def _reembolsar_saldo_pedido(pedido):
+    """Devuelve el total del pedido a la fuente que lo pagó (saldo del padre o del
+    estudiante), reflejando la lógica con la que se descontó al crear el pedido.
+    Debe llamarse dentro de un bloque transaction.atomic()."""
+    from app_padre.models import PedidoPadre
+    pp = PedidoPadre.objects.select_for_update().filter(pedido=pedido).first()
+    if pp and pp.fuente == 'saldo_padre':
+        padre = Padre.objects.select_for_update().get(pk=pp.padre_id)
+        padre.saldo += pedido.total
+        padre.save(update_fields=['saldo'])
+    else:
+        est = Estudiante.objects.select_for_update().get(pk=pedido.estudiante_id)
+        est.saldo += pedido.total
+        est.save(update_fields=['saldo'])
+
+
 @admin_required
 def pedido_estado(request, pk):
     pedido = get_object_or_404(Pedido, pk=pk)
@@ -2020,6 +2035,7 @@ def pedido_estado(request, pk):
                 messages.error(request, 'Transición de estado inválida.')
                 return redirect(next_url)
 
+            estado_anterior = pedido_locked.estado
             pedido_locked.estado = nuevo
             if nuevo == 'entregado':
                 pedido_locked.fecha_entrega = timezone.now()
@@ -2042,17 +2058,22 @@ def pedido_estado(request, pk):
                             nota=f'Déficit en pedido {pedido_locked.ticket} — {deficit} unidad(es) sin stock'
                         )
 
-            elif nuevo == 'cancelado' and pedido_locked.estado == 'entregado':
-                # Anulación de entrega — restaurar stock (Bug #1)
-                for detalle in pedido_locked.detalles.select_related('producto').all():
-                    prod = Producto.objects.select_for_update().get(pk=detalle.producto.pk)
-                    prod.stock += detalle.cantidad
-                    prod.save(update_fields=['stock'])
-                    MovimientoInventario.objects.create(
-                        producto=prod, tipo='ajuste',
-                        cantidad=detalle.cantidad,
-                        nota=f'Devolución por anulación de pedido {pedido_locked.ticket}'
-                    )
+            elif nuevo == 'cancelado':
+                # Restaurar stock solo si el pedido ya había sido entregado (Bug #1).
+                # Se compara contra estado_anterior porque .estado ya fue reasignado arriba.
+                if estado_anterior == 'entregado':
+                    for detalle in pedido_locked.detalles.select_related('producto').all():
+                        prod = Producto.objects.select_for_update().get(pk=detalle.producto.pk)
+                        prod.stock += detalle.cantidad
+                        prod.save(update_fields=['stock'])
+                        MovimientoInventario.objects.create(
+                            producto=prod, tipo='ajuste',
+                            cantidad=detalle.cantidad,
+                            nota=f'Devolución por anulación de pedido {pedido_locked.ticket}'
+                        )
+                # El saldo se descuenta al crear el pedido, así que toda cancelación
+                # debe devolverlo a la fuente original (saldo del estudiante o del padre).
+                _reembolsar_saldo_pedido(pedido_locked)
 
             pedido_locked.save(update_fields=['estado', 'fecha_entrega'])
 
@@ -2113,7 +2134,6 @@ def pedido_docente_estado(request, pk):
                 messages.error(request, 'Transición de estado inválida.')
                 return redirect(next_url)
 
-            pedido_locked.estado = nuevo
             if nuevo == 'entregado':
                 for detalle in pedido_locked.detalles.select_related('producto').all():
                     prod = Producto.objects.select_for_update().get(pk=detalle.producto.pk)
@@ -2125,6 +2145,13 @@ def pedido_docente_estado(request, pk):
                         nota=f'Pedido docente {pedido_locked.ticket}'
                     )
 
+            elif nuevo == 'cancelado':
+                # El saldo del docente se descontó al crear el pedido → devolverlo.
+                docente = Docente.objects.select_for_update().get(pk=pedido_locked.docente_id)
+                docente.saldo += pedido_locked.total
+                docente.save(update_fields=['saldo'])
+
+            pedido_locked.estado = nuevo
             pedido_locked.save(update_fields=['estado'])
 
         messages.success(request, f'Pedido {pedido.ticket} → {dict(PedidoDocente.ESTADO_CHOICES).get(nuevo)}')
@@ -2198,9 +2225,9 @@ def factura_pdf(request, pk):
             SimpleDocTemplate, Table, TableStyle,
             Paragraph, Spacer, HRFlowable
         )
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.styles import ParagraphStyle
         from reportlab.lib.units import cm
-        from reportlab.lib.enums import TA_RIGHT, TA_CENTER, TA_LEFT
+        from reportlab.lib.enums import TA_RIGHT, TA_CENTER
         import io
     except ImportError:
         messages.error(request, 'reportlab no está instalado.')
@@ -2248,14 +2275,11 @@ def factura_pdf(request, pk):
     BORDE     = colors.HexColor('#e5e7eb')
 
     # ── Estilos de párrafo
-    styles = getSampleStyleSheet()
     def st(name, **kw):
         s = ParagraphStyle(name, **kw)
         return s
 
-    bold_sm  = st('bsm',  fontName='Helvetica-Bold',   fontSize=7,  textColor=GRIS_OSC,  leading=10)
     norm_sm  = st('nsm',  fontName='Helvetica',         fontSize=7,  textColor=GRIS_MED,  leading=10)
-    norm_xs  = st('nxs',  fontName='Helvetica',         fontSize=6,  textColor=GRIS_MED,  leading=9)
     head_lg  = st('hlg',  fontName='Helvetica-Bold',    fontSize=16, textColor=colors.white, leading=18)
     head_sm  = st('hsm',  fontName='Helvetica-Bold',    fontSize=8,  textColor=colors.white, leading=10)
     head_xs  = st('hxs',  fontName='Helvetica',         fontSize=6.5,textColor=colors.HexColor('#a3e8b8'), leading=9)
@@ -2267,8 +2291,6 @@ def factura_pdf(request, pk):
     tbl_lft  = st('tlft', fontName='Helvetica',         fontSize=7.5,textColor=GRIS_OSC,  leading=10)
     tbl_rt   = st('trt',  fontName='Helvetica',         fontSize=7.5,textColor=GRIS_OSC,  leading=10, alignment=TA_RIGHT)
     tbl_bold = st('tbld', fontName='Helvetica-Bold',    fontSize=7.5,textColor=GRIS_OSC,  leading=10, alignment=TA_RIGHT)
-    total_lbl= st('tolab',fontName='Helvetica-Bold',    fontSize=8,  textColor=GRIS_OSC,  leading=10)
-    total_gr = st('togr', fontName='Helvetica-Bold',    fontSize=11, textColor=VERDE_OSC, leading=13, alignment=TA_RIGHT)
     foot_txt = st('ftxt', fontName='Helvetica',         fontSize=6,  textColor=GRIS_MED,  leading=8)
     leyenda  = st('ley',  fontName='Helvetica-Oblique', fontSize=5.5,textColor=GRIS_MED,  leading=8)
 
@@ -3171,7 +3193,7 @@ def api_alertas(request):
         detalle.append({
             'tipo': 'stock_producto',
             'texto': f'{p.nombre} — {p.stock} uds. (mín: {p.stock_minimo})',
-            'url': f'/admin-panel/inventario/',
+            'url': '/admin-panel/inventario/',
             'color': 'amber',
         })
 
