@@ -69,6 +69,13 @@
     white-space: nowrap;
   }
   .btn-ver-qr:hover { background: #ede9fe; box-shadow: 0 1px 4px rgba(124,58,237,.15); }
+  [data-theme="dark"] .btn-ver-qr {
+    background: #3b1f6e; color: #c4b5fd;
+    border-color: #6d28d9;
+  }
+  [data-theme="dark"] .btn-ver-qr:hover {
+    background: #4c2889; box-shadow: 0 1px 4px rgba(167,139,250,.25);
+  }
 
   /* ── Modal QR ── */
   .qr-modal-backdrop {
@@ -328,7 +335,7 @@
     <div class="qr-modal-sub" id="qrModalSub">—</div>
 
     <div class="qr-modal-canvas-wrap">
-      <canvas id="qrCanvas"></canvas>
+      <div id="qrContainer"></div>
     </div>
 
     <div class="qr-modal-code" id="qrModalCode"></div>
@@ -344,8 +351,8 @@
   </div>
 </div>
 
-<!-- QRCode.js (sin dependencias externas, CDN) -->
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<!-- QRCode.js browser library -->
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 
 <script>
 const PDF_BASE = "{% url 'app_admin:carnets_pdf' %}";
@@ -375,14 +382,16 @@ function abrirQR(codigo, nombre, sub, rol, pk) {
   document.getElementById('btnDescargaPdf').href =
     PDF_BASE + '?tipo=' + TIPO_ACTUAL + '&pk=' + pk;
 
-  // Generar QR en canvas
-  const canvas = document.getElementById('qrCanvas');
-  QRCode.toCanvas(canvas, codigo, {
+  // Generar QR
+  const container = document.getElementById('qrContainer');
+  container.innerHTML = '';
+  new QRCode(container, {
+    text: codigo,
     width: 220,
-    margin: 1,
-    color: { dark: '#0f0f0e', light: '#ffffff' },
-  }, function(err) {
-    if (err) console.error(err);
+    height: 220,
+    colorDark: '#0f0f0e',
+    colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.M,
   });
 
   document.getElementById('qrBackdrop').classList.add('open');
