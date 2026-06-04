@@ -43,12 +43,3 @@
   transition: opacity 0.15s;
 }
 body.sb-closed .sb-saldo-chip { opacity: 0; }
-
-/* ── Chip de saldo en el topbar ── */
-.saldo-topbar-chip {
-  display: flex; align-items: center; gap: 0.4rem;
-  padding: 0.28rem 0.75rem; border-radius: 7px;
-  background: var(--leaf-pale); border: 1px solid var(--leaf-tint);
-  font-size: var(--text-sm); font-weight: 700; color: var(--leaf-dark);
-}
-.saldo-topbar-chip i { font-size: var(--text-sm); }
