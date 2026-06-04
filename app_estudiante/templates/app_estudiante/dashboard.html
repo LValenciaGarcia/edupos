@@ -126,11 +126,12 @@
   .fav-item:last-child { border-bottom: none; }
   .fav-item:hover { background: var(--cream); }
   .fav-icon {
-    width: 2rem; height: 2rem; border-radius: 7px; flex-shrink: 0;
+    width: 2rem; height: 2rem; border-radius: 7px; flex-shrink: 0; overflow: hidden;
     background: var(--leaf-pale); border: 1px solid var(--leaf-tint);
     display: flex; align-items: center; justify-content: center;
     font-size: 0.85rem; color: var(--leaf);
   }
+  .fav-icon img { width: 100%; height: 100%; object-fit: cover; }
   .fav-nombre { font-size: 0.8rem; font-weight: 600; color: var(--ink); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fav-veces  { font-size: 0.67rem; color: var(--ash); }
   .fav-precio { font-family: var(--serif); font-size: 0.88rem; color: var(--leaf); flex-shrink: 0; }
@@ -290,7 +291,11 @@
       {% for p in top_prods %}
       <div class="fav-item">
         <div class="fav-icon">
+          {% if p.producto__imagen %}
+          <img src="{{ p.producto__imagen|cloudinary_jpg }}" alt="{{ p.producto__nombre }}">
+          {% else %}
           <i class="bi bi-{% if p.producto__categoria__nombre == 'desayuno' %}cup-hot{% elif p.producto__categoria__nombre == 'almuerzo' %}egg-fried{% elif p.producto__categoria__nombre == 'bebidas' %}cup-straw{% else %}bag{% endif %}"></i>
+          {% endif %}
         </div>
         <div class="fav-nombre" title="{{ p.producto__nombre }}">{{ p.producto__nombre }}</div>
         <div style="text-align:right;flex-shrink:0;">

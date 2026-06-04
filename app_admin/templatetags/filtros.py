@@ -23,7 +23,11 @@ def cloudinary_jpg(imagen_field):
     # Si es una ruta relativa o /media/..., construir URL de Cloudinary manualmente
     cloud_name = settings.CLOUDINARY_STORAGE.get('CLOUD_NAME', '')
     if not cloud_name:
-        return url
+        # Sin Cloudinary (desarrollo): si llega el .name (ruta relativa sin /media/),
+        # anteponer MEDIA_URL para que la imagen resuelva localmente.
+        if url.startswith(('http://', 'https://', '/')):
+            return url
+        return f'{settings.MEDIA_URL}{url}'
 
     # Obtener solo el name del campo (sin /media/ prefix)
     name = url

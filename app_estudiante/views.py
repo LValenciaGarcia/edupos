@@ -124,7 +124,7 @@ def dashboard(request):
             pedido__estudiante=estudiante, pedido__estado='entregado'
         )
         .values('producto__id', 'producto__nombre', 'producto__precio_venta',
-                'producto__disponible', 'producto__categoria__nombre')
+                'producto__disponible', 'producto__categoria__nombre', 'producto__imagen')
         .annotate(veces=Sum('cantidad'))
         .order_by('-veces')[:4]
     )
