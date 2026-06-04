@@ -1,20 +1,20 @@
-import csv
 import json
+import logging
 from decimal import Decimal
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import User
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Sum, Count, Q, F
+from django.db.models import Sum, Q
 from django.db.models.functions import TruncDate, TruncMonth
-from django.http import HttpResponse
 from django.utils import timezone
 
 from authentication.models import Perfil, Estudiante
 from app_admin.models import Producto, Categoria, Pedido, DetallePedido
 from app_padre.models import RestriccionAlimento, LimiteGasto, Notificacion, AlergiaEstudiante, HorarioCompra
+
+logger = logging.getLogger(__name__)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -246,7 +246,8 @@ def menu(request):
                 est_locked.save(update_fields=['saldo'])
                 # Actualizar referencia local
                 estudiante.saldo = est_locked.saldo
-        except Exception as e:
+        except Exception:
+            logger.exception('Error al procesar pedido de estudiante')
             messages.error(request, 'Error al procesar el pedido. Intenta de nuevo.')
             return redirect('app_estudiante:menu')
 
@@ -711,6 +712,7 @@ def recargar_saldo(request):
                 recarga.save(update_fields=['mp_preference_id'])
                 return redirect(pref['init_point'])
             except Exception:
+                logger.exception('Error al crear preferencia MercadoPago (estudiante)')
                 recarga.delete()
                 messages.error(request, 'No se pudo conectar con MercadoPago. Intenta de nuevo.')
                 return redirect('app_estudiante:recargar_saldo')

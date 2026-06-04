@@ -1,6 +1,5 @@
 import unicodedata
 import re
-from django.contrib.auth.models import User
 
 
 def _normalizar(s: str) -> str:

@@ -2,7 +2,7 @@ from django.db import models, transaction
 from django.utils import timezone
 from authentication.models import Docente
 from authentication.validators import validate_image
-from app_admin.models import Producto, Categoria
+from app_admin.models import Producto
 
 
 # ══════════════════════════════════════════════════════════════════════════════

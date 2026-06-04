@@ -1,7 +1,4 @@
 from django import forms
-from django.contrib.auth.models import User
-from authentication.models import Perfil
-from authentication.validators import validate_image
 from .models import RecargaSaldo, LimiteGasto, AlergiaEstudiante, RestriccionAlimento, HorarioCompra
 
 

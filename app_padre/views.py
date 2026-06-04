@@ -1,6 +1,6 @@
 import json
 import csv
-import io
+import logging
 import unicodedata
 from decimal import Decimal
 from collections import defaultdict
@@ -10,13 +10,13 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Sum, Count, Avg, Q, F
+from django.db.models import Sum, Q, F
 from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
-from django.views.decorators.http import require_POST, require_GET
+from django.views.decorators.http import require_POST
 
 from authentication.models import Perfil, Padre, Estudiante
-from authentication.utils import generar_username as _generar_username, generar_username_estudiante as _gen_username_est
+from authentication.utils import generar_username_estudiante as _gen_username_est
 from app_admin.models import Producto, Categoria, Pedido, DetallePedido, Alergeno
 from .models import (
     RecargaSaldo, RecargaPadre, LimiteGasto, RestriccionAlimento,
@@ -24,6 +24,8 @@ from .models import (
     PedidoProgramado, DetalleProgramado,
     AlergiaEstudiante,
 )
+
+logger = logging.getLogger(__name__)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -285,7 +287,8 @@ def recargar_saldo(request, pk):
                 recarga.mp_preference_id = pref['id']
                 recarga.save(update_fields=['mp_preference_id'])
                 return redirect(pref['init_point'])
-            except Exception as e:
+            except Exception:
+                logger.exception('Error al crear preferencia MercadoPago (recarga estudiante por padre)')
                 recarga.delete()
                 messages.error(request, 'No se pudo conectar con MercadoPago. Intenta de nuevo.')
                 return redirect('app_padre:recargar_saldo', pk=pk)
@@ -418,6 +421,7 @@ def menu(request):
                     padre_locked.saldo -= total
                     padre_locked.save(update_fields=['saldo'])
         except Exception:
+            logger.exception('Error al procesar pedido del padre (menú)')
             messages.error(request, 'Error al procesar el pedido. Intenta de nuevo.')
             return redirect('app_padre:menu')
 
@@ -1013,6 +1017,7 @@ def pedido_padre(request, pk):
                     padre_locked.saldo -= total
                     padre_locked.save(update_fields=['saldo'])
         except Exception:
+            logger.exception('Error al procesar pedido del padre (pedido_padre)')
             messages.error(request, 'Error al procesar el pedido. Intenta de nuevo.')
             return redirect('app_padre:pedido_padre', pk=pk)
 
@@ -1224,6 +1229,7 @@ def saldo_padre(request):
                 recarga.save(update_fields=['mp_preference_id'])
                 return redirect(pref['init_point'])
             except Exception:
+                logger.exception('Error al crear preferencia MercadoPago (recarga saldo padre)')
                 recarga.delete()
                 messages.error(request, 'No se pudo conectar con MercadoPago. Intenta de nuevo.')
                 return redirect('app_padre:saldo_padre')

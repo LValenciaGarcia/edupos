@@ -2,19 +2,18 @@ import csv
 import io
 import json
 from decimal import Decimal
-from collections import defaultdict
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Sum, Count, Avg, Q, F
+from django.db.models import Sum, Avg, F
 from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from authentication.models import Perfil, Docente
-from app_admin.models import Producto, Categoria, DetallePedido
+from app_admin.models import Producto, Categoria
 from .models import (
     PedidoDocente, DetallePedidoDocente,
     PedidoProgramadoDocente, DetalleProgramadoDocente,

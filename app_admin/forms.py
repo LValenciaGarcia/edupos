@@ -1,5 +1,5 @@
 from django import forms
-from .models import Producto, Ingrediente, LoteIngrediente, ProduccionElaborado, Proveedor, Categoria, Insumo
+from .models import Producto, Ingrediente, LoteIngrediente, ProduccionElaborado, Proveedor, Insumo
 
 
 class ProductoForm(forms.ModelForm):
