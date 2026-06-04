@@ -175,7 +175,7 @@ CACHES = {
 
 
 # ─── django-axes ──────────────────────────────────────────────────────────────
-AXES_ENABLED          = False   # ← temporal para diagnóstico
+AXES_ENABLED          = True    # bloqueo de fuerza bruta en login
 AXES_FAILURE_LIMIT    = 5
 AXES_COOLOFF_TIME     = 1
 AXES_LOCKOUT_CALLABLE = None

@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+usuarios.txt           # credenciales en texto plano — nunca versionar
 
 # Python
 __pycache__/

@@ -35,8 +35,13 @@ def _verificar_firma_mp(request, payment_id: str) -> bool:
     """
     secret = getattr(settings, 'MERCADOPAGO_WEBHOOK_SECRET', '')
     if not secret:
-        logger.warning('MERCADOPAGO_WEBHOOK_SECRET no configurado: webhook acepta cualquier origen.')
-        return True
+        # En desarrollo se permite para no romper el flujo local; en producción se
+        # rechaza para no aprobar recargas con la firma sin validar (saldo forjado).
+        if settings.DEBUG:
+            logger.warning('MERCADOPAGO_WEBHOOK_SECRET no configurado: webhook acepta cualquier origen (solo DEBUG).')
+            return True
+        logger.error('MERCADOPAGO_WEBHOOK_SECRET no configurado en producción: webhook rechazado.')
+        return False
 
     signature_header = request.headers.get('x-signature', '')
     request_id       = request.headers.get('x-request-id', '')
