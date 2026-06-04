@@ -398,7 +398,7 @@
       <td style="min-width:200px;">
         <div style="display:flex;align-items:center;gap:0.65rem;">
           {% if prov.logo %}
-            <img src="{{ prov.logo.url }}" class="prov-logo" alt="{{ prov.nombre }}">
+            <img src="{{ prov.logo.url|cloudinary_jpg }}" class="prov-logo" alt="{{ prov.nombre }}">
           {% else %}
             <div class="prov-logo-placeholder">
               <i class="bi bi-truck"></i>

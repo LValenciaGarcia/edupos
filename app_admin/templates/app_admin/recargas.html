@@ -80,7 +80,7 @@
       <div class="recarga-comprobante">
         {% if r.comprobante %}
         <button class="btn btn-sky btn-xs"
-                onclick="openComprobante('{{ r.comprobante.url }}', {{ r.pk }}, '{{ r.tipo }}', '{{ r.nombre|escapejs }}', {{ r.monto }}, '{{ r.nota|escapejs }}', '{{ r.estado }}')">
+                onclick="openComprobante('{{ r.comprobante.url|cloudinary_jpg }}', {{ r.pk }}, '{{ r.tipo }}', '{{ r.nombre|escapejs }}', {{ r.monto }}, '{{ r.nota|escapejs }}', '{{ r.estado }}')">
           <i class="bi bi-file-image"></i> Ver comprobante
         </button>
         {% else %}

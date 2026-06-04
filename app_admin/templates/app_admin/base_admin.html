@@ -1,4 +1,4 @@
-{% load static %}
+{% load static filtros %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -168,7 +168,7 @@
       <button class="sb-user-btn" onclick="toggleUserDrop()" id="userBtn">
         <div class="sb-avatar">
           {% if request.user.perfil.perfil_admin.foto %}
-          <img src="{{ request.user.perfil.perfil_admin.foto.url }}" alt="{{ request.user.email }}">
+          <img src="{{ request.user.perfil.perfil_admin.foto.url|cloudinary_jpg }}" alt="{{ request.user.email }}">
           {% else %}
             {{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}
           {% endif %}
