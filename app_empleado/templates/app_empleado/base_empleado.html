@@ -97,6 +97,7 @@
           <div class="sb-drop-name">{{ request.user.get_full_name|default:request.user.email }}</div>
           <div class="sb-drop-role">{{ request.user.perfil.empleado.get_cargo_display }}</div>
         </div>
+        <a href="{% url 'app_empleado:perfil' %}" class="sb-drop-link"><i class="bi bi-person"></i> Mi perfil</a>
         <a href="{% url 'authentication:logout' %}" class="sb-drop-link danger">
           <i class="bi bi-box-arrow-right"></i> Cerrar sesión
         </a>

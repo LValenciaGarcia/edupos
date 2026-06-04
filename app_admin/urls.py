@@ -98,9 +98,8 @@ urlpatterns = [
     path('ingredientes/exportar/excel/',        views.exportar_ingredientes_excel,  name='exportar_ingredientes_excel'),
     path('ingredientes/exportar/pdf/',          views.exportar_ingredientes_pdf,    name='exportar_ingredientes_pdf'),
 
-    # ── Perfil y Configuración ─────────────────────────────────────────────
+    # ── Perfil ─────────────────────────────────────────────────────────────
     path('perfil/',                             views.perfil,                   name='perfil'),
-    path('configuracion/',                      views.configuracion,            name='configuracion'),
 
     # ── Alertas API ────────────────────────────────────────────────────────
     path('api/alertas/',                        views.api_alertas,              name='api_alertas'),

@@ -3174,11 +3174,6 @@ def perfil(request):
     }))
 
 
-@admin_required
-def configuracion(request):
-    return render(request, 'app_admin/configuracion.html', _ctx())
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # ALERTAS API (para topbar)
 # ══════════════════════════════════════════════════════════════════════════════
