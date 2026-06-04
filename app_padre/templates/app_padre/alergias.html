@@ -10,12 +10,12 @@
     align-items: center;
     gap: .35rem;
     padding: .35rem .75rem;
-    border: 1.5px solid #e2e0dc;
+    border: 1.5px solid var(--mist);
     border-radius: 99px;
-    background: #fff;
+    background: var(--ivory);
     font-size: .76rem;
     font-weight: 600;
-    color: #374151;
+    color: var(--ink);
     cursor: pointer;
     font-family: var(--sans);
     transition: background .13s, border-color .13s, color .13s, transform .1s;
@@ -23,17 +23,54 @@
   }
   .alerg-chip i { font-size: .72rem; }
   .alerg-chip:hover {
-    border-color: #f87171;
-    background: #fef2f2;
-    color: #dc2626;
+    border-color: var(--red);
+    background: var(--red-pale);
+    color: var(--red);
     transform: translateY(-1px);
   }
   .alerg-chip.selected {
-    border-color: #dc2626;
-    background: #fee2e2;
-    color: #dc2626;
-    box-shadow: 0 0 0 3px rgba(220,38,38,.12);
+    border-color: var(--red);
+    background: var(--red-tint);
+    color: var(--red);
+    box-shadow: 0 0 0 3px var(--red-tint);
   }
+
+  /* ── Panel IA ── */
+  .ia-panel {
+    padding: .85rem 1rem;
+    background: var(--violet-pale);
+    border: 1.5px solid var(--violet-tint);
+    border-radius: 10px;
+    font-size: .8rem;
+  }
+  .ia-panel-label {
+    font-size: .63rem; font-weight: 700; letter-spacing: .07em;
+    text-transform: uppercase; color: var(--violet);
+    margin-bottom: .5rem;
+    display: flex; align-items: center; gap: .3rem;
+  }
+  .ia-panel-nombre {
+    font-weight: 700; color: var(--ink);
+    margin-bottom: .2rem; font-size: .85rem;
+  }
+  .ia-panel-alerta {
+    color: var(--stone); font-style: italic;
+    margin-bottom: .6rem; font-size: .78rem; line-height: 1.4;
+  }
+  .ia-btn-aplicar {
+    padding: .28rem .75rem; border: none; border-radius: 6px;
+    background: var(--violet); color: #fff;
+    font-size: .75rem; font-weight: 600; cursor: pointer;
+    font-family: var(--sans); transition: opacity .14s;
+  }
+  .ia-btn-aplicar:hover { opacity: .85; }
+  .ia-btn-ignorar {
+    padding: .28rem .75rem; border: 1.5px solid var(--fog); border-radius: 6px;
+    background: var(--ivory); color: var(--stone);
+    font-size: .75rem; font-weight: 600; cursor: pointer;
+    font-family: var(--sans); transition: border-color .14s;
+  }
+  .ia-btn-ignorar:hover { border-color: var(--ash); }
 </style>
 {% endblock %}
 
@@ -167,7 +204,7 @@
             {% endif %}
 
             <div class="field">
-              <label>Nombre del alérgeno <span style="color:#e53e3e;">*</span></label>
+              <label>Nombre del alérgeno <span style="color:var(--red);">*</span></label>
               <input type="text" name="nombre" id="input-nombre-alergia"
                      placeholder="Ej: Maní, Lactosa, Gluten, Mariscos…" required
                      autocomplete="off"
@@ -201,20 +238,17 @@
             </div>
 
             <!-- Panel de sugerencia IA -->
-            <div id="ia-sugerencia-panel"
-                 style="display:none;padding:.85rem 1rem;background:#f5f3ff;border:1.5px solid #c4b5fd;border-radius:10px;font-size:.8rem;">
-              <div style="font-size:.63rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#7c3aed;margin-bottom:.5rem;display:flex;align-items:center;gap:.3rem;">
+            <div id="ia-sugerencia-panel" class="ia-panel" style="display:none;">
+              <div class="ia-panel-label">
                 <i class="bi bi-stars"></i> Sugerencia IA
               </div>
-              <div id="ia-nombre-norm" style="font-weight:700;color:#1a1a18;margin-bottom:.2rem;font-size:.85rem;"></div>
-              <div id="ia-alerta" style="color:#6b7280;font-style:italic;margin-bottom:.6rem;font-size:.78rem;line-height:1.4;"></div>
+              <div id="ia-nombre-norm" class="ia-panel-nombre"></div>
+              <div id="ia-alerta" class="ia-panel-alerta"></div>
               <div style="display:flex;gap:.5rem;">
-                <button type="button" id="btn-aplicar-ia"
-                        style="padding:.28rem .75rem;border:none;border-radius:6px;background:#7c3aed;color:#fff;font-size:.75rem;font-weight:600;cursor:pointer;font-family:var(--sans);transition:background .14s;">
+                <button type="button" id="btn-aplicar-ia" class="ia-btn-aplicar">
                   Aplicar sugerencia
                 </button>
-                <button type="button" onclick="ocultarSugerencia()"
-                        style="padding:.28rem .75rem;border:1.5px solid #d1d5db;border-radius:6px;background:#fff;font-size:.75rem;font-weight:600;cursor:pointer;font-family:var(--sans);color:#6b7280;transition:border-color .14s;">
+                <button type="button" onclick="ocultarSugerencia()" class="ia-btn-ignorar">
                   Ignorar
                 </button>
               </div>
