@@ -59,6 +59,74 @@
     padding: .1rem .4rem; border-radius: 4px;
     border: 1px solid var(--mist); letter-spacing: .02em;
   }
+
+  .btn-ver-qr {
+    display: inline-flex; align-items: center; gap: .3rem;
+    padding: .28rem .65rem; font-size: .75rem; font-weight: 600;
+    border-radius: 6px; border: 1.5px solid #ddd6fe;
+    background: #f5f3ff; color: var(--violet);
+    cursor: pointer; transition: background .14s, box-shadow .14s;
+    white-space: nowrap;
+  }
+  .btn-ver-qr:hover { background: #ede9fe; box-shadow: 0 1px 4px rgba(124,58,237,.15); }
+
+  /* ── Modal QR ── */
+  .qr-modal-backdrop {
+    display: none; position: fixed; inset: 0;
+    background: rgba(15,15,14,.55); backdrop-filter: blur(3px);
+    z-index: 1200; align-items: center; justify-content: center;
+  }
+  .qr-modal-backdrop.open { display: flex; }
+
+  .qr-modal {
+    background: #fff; border-radius: 18px;
+    padding: 2rem 2rem 1.6rem;
+    width: 100%; max-width: 380px;
+    box-shadow: 0 24px 60px rgba(0,0,0,.18);
+    position: relative; text-align: center;
+    animation: qrPop .2s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes qrPop {
+    from { transform: scale(.88); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+  }
+  .qr-modal-close {
+    position: absolute; top: .9rem; right: .9rem;
+    background: var(--mist); border: none; border-radius: 50%;
+    width: 28px; height: 28px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--stone); font-size: .9rem;
+    transition: background .14s;
+  }
+  .qr-modal-close:hover { background: #e2e0dc; }
+
+  .qr-modal-role {
+    display: inline-flex; align-items: center; gap: .35rem;
+    font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    padding: .22rem .65rem; border-radius: 20px; margin-bottom: .9rem;
+  }
+  .qr-modal-role.est { background: #d1fae5; color: #065f46; }
+  .qr-modal-role.doc { background: #ede9fe; color: var(--violet); }
+
+  .qr-modal-name {
+    font-size: 1.1rem; font-weight: 700; color: var(--ink);
+    margin-bottom: .2rem; line-height: 1.25;
+  }
+  .qr-modal-sub {
+    font-size: .78rem; color: var(--stone); margin-bottom: 1.1rem;
+  }
+  .qr-modal-canvas-wrap {
+    display: flex; justify-content: center;
+    background: #fff; border: 1.5px solid var(--mist);
+    border-radius: 12px; padding: 1rem; margin-bottom: 1rem;
+  }
+  .qr-modal-code {
+    font-size: .72rem; color: var(--ash); margin-bottom: 1.2rem;
+    font-family: monospace; letter-spacing: .04em;
+  }
+  .qr-modal-actions {
+    display: flex; gap: .6rem; justify-content: center;
+  }
 </style>
 
 <!-- Tabs -->
@@ -81,10 +149,9 @@
 <div class="ca-info">
   <i class="bi bi-info-circle-fill"></i>
   <span>
-    Genera un PDF con tarjetas tamaño carnet (8 por hoja A4). Cada tarjeta incluye un QR que,
-    al escanearse en la caja, identifica al
+    Haz clic en <strong>Ver QR</strong> para previsualizar el carnet de cada
     <strong>{% if tipo == 'docente' %}docente{% else %}estudiante{% endif %}</strong>
-    y carga su saldo automáticamente.
+    y descargarlo en PDF. También puedes seleccionar varios y generar un PDF conjunto.
     {% if tipo == 'docente' %}
       El QR codifica <code>DOC-{id}</code> del docente.
     {% else %}
@@ -115,8 +182,8 @@
   {% endif %}
 </form>
 
-<!-- Tabla con selección y generación de PDF -->
-<form method="get" action="{% url 'app_admin:carnets_pdf' %}" target="_blank">
+<!-- Tabla con selección -->
+<form method="get" action="{% url 'app_admin:carnets_pdf' %}" target="_blank" id="formPdfMasivo">
   <input type="hidden" name="tipo" value="{{ tipo }}">
 
   <div class="card">
@@ -128,8 +195,9 @@
       </label>
       <span class="ca-sel-count" id="caCount">0 seleccionados</span>
       <span style="flex:1;"></span>
-      <button type="submit" class="btn btn-primary btn-sm" id="caBtnPdf" disabled>
-        <i class="bi bi-printer"></i> Generar PDF
+      <button type="submit" class="btn btn-ghost btn-sm" id="caBtnPdf" disabled
+              style="display:inline-flex;align-items:center;gap:.35rem;">
+        <i class="bi bi-file-earmark-pdf" style="color:#e53e3e;"></i> PDF seleccionados
       </button>
     </div>
 
@@ -144,6 +212,7 @@
               <th>Nombre</th>
               <th>Código QR</th>
               <th>Grado</th>
+              <th style="width:90px;text-align:center;">Carnet</th>
             </tr>
           </thead>
           <tbody>
@@ -158,6 +227,12 @@
               </td>
               <td><span class="code-pill">{{ e.codigo }}</span></td>
               <td><span class="badge badge-est">{{ e.grado }}</span></td>
+              <td style="text-align:center;">
+                <button type="button" class="btn-ver-qr"
+                        onclick="abrirQR('{{ e.codigo }}', '{{ e.perfil.user.get_full_name|default:e.perfil.user.username }}', 'Grado {{ e.grado }}', 'est', {{ e.pk }})">
+                  <i class="bi bi-qr-code"></i> Ver QR
+                </button>
+              </td>
             </tr>
             {% endfor %}
           </tbody>
@@ -187,6 +262,7 @@
               <th>Nombre</th>
               <th>Documento</th>
               <th>Materia / Área</th>
+              <th style="width:90px;text-align:center;">Carnet</th>
             </tr>
           </thead>
           <tbody>
@@ -209,6 +285,12 @@
                   <span style="color:var(--ash);">—</span>
                 {% endif %}
               </td>
+              <td style="text-align:center;">
+                <button type="button" class="btn-ver-qr"
+                        onclick="abrirQR('DOC-{{ d.pk }}', '{{ d.perfil.user.get_full_name|default:d.perfil.user.username }}', '{{ d.materia|default:"Docente" }}', 'doc', {{ d.pk }})">
+                  <i class="bi bi-qr-code"></i> Ver QR
+                </button>
+              </td>
             </tr>
             {% endfor %}
           </tbody>
@@ -230,18 +312,105 @@
   </div>
 </form>
 
+<!-- ── Modal QR ── -->
+<div class="qr-modal-backdrop" id="qrBackdrop" onclick="cerrarQR(event)">
+  <div class="qr-modal" role="dialog" aria-modal="true" aria-labelledby="qrModalName">
+    <button class="qr-modal-close" onclick="cerrarQR(null)" aria-label="Cerrar">
+      <i class="bi bi-x-lg"></i>
+    </button>
+
+    <div id="qrRoleBadge" class="qr-modal-role est">
+      <i class="bi bi-mortarboard" id="qrRoleIcon"></i>
+      <span id="qrRoleText">Estudiante</span>
+    </div>
+
+    <div class="qr-modal-name" id="qrModalName">—</div>
+    <div class="qr-modal-sub" id="qrModalSub">—</div>
+
+    <div class="qr-modal-canvas-wrap">
+      <canvas id="qrCanvas"></canvas>
+    </div>
+
+    <div class="qr-modal-code" id="qrModalCode"></div>
+
+    <div class="qr-modal-actions">
+      <a id="btnDescargaPdf" href="#" target="_blank"
+         class="btn btn-primary btn-sm"
+         style="display:inline-flex;align-items:center;gap:.4rem;">
+        <i class="bi bi-file-earmark-pdf"></i> Descargar PDF
+      </a>
+      <button class="btn btn-ghost btn-sm" onclick="cerrarQR(null)">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- QRCode.js (sin dependencias externas, CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+
 <script>
+const PDF_BASE = "{% url 'app_admin:carnets_pdf' %}";
+const TIPO_ACTUAL = "{{ tipo }}";
+
+let qrInstance = null;
+
+function abrirQR(codigo, nombre, sub, rol, pk) {
+  // Badge de rol
+  const badge    = document.getElementById('qrRoleBadge');
+  const roleIcon = document.getElementById('qrRoleIcon');
+  const roleText = document.getElementById('qrRoleText');
+  badge.className = 'qr-modal-role ' + rol;
+  if (rol === 'doc') {
+    roleIcon.className = 'bi bi-person-badge';
+    roleText.textContent = 'Docente';
+  } else {
+    roleIcon.className = 'bi bi-mortarboard';
+    roleText.textContent = 'Estudiante';
+  }
+
+  document.getElementById('qrModalName').textContent = nombre;
+  document.getElementById('qrModalSub').textContent  = sub;
+  document.getElementById('qrModalCode').textContent = codigo;
+
+  // Enlace PDF individual
+  document.getElementById('btnDescargaPdf').href =
+    PDF_BASE + '?tipo=' + TIPO_ACTUAL + '&pk=' + pk;
+
+  // Generar QR en canvas
+  const canvas = document.getElementById('qrCanvas');
+  QRCode.toCanvas(canvas, codigo, {
+    width: 220,
+    margin: 1,
+    color: { dark: '#0f0f0e', light: '#ffffff' },
+  }, function(err) {
+    if (err) console.error(err);
+  });
+
+  document.getElementById('qrBackdrop').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function cerrarQR(event) {
+  if (event && event.target !== document.getElementById('qrBackdrop')) return;
+  document.getElementById('qrBackdrop').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') cerrarQR(null);
+});
+
+// ── Selección múltiple ──
 function toggleAll(master) {
   document.querySelectorAll('.ca-pk').forEach(c => c.checked = master.checked);
   actualizarConteo();
 }
 
 function actualizarConteo() {
-  const total    = document.querySelectorAll('.ca-pk').length;
-  const checked  = document.querySelectorAll('.ca-pk:checked').length;
-  const master   = document.getElementById('caCheckAll');
-  const countEl  = document.getElementById('caCount');
-  const btnPdf   = document.getElementById('caBtnPdf');
+  const total   = document.querySelectorAll('.ca-pk').length;
+  const checked = document.querySelectorAll('.ca-pk:checked').length;
+  const master  = document.getElementById('caCheckAll');
+  const countEl = document.getElementById('caCount');
+  const btnPdf  = document.getElementById('caBtnPdf');
 
   countEl.textContent = checked + ' seleccionado' + (checked === 1 ? '' : 's');
   btnPdf.disabled     = checked === 0;
